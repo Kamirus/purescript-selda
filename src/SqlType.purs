@@ -3,18 +3,35 @@ module SqlType where
 import Prelude
 
 import Data.Identity (Identity(..))
+import Data.Newtype (class Newtype)
 
-class Lit repr where
+data LitType a
+  = LString String
+  | LInt Int
+
+class LitC repr where
   litString ∷ String → repr String
   litInt ∷ Int → repr Int
-  toSqlType ∷ ∀ a. repr a → SqlTypeRep
+  toRepr ∷ ∀ a. repr a → LitType a
 
-newtype LitI a = LitI { val ∷ a , sqlType ∷ SqlTypeRep }
+-- newtype Lit a = Lit { val ∷ a , type ∷ LitType }
+-- derive instance litNewtype ∷ Newtype (Lit a) _
 
-instance lit ∷ Lit LitI where
-  litString s = LitI { val: s, sqlType: TString }
-  litInt s = LitI { val: s, sqlType: TInt }
-  toSqlType (LitI r) = r.sqlType
+-- instance lit ∷ LitC Lit where
+--   litString s = Lit { val: s, type: LString }
+--   litInt s = Lit { val: s, type: LInt }
+--   toRepr r = r
+
+instance lit ∷ LitC LitType where
+  litString s = LString s
+  litInt s = LInt s
+  toRepr r = r
+
+
+eval ∷ ∀ a. LitType a → String
+eval = case _ of
+  LString s -> s
+  LInt i → show i
 
 ---
 

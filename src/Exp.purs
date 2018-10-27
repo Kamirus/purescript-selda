@@ -2,6 +2,6 @@ module Exp where
 
 import SqlType (class Lit)
 
-class Exp exp sql a where
-  col ∷ String → exp sql a
-  lit ∷ ∀ lit. Lit lit a ⇒ lit a → exp sql a
+class Exp repr where
+  col ∷ ∀ sql a. String → repr sql a
+  lit ∷ ∀ lit sql a. Lit lit ⇒ lit a → repr sql a
