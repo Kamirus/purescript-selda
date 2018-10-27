@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 
-import Control.Monad.State (State, get)
+import Control.Monad.State (State, get, put)
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Heterogeneous.Mapping (class MappingWithIndex, hmap, hmapWithIndex, mappingWithIndex)
 import Prim.Row as Row
@@ -15,7 +15,7 @@ how to define table?
 - foreign key? 
 -}
 
-newtype Table ( r ∷ # Type ) = Table { name ∷ String }
+newtype Table ( r ∷ # Type ) = Table { name ∷ String , alias ∷ String }
 
 -- newtype Query s a = Query (State GenState a)
 -- derive newtype instance functorQuery ∷ Functor (Query s)
@@ -25,12 +25,12 @@ newtype Table ( r ∷ # Type ) = Table { name ∷ String }
 -- derive newtype instance monadQuery ∷ Monad (Query s)
 
 people ∷ Table ( name ∷ String , age ∷ Int , id ∷ Int )
-people = Table { name: "people" }
+people = Table { name: "people" , alias: "people" }
 
-newtype Col name alias a = Col 
-  { name ∷ SProxy name
-  , alias ∷ SProxy alias
-  }
+-- newtype Col name alias a = Col 
+--   { name ∷ SProxy name
+--   , alias ∷ SProxy alias
+--   }
 
 -- eq' ∷ ∀ name alias a. IsSymbol name ⇒ Col name alias a → a → String
 -- eq' 
@@ -52,19 +52,42 @@ type GenState =
   -- , nameScope ∷ Int
   }
 
-renameAll
-  ∷ Table ( name ∷ String , id ∷ Int )
-  → State GenState { name ∷ Col "name" "name_1" String , id ∷ Col "id" "id_3" Int }
-renameAll t = do
-  st ← get
-  let
-    name = Col { name: SProxy ∷ SProxy "name", alias: SProxy ∷ SProxy "name_1" }
-    id = Col { name: SProxy ∷ SProxy "id", alias: SProxy ∷ SProxy "id_3" }
-  pure { name , id }
+-- data SqlSource
+--   = 
 
--- select 
+-- renameAll
 --   ∷ Table ( name ∷ String , id ∷ Int )
---   → 
+--   → State GenState { name ∷ Col "name" "name_1" String , id ∷ Col "id" "id_3" Int }
+-- renameAll t = do
+--   st ← get
+--   let
+--     name = Col { name: SProxy ∷ SProxy "name", alias: SProxy ∷ SProxy "name_1" }
+--     id = Col { name: SProxy ∷ SProxy "id", alias: SProxy ∷ SProxy "id_3" }
+--   pure { name , id }
+
+newtype Col row name a = Col
+  { table ∷ Table row
+  , name ∷ SProxy name
+  }
+
+mkCol 
+  ∷ ∀ row name a tail
+  . Row.Cons name a tail row
+  ⇒ Table row → SProxy name → Col row name a --{ table ∷ Table row , name ∷ SProxy name }
+mkCol t name = Col { table: t, name }
+-- aux = mkCol people (SProxy ∷ SProxy "name")
+
+select 
+  ∷ Table ( name ∷ String , id ∷ Int )
+  → State GenState { name ∷ Col _ "name" String , id ∷ Col _ "id" Int }
+select (Table t) = do
+  st ← get
+  put $ st { nameSupply = st.nameSupply + 1 }
+  let
+    t' = Table $ t { alias = t.name <> show st.nameSupply }
+    name = mkCol t' $ SProxy ∷ SProxy "name"
+    id = mkCol t' $ SProxy ∷ SProxy "id"
+  pure $ { name, id }
 
 -- foo = do
 --   { name, age, id } ← select people
