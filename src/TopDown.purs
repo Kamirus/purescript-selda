@@ -9,7 +9,7 @@ import Data.Foldable (for_)
 import Data.Newtype (class Newtype, unwrap)
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), uncurry)
 import Database.PostgreSQL (class FromSQLRow)
 import Database.PostgreSQL as PG
 import Effect (Effect)
@@ -27,20 +27,40 @@ class ExpRepr r where
   fromInt ∷ Int → r Int
   fromBoolean ∷ Boolean → r Boolean
   fromString ∷ String → r String
-  -- repr ∷ r a → String
 
 class ExpRepr expr <= ExpOps expr where
   eqq ∷ ∀ a. expr a → expr a → expr Boolean
   gt ∷ ∀ a. expr a → expr a → expr Boolean
 
-infix 8 eqq as .==
-infix 8 gt as .>
+class ExpRepr r <= ToExpRepr a r b | a → r b where
+  toExpRepr ∷ a → r b
+
+instance toExpReprCol ∷ ExpRepr r ⇒ ToExpRepr (Col a) r a where toExpRepr = fromCol
+instance toExpReprInt ∷ ExpRepr r ⇒ ToExpRepr Int r Int where toExpRepr = fromInt
+instance toExpReprBoolean ∷ ExpRepr r ⇒ ToExpRepr Boolean r Boolean where toExpRepr = fromBoolean
+instance toExpReprString ∷ ExpRepr r ⇒ ToExpRepr String r String where toExpRepr = fromString
+
+binOp
+  ∷ ∀ expr x a b y
+  . ExpOps expr
+  ⇒ ToExpRepr a expr x
+  ⇒ ToExpRepr b expr x
+  ⇒ (expr x → expr x → expr y)
+  → a
+  → b
+  → expr y
+binOp f e1 e2 = f (toExpRepr e1) (toExpRepr e2)
+
+expEq = binOp eqq
+expGt = binOp gt
+
+infix 8 expEq as .==
+infix 8 expGt as .>
 
 newtype EI a = EI String
 derive instance newtypeEI ∷ Newtype (EI a) _
 
 instance eiCol ∷ ExpRepr EI where
-  -- repr = unwrap
   fromCol = EI <<< showCol
   fromInt = EI <<< show
   fromBoolean = EI <<< show
@@ -229,8 +249,8 @@ main = launchAff_ $ do
     q = do
       p1 ← select people
       p2 ← select people
-      restrict $ (fromCol p1.id) .== (fromCol p2.id)
-      restrict $ (fromCol p1.id) .> (fromInt 1)
+      restrict $ p1.id .== p2.id
+      restrict $ p1.id .> 1
       pure $ { id: p1.id, n1: p1.name, n2: p2.name }
   rows ← runQuery q
   liftEffect $ log "id\tn1\tn2"
