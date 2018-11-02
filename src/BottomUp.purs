@@ -50,11 +50,11 @@ instance showNames
   foldingWithIndex ShowNames prop acc (Col { table, name }) = 
     acc <> [table.alias <> "." <> name <> " " <> reflectSymbol prop]
 
--- recordNames
---   ∷ ∀ a
---   . HFoldlWithIndex ShowNames (Array String) a (Array String)
---   ⇒ a
---   → (Array String)
+recordNames
+  ∷ ∀ a
+  . HFoldlWithIndex ShowNames (Array String) a (Array String)
+  ⇒ a
+  → (Array String)
 recordNames r = hfoldlWithIndex ShowNames ([] ∷ Array String) r 
 
 pg ∷ Aff Unit
