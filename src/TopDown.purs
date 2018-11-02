@@ -37,17 +37,11 @@ type GenState =
   , nextId ∷ Int
   }
 
+initState ∷ GenState
 initState = 
   { sources: []
   , nextId: 0
   }
-
-{-
-Table { name ∷ String, id ∷ Int }
-{ name ∷ Col String, id ∷ Col Int }
-[ "id", "name" ]
-((id ∷ Int) /\ (name ∷ String)) → { name ∷ String, id ∷ Int }
--}
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Col String, id ∷ Col Int }
 class TableCols (rl ∷ RowList) (r ∷ # Type) | rl → r where
@@ -68,6 +62,32 @@ instance tableColsCons
     let _sym = (SProxy ∷ SProxy sym) in
     let res' = tableCols table (RLProxy ∷ RLProxy tail) in
     Record.insert _sym (Col { table, name: reflectSymbol _sym }) res'
+
+type Query a = State GenState a
+
+select 
+  ∷ ∀ r rl res
+  . RL.RowToList r rl
+  ⇒ TableCols rl res
+  ⇒ Table r → Query (Record res)
+select (Table { name }) = do
+  id ← freshId
+  st ← get
+  let
+    table = { name, alias: name <> show id }
+    res = tableCols table (RLProxy ∷ RLProxy rl)
+  put $ st { sources = table : st.sources }
+  pure res
+
+freshId ∷ Query Int
+freshId = do
+  st ← get
+  put $ st { nextId = st.nextId + 1 }
+  pure st.nextId
+
+---
+--- POSTGRES
+---
 
 {- 
 For record { n1 ∷ Col String, n2 ∷ Col String, id ∷ Col Int }
@@ -126,28 +146,6 @@ else instance queryResCons
     { f
     , cols: showCol col : r.cols 
     }
-
-type Query a = State GenState a
-
-select 
-  ∷ ∀ r rl res
-  . RL.RowToList r rl
-  ⇒ TableCols rl res
-  ⇒ Table r → Query (Record res)
-select (Table { name }) = do
-  id ← freshId
-  st ← get
-  let
-    table = { name, alias: name <> show id }
-    res = tableCols table (RLProxy ∷ RLProxy rl)
-  put $ st { sources = table : st.sources }
-  pure res
-
-freshId ∷ Query Int
-freshId = do
-  st ← get
-  put $ st { nextId = st.nextId + 1 }
-  pure st.nextId
 
 qqq
   ∷ State { sources ∷ Array { name ∷ String
