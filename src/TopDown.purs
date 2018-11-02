@@ -28,11 +28,11 @@ class ExpRepr r where
   fromBoolean ∷ Boolean → r Boolean
   fromString ∷ String → r String
 
-class ExpRepr expr <= ExpOps expr where
+class ExpOps expr where
   eqq ∷ ∀ a. expr a → expr a → expr Boolean
   gt ∷ ∀ a. expr a → expr a → expr Boolean
 
-class ExpRepr r <= ToExpRepr a r b | a → r b where
+class ToExpRepr a r b | a → r b where
   toExpRepr ∷ a → r b
 
 instance toExpReprCol ∷ ExpRepr r ⇒ ToExpRepr (Col a) r a where toExpRepr = fromCol
