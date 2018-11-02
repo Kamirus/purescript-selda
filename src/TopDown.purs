@@ -6,6 +6,7 @@ import BottomUp (dbconfig, recordNames)
 import Control.Monad.State (State, get, put, runState)
 import Data.Array ((:))
 import Data.Foldable (for_)
+import Data.Newtype (class Newtype, unwrap)
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
@@ -21,6 +22,44 @@ import Prim.RowList as RL
 import Record as Record
 import Type.Row (RLProxy(..))
 
+---
+
+class ExpRepr r a where
+  repr ∷ r a → String
+  expr ∷ a → r a
+
+class ExpOps expr where
+  eqq ∷ ∀ a. ExpRepr expr a ⇒ expr a → expr a → expr Boolean
+
+newtype EI a = EI String
+derive instance newtypeEI ∷ Newtype (EI a) _
+
+instance eiBoolean ∷ ExpRepr EI Boolean where
+  repr = unwrap
+  expr b = EI $ show b
+
+instance eiString ∷ ExpRepr EI String where
+  repr = unwrap
+  expr s = EI $ "'" <> s <> "'"
+
+instance eiInt ∷ ExpRepr EI Int where
+  repr = unwrap
+  expr i = EI $ show i
+
+instance eiCol ∷ ExpRepr EI (Col a) where
+  repr = unwrap
+  expr col = EI $ showCol col
+
+instance eiOps ∷ ExpOps EI where
+  eqq r1 r2 = EI $ "(" <> repr r1 <> "=" <> repr r2 <> ")"
+
+restrict ∷ EI Boolean → Query Unit
+restrict e = do
+  st ← get
+  put $ st { restricts = e : st.restricts }
+
+---
+
 people ∷ Table ( name ∷ String , age ∷ Int , id ∷ Int )
 people = Table { name: "people" }
 
@@ -34,12 +73,14 @@ showCol (Col { table, name }) = table.alias <> "." <> name
 
 type GenState = 
   { sources ∷ Array AliasedTable
+  , restricts ∷ Array (EI Boolean)
   , nextId ∷ Int
   }
 
 initState ∷ GenState
 initState = 
   { sources: []
+  , restricts: []
   , nextId: 0
   }
 
@@ -147,19 +188,6 @@ else instance queryResCons
     , cols: showCol col : r.cols 
     }
 
-qqq
-  ∷ State { sources ∷ Array { name ∷ String
-                            , alias ∷ String
-                            }
-          , nextId ∷ Int
-          }
-          { id ∷ Col Int
-          , name ∷ Col String
-          }
-qqq = do
-  { id, name } ← select people
-  pure $ { id, name }
-
 rowToRecord
   ∷ ∀ i o tup il
   . RL.RowToList i il
@@ -179,8 +207,13 @@ runQuery q = do
   let
     (Tuple res st) = runState q initState
     tables = joinWith ", " $ map (\t → t.name <> " " <> t.alias) st.sources
+    wheres = joinWith " AND " $ map (\e → "(" <> repr e <> ")") st.restricts
     { f, cols } = rowToRecord res
-    q_str = "select " <> joinWith ", " cols <> " from " <> tables <> ";"
+    q_str =
+      "select " <> joinWith ", " cols
+        <> " from " <> tables
+        <> " where " <> wheres
+        <> ";"
 
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
@@ -199,6 +232,7 @@ main = launchAff_ $ do
     q = do
       p1 ← select people
       p2 ← select people
+      restrict $ eqq (expr p1.id) (expr p2.id)
       pure $ { id: p1.id, n1: p1.name, n2: p2.name }
   rows ← runQuery q
   liftEffect $ log "id\tn1\tn2"
