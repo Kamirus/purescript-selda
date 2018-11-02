@@ -69,6 +69,12 @@ instance tableColsCons
     let res' = tableCols table (RLProxy ∷ RLProxy tail) in
     Record.insert _sym (Col { table, name: reflectSymbol _sym }) res'
 
+{- 
+For record { n1 ∷ Col String, n2 ∷ Col String, id ∷ Col Int }
+produce [ "alias1.id", "alias1.name", "alias2.name" ]  notice order (id, n1, n2) not (n1, n2, id)
+and function used to retrieve values from postgresql client
+  \Tuple int (Tuple string1 string2) → { id: int, n1: string1, n2: string2 }
+-}
 class QueryRes (i ∷ # Type) (il ∷ RowList) tup (o ∷ # Type) | i il → tup o where
   queryRes
     ∷ FromSQLRow tup
