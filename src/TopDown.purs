@@ -22,36 +22,33 @@ import Prim.RowList as RL
 import Record as Record
 import Type.Row (RLProxy(..))
 
----
+class ExpRepr r where
+  fromCol ∷ ∀ a. Col a → r a
+  fromInt ∷ Int → r Int
+  fromBoolean ∷ Boolean → r Boolean
+  fromString ∷ String → r String
+  -- repr ∷ r a → String
 
-class ExpRepr r a where
-  repr ∷ r a → String
-  expr ∷ a → r a
+class ExpRepr expr <= ExpOps expr where
+  eqq ∷ ∀ a. expr a → expr a → expr Boolean
+  gt ∷ ∀ a. expr a → expr a → expr Boolean
 
-class ExpOps expr where
-  eqq ∷ ∀ a. ExpRepr expr a ⇒ expr a → expr a → expr Boolean
+infix 8 eqq as .==
+infix 8 gt as .>
 
 newtype EI a = EI String
 derive instance newtypeEI ∷ Newtype (EI a) _
 
-instance eiBoolean ∷ ExpRepr EI Boolean where
-  repr = unwrap
-  expr b = EI $ show b
-
-instance eiString ∷ ExpRepr EI String where
-  repr = unwrap
-  expr s = EI $ "'" <> s <> "'"
-
-instance eiInt ∷ ExpRepr EI Int where
-  repr = unwrap
-  expr i = EI $ show i
-
-instance eiCol ∷ ExpRepr EI (Col a) where
-  repr = unwrap
-  expr col = EI $ showCol col
+instance eiCol ∷ ExpRepr EI where
+  -- repr = unwrap
+  fromCol = EI <<< showCol
+  fromInt = EI <<< show
+  fromBoolean = EI <<< show
+  fromString s = EI $ "'" <> s <>"'"
 
 instance eiOps ∷ ExpOps EI where
-  eqq r1 r2 = EI $ "(" <> repr r1 <> "=" <> repr r2 <> ")"
+  eqq (EI e1) (EI e2) = EI $ "(" <> e1 <> "=" <> e2 <> ")"
+  gt (EI e1) (EI e2) = EI $ "(" <> e1 <> ">" <> e2 <> ")"
 
 restrict ∷ EI Boolean → Query Unit
 restrict e = do
@@ -207,7 +204,7 @@ runQuery q = do
   let
     (Tuple res st) = runState q initState
     tables = joinWith ", " $ map (\t → t.name <> " " <> t.alias) st.sources
-    wheres = joinWith " AND " $ map (\e → "(" <> repr e <> ")") st.restricts
+    wheres = joinWith " AND " $ map (\(EI e) → "(" <> e <> ")") st.restricts
     { f, cols } = rowToRecord res
     q_str =
       "select " <> joinWith ", " cols
@@ -232,7 +229,8 @@ main = launchAff_ $ do
     q = do
       p1 ← select people
       p2 ← select people
-      restrict $ eqq (expr p1.id) (expr p2.id)
+      restrict $ (fromCol p1.id) .== (fromCol p2.id)
+      restrict $ (fromCol p1.id) .> (fromInt 1)
       pure $ { id: p1.id, n1: p1.name, n2: p2.name }
   rows ← runQuery q
   liftEffect $ log "id\tn1\tn2"
