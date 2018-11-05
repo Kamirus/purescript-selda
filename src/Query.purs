@@ -23,7 +23,7 @@ select (Table { name }) = do
   id ← freshId
   st ← get
   let
-    table = { name, alias: name <> show id }
+    table = { name, alias: name <> "_" <> show id }
     res = tableCols table (RLProxy ∷ RLProxy rl)
   put $ st { sources = table : st.sources }
   pure res
