@@ -4,21 +4,22 @@ import Prelude
 
 import Control.Monad.State (get, put)
 import Data.Array ((:))
+import Expr (Expr, Table(..))
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Type.Row (RLProxy(..))
-import Types (class TableCols, Query, Table(..), freshId, tableCols)
+import Types (class TableCols, Query, freshId, tableCols)
 
-restrict ∷ ∀ expr. expr Boolean → Query expr Unit
+restrict ∷ Expr Boolean → Query Unit
 restrict e = do
   st ← get
   put $ st { restricts = e : st.restricts }
 
 select 
-  ∷ ∀ r rl res expr
+  ∷ ∀ r rl res
   . RL.RowToList r rl
   ⇒ TableCols rl res
-  ⇒ Table r → Query expr (Record res)
+  ⇒ Table r → Query (Record res)
 select (Table { name }) = do
   id ← freshId
   st ← get

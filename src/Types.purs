@@ -4,27 +4,20 @@ import Prelude
 
 import Control.Monad.State (State, get, put)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Expr (AliasedTable, Col(..), Expr)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Type.Row (RLProxy(..))
 
-newtype Table ( r ∷ # Type ) = Table { name ∷ String }
-
-type AliasedTable = { name ∷ String, alias ∷ String }
-
-newtype Col a = Col { table ∷ AliasedTable, name ∷ String }
-showCol ∷ ∀ a. Col a → String
-showCol (Col { table, name }) = table.alias <> "." <> name
-
-type GenState expr = 
+type GenState = 
   { sources ∷ Array AliasedTable
-  , restricts ∷ Array (expr Boolean)
+  , restricts ∷ Array (Expr Boolean)
   , nextId ∷ Int
   }
 
-initState ∷ ∀ expr. GenState expr
+initState ∷ GenState
 initState = 
   { sources: []
   , restricts: []
@@ -51,9 +44,9 @@ instance tableColsCons
     let res' = tableCols table (RLProxy ∷ RLProxy tail) in
     Record.insert _sym (Col { table, name: reflectSymbol _sym }) res'
 
-type Query expr a = State (GenState expr) a
+type Query a = State GenState a
 
-freshId ∷ ∀ expr. Query expr Int
+freshId ∷ Query Int
 freshId = do
   st ← get
   put $ st { nextId = st.nextId + 1 }

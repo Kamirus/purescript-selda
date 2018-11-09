@@ -14,3 +14,4 @@
 - order by
 - limit
 - default, sequenced primary key - do not insert those, but do select
+- make Col abstract

@@ -2,26 +2,24 @@ module PG.PG where
 
 import Prelude
 
-import BottomUp (dbconfig)
 import Control.Monad.State (runState)
 import Data.Array ((:))
+import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow)
+import Database.PostgreSQL (class FromSQLRow, PoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import PG.Exp (EI(..))
+import Expr (Col(..), showCol, showExpr)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Type.Row (RLProxy(..))
-import Types (Col, Query, initState, showCol)
-
-type PGQuery a = Query EI a
+import Types (Query, initState)
 
 {- 
 For record { n1 ∷ Col String, n2 ∷ Col String, id ∷ Col Int }
@@ -94,13 +92,13 @@ runQuery
   . RL.RowToList i il
   ⇒ QueryRes i il tup o
   ⇒ FromSQLRow tup
-  ⇒ PGQuery (Record i)
+  ⇒ Query (Record i)
   → Aff (Array (Record o))
 runQuery q = do
   let
     (Tuple res st) = runState q initState
     tables = joinWith ", " $ map (\t → t.name <> " " <> t.alias) st.sources
-    wheres = joinWith " AND " $ map (\(EI e) → "(" <> e <> ")") st.restricts
+    wheres = joinWith " AND " $ map (\e → "(" <> showExpr e <> ")") st.restricts
     { f, cols } = rowToRecord res
     q_str =
       "select " <> joinWith ", " cols
@@ -113,3 +111,14 @@ runQuery q = do
     liftEffect $ log q_str
     rows ← PG.query conn (PG.Query q_str) PG.Row0
     pure $ map f rows
+
+dbconfig ∷ PoolConfiguration
+dbconfig =	
+  { database: "selda"	
+  , host: Just $ "127.0.0.1"	
+  , idleTimeoutMillis: Just $ 1000	
+  , max: Just $ 10	
+  , password: Just $ "qwerty"	
+  , port: Just $ 5432	
+  , user: Just $ "init"	
+  }
