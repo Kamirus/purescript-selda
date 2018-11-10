@@ -22,27 +22,50 @@ type AliasedTable = { name ∷ String, alias ∷ String }
 newtype Column a = Column { table ∷ AliasedTable, name ∷ String }
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
-class TableCols (rl ∷ RowList) (r ∷ # Type) | rl → r where
-  tableCols ∷ AliasedTable → RLProxy rl → Record r
+class TableColumns (rl ∷ RowList) (r ∷ # Type) | rl → r where
+  tableColumns ∷ AliasedTable → RLProxy rl → Record r
 
-instance tableColsNil ∷ TableCols RL.Nil () where
-  tableCols _ _ = {}
+instance tableColumnsNil ∷ TableColumns RL.Nil () where
+  tableColumns _ _ = {}
 
-instance tableColsCons
+instance tableColumnsCons
     ∷ ( IsSymbol sym
       , R.Lacks sym r'
-      , R.Cons sym (Col s t) r' r
-      , TableCols tail r'
+      , R.Cons sym (Column t) r' r
+      , TableColumns tail r'
       )
-    ⇒ TableCols (RL.Cons sym t tail) r
+    ⇒ TableColumns (RL.Cons sym t tail) r
   where
-  tableCols table _ = 
+  tableColumns table _ = 
     let
       _sym = (SProxy ∷ SProxy sym)
-      res' = tableCols table (RLProxy ∷ RLProxy tail)
-      col = Col $ EColumn $ Column { table, name: reflectSymbol _sym }
+      res' = tableColumns table (RLProxy ∷ RLProxy tail)
+      col = Column { table, name: reflectSymbol _sym }
     in
     Record.insert _sym col res'
+
+-- { name ∷ Column String, id ∷ Column Int } → { name ∷ Col s String, id ∷ Col s Int }
+class ToCols s (i ∷ # Type) (ri ∷ RowList) (o ∷ # Type) | s i ri → o where
+  toCols ∷ Record i → RLProxy ri → Query s (Record o)
+
+instance toColsNil ∷ ToCols s i RL.Nil () where
+  toCols _ _ = pure {}
+
+instance toColsCons
+    ∷ ( IsSymbol sym
+      , R.Lacks sym o'
+      , R.Cons sym (Col s t) o' o
+      , R.Cons sym (Column t) i' i
+      , ToCols s i tail o'
+      )
+    ⇒ ToCols s i (RL.Cons sym (Column t) tail) o
+  where
+  toCols i _ = do
+    let
+      _sym = (SProxy ∷ SProxy sym)
+      col = Record.get _sym i
+    res' ← toCols i (RLProxy ∷ RLProxy tail)
+    pure $ Record.insert _sym (Col $ EColumn col) res'
 
 --- Query
 
