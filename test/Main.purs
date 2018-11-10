@@ -32,19 +32,29 @@ q2 = do
   p2 ← select people
   pure $ { p1, p2 }
 
-q3 ∷ ∀ s. Query s { l ∷ Col s Int }
-q3 = pure $ { l: lit 123 }
+q3 ∷ ∀ s. Query s { l ∷ Col s Int , l2 ∷ Col s Int }
+q3 = pure $ { l: lit 123, l2: lit 123 }
 
 main ∷ Effect Unit
-main = launchAff_ $ do
-  rows ← withPG q dbconfig
-  liftEffect $ log "id\tn1\tn2"
-  liftEffect $ for_ rows \{ id, n1, n2 } → log (show id <> "\t" <> n1 <> "\t" <> n2 )
+main = do 
+  launchAff_ $ do
+    rows ← withPG q dbconfig
+    liftEffect $ log "id\tn1\tn2"
+    liftEffect $ for_ rows \{ id, n1, n2 } → log (show id <> "\t" <> n1 <> "\t" <> n2 )
+  m1 
+  m3
 
--- m1 ∷ Effect Unit
--- m1 = launchAff_ $ do
---   r1 ← withPG q1 dbconfig
---   liftEffect $ for_ r1 \r → log (show r)
+m1 = launchAff_ $ do
+  rows ← withPG q1 dbconfig
+  liftEffect $ for_ rows \r → log (show r)
+
+-- m2 = launchAff_ $ do
+--   rows ← withPG q2 dbconfig
+--   liftEffect $ for_ rows \r → log (show r)
+
+m3 = launchAff_ $ do
+  rows ← withPG q3 dbconfig
+  liftEffect $ for_ rows \r → log (show r)
 
 dbconfig ∷ PoolConfiguration
 dbconfig =	

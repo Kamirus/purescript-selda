@@ -42,7 +42,7 @@ instance queryRes2
     ∷ ( IsSymbol sym , IsSymbol sym2
       , R.Lacks sym () , R.Lacks sym2 tmp
       , R.Cons sym t () tmp , R.Cons sym2 t2 tmp o
-      , R.Cons sym (Col s t) i' i, R.Cons sym2 (Col s t) i'' i
+      , R.Cons sym (Col s t) i' i, R.Cons sym2 (Col s t2) i'' i
       )
     ⇒ QueryRes i (RL.Cons sym (Col s t) (RL.Cons sym2 (Col s t2) RL.Nil)) (Tuple t t2) o
   where

@@ -2,6 +2,8 @@
 
 # TODO
 
+- nested records not working - generic part
+
 - better implementation for EXPR, than EI - build ast, than string
 - simple joins
 - git branch cleanup
