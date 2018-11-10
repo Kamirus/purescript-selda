@@ -2,13 +2,13 @@ module PG.PG where
 
 import Prelude
 
-import BottomUp (dbconfig)
 import Control.Monad.State (runState)
 import Data.Array ((:))
+import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow)
+import Database.PostgreSQL (class FromSQLRow, PoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -42,7 +42,7 @@ instance queryRes2
     ∷ ( IsSymbol sym , IsSymbol sym2
       , R.Lacks sym () , R.Lacks sym2 tmp
       , R.Cons sym t () tmp , R.Cons sym2 t2 tmp o
-      , R.Cons sym (Col t) i' i, R.Cons sym2 (Col t) i'' i
+      , R.Cons sym (Col t) i' i, R.Cons sym2 (Col t2) i'' i
       )
     ⇒ QueryRes i (RL.Cons sym (Col t) (RL.Cons sym2 (Col t2) RL.Nil)) (Tuple t t2) o
   where
@@ -113,3 +113,14 @@ runQuery q = do
     liftEffect $ log q_str
     rows ← PG.query conn (PG.Query q_str) PG.Row0
     pure $ map f rows
+
+dbconfig ∷ PoolConfiguration
+dbconfig =	
+  { database: "selda"	
+  , host: Just $ "127.0.0.1"	
+  , idleTimeoutMillis: Just $ 1000	
+  , max: Just $ 10	
+  , password: Just $ "qwerty"	
+  , port: Just $ 5432	
+  , user: Just $ "init"	
+  }

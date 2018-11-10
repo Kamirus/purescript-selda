@@ -23,7 +23,8 @@ main = launchAff_ $ do
       p2 ← select people
       restrict $ p1.id .== p2.id
       restrict $ p1.id .> 1
-      pure $ { id: p1.id, n1: p1.name, n2: p2.name }
+      pure $ p1
   rows ← runQuery q
   liftEffect $ log "id\tn1\tn2"
-  liftEffect $ for_ rows \{ id, n1, n2 } → log (show id <> "\t" <> n1 <> "\t" <> n2 )
+  -- liftEffect $ for_ rows \{ id, n1, n2 } → log (show id <> "\t" <> n1 <> "\t" <> n2 )
+  liftEffect $ for_ rows \r → log (show r)
