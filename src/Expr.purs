@@ -2,25 +2,89 @@ module Expr where
 
 import Prelude
 
+import Control.Monad.State (class MonadState, State, get, put, state)
 import Data.Exists (Exists, mkExists, runExists)
 import Data.Leibniz (type (~), coerce, coerceSymm)
+import Data.Newtype (class Newtype, unwrap)
+import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Prim.Row as R
 import Prim.RowList (kind RowList)
+import Prim.RowList as RL
+import Record as Record
+import Type.Row (RLProxy(..))
+
+--- Table
 
 newtype Table ( r ∷ # Type ) = Table { name ∷ String }
 
 type AliasedTable = { name ∷ String, alias ∷ String }
 
-newtype Col a = Col { table ∷ AliasedTable, name ∷ String }
-showCol ∷ ∀ a. Col a → String
-showCol (Col { table, name }) = table.alias <> "." <> name
+newtype Column a = Column { table ∷ AliasedTable, name ∷ String }
 
-{-
-typeclass
-leibniz + exists
-polymor variant
--}
+-- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
+class TableCols (rl ∷ RowList) (r ∷ # Type) | rl → r where
+  tableCols ∷ AliasedTable → RLProxy rl → Record r
 
-data Lit a
+instance tableColsNil ∷ TableCols RL.Nil () where
+  tableCols _ _ = {}
+
+instance tableColsCons
+    ∷ ( IsSymbol sym
+      , R.Lacks sym r'
+      , R.Cons sym (Col s t) r' r
+      , TableCols tail r'
+      )
+    ⇒ TableCols (RL.Cons sym t tail) r
+  where
+  tableCols table _ = 
+    let
+      _sym = (SProxy ∷ SProxy sym)
+      res' = tableCols table (RLProxy ∷ RLProxy tail)
+      col = Col $ EColumn $ Column { table, name: reflectSymbol _sym }
+    in
+    Record.insert _sym col res'
+
+--- Query
+
+type GenState = 
+  { sources ∷ Array AliasedTable
+  , restricts ∷ Array (Expr Boolean)
+  , nextId ∷ Int
+  }
+
+initState ∷ GenState
+initState = 
+  { sources: []
+  , restricts: []
+  , nextId: 0
+  }
+
+newtype Query s a = Query (State GenState a)
+derive newtype instance functorQuery ∷ Functor (Query s)
+derive newtype instance applyQuery ∷ Apply (Query s)
+derive newtype instance applicativeQuery ∷ Applicative (Query s)
+derive newtype instance bindQuery ∷ Bind (Query s)
+derive newtype instance monadQuery ∷ Monad (Query s)
+
+freshId ∷ ∀ s. Query s Int
+freshId = Query do
+  st ← get
+  put $ st { nextId = st.nextId + 1 }
+  pure st.nextId
+
+---
+
+newtype Col s a = Col (Expr a)
+derive instance newtypeCol ∷ Newtype (Col s a) _
+
+class Lit a where
+  lit ∷ ∀ s. a → Col s a
+
+instance litBoolean ∷ Lit Boolean where lit x = Col $ ELit $ LBoolean x identity
+instance litString ∷ Lit String where lit x = Col $ ELit $ LString x identity
+instance litInt ∷ Lit Int where lit x = Col $ ELit $ LInt x identity
+
+data Literal a
   = LBoolean Boolean (Boolean ~ a)
   | LString String (String ~ a)
   | LInt Int (Int ~ a)
@@ -28,87 +92,63 @@ data Lit a
 data BinOp i o
   = Or (Boolean ~ i) (Boolean ~ o)
   | Gt (Boolean ~ o)
-  -- | Eq (Boolean ~ o)
+  | Eq (Boolean ~ o)
 
 data Expr o
-  = ECol (Col o)
-  | ELit (Lit o)
-  | BinaryOp (Exists (BinOpExp o)) -- | EBinOp (BinOp o i) (Expr i i) (Expr i i)
+  = EColumn (Column o)
+  | ELit (Literal o)
+  | EBinOp (Exists (BinExp o))
 
-data BinOpExp o i = BinOpExp (BinOp i o) (Expr i) (Expr i)
+data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
-showLit ∷ ∀ a. Lit a → String
-showLit = case _ of
-  LBoolean b _ → show b
-  LString s _ → show s
-  LInt i _ → show i
+instance showColumn ∷ Show (Column a) where
+  show (Column { table, name }) = table.alias <> "." <> name
 
-showExpr ∷ ∀ o. Expr o → String
-showExpr = case _ of
-  ECol col → showCol col
-  ELit lit → showLit lit
-  BinaryOp e → runExists f e
-    where
-    f ∷ ∀ i. BinOpExp o i → String
-    f (BinOpExp (Or _ _) e1 e2) = "(" <> showExpr e1 <> " || " <> showExpr e2 <> ")"
-    f (BinOpExp (Gt _) e1 e2) = "(" <> showExpr e1 <> " > " <> showExpr e2 <> ")"
+instance showCol ∷ Show (Col s a) where
+  show = unwrap >>> show
 
--- bar ∷ Lit Boolean
--- bar = LBoolean true identity
+instance showLiteral ∷ Show (Literal a) where
+  show = case _ of
+    LBoolean b _ → show b
+    LString s _ → "'" <> show s <> "'"
+    LInt i _ → show i
 
--- fromExpr ∷ Expr o → o
--- fromExpr 
+instance showBinOp ∷ Show (BinOp i o) where
+  show = case _ of
+    Or _ _ → " || "
+    Gt _ → " > "
+    Eq _ → " = "
 
--- foo ∷ ∀ o. Expr o → Boolean
--- foo (ELit (LBoolean b f)) = b
--- foo (BinaryOp e) = runExists f e
---   where
---   f ∷ ∀ i. BinOpExp o i → Boolean
---   f (BinOpExp (Or fi fo) e1 e2) = foo e1 || foo e2 -- foo e1 <> " + " <> foo e2
---   -- f (BinOpExp op e1 e2) = foo e1 <> " + " <> foo e2
+instance showExpr ∷ Show (Expr a) where
+  show = case _ of
+    EColumn col → show col
+    ELit lit → show lit
+    EBinOp e → runExists show e
 
--- eval ∷ ∀ a. Lit a → a
--- eval (LBoolean i f) = coerce f i
+instance showBinExp ∷ Show (BinExp o i) where
+  show (BinExp op e1 e2) = "(" <> show e1 <> show op <> show e2 <> ")"
 
-class ExpRepr r where
-  fromCol ∷ ∀ a. Col a → r a
-  fromInt ∷ Int → r Int
-  fromBoolean ∷ Boolean → r Boolean
-  fromString ∷ String → r String
 
-class ExpOps expr where
-  eqq ∷ ∀ a. expr a → expr a → expr Boolean
-  gt ∷ ∀ a. expr a → expr a → expr Boolean
+expOr ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
+expOr = binOp (Or identity identity)
 
-class ToExpRepr a r b | a → r b where
-  toExpRepr ∷ a → r b
+expGt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
+expGt = binOp (Gt identity)
 
-instance toExpReprCol ∷ ExpRepr r ⇒ ToExpRepr (Col a) r a where toExpRepr = fromCol
-instance toExpReprInt ∷ ExpRepr r ⇒ ToExpRepr Int r Int where toExpRepr = fromInt
-instance toExpReprBoolean ∷ ExpRepr r ⇒ ToExpRepr Boolean r Boolean where toExpRepr = fromBoolean
--- instance toExpReprString ∷ ExpRepr r ⇒ ToExpRepr String r String where toExpRepr = fromString
+expEq ∷ ∀ s a. Col s a → Col s a → Col s Boolean
+expEq = binOp (Eq identity)
 
-binOp
-  ∷ ∀ expr x a b y
-  . ExpOps expr
-  ⇒ ToExpRepr a expr x
-  ⇒ ToExpRepr b expr x
-  ⇒ (expr x → expr x → expr y)
-  → a
-  → b
-  → expr y
-binOp f e1 e2 = f (toExpRepr e1) (toExpRepr e2)
+binOp ∷ ∀ s o i. BinOp i o -> Col s i -> Col s i -> Col s o
+binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
 
--- expEq = binOp eqq
--- expGt = binOp gt
+-- instance colHeytingAlgebra ∷ HeytingAlgebra (Col s Boolean) where
 
-expGt ∷ ∀ a. Expr a → Expr a → Expr Boolean
-expGt e1 e2 = BinaryOp $ mkExists e
-  where
-  e ∷ BinOpExp Boolean a
-  e = BinOpExp (Gt identity) e1 e2
--- expGt = binOp gt
-
--- infix 8 expEq as .==
-infix 8 expGt as .>
+-- infixl 4 `like`
+infixl 4 expEq as .==
+infixl 4 expGt as .>
+-- infixl 4 expLt as .<
+-- infixl 4 expGe as .>=
+-- infixl 4 expLe as .<=
+-- infixr 3 expAnd as .&&
+infixr 2 expOr as .||
 

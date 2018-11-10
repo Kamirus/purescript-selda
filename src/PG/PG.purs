@@ -13,16 +13,15 @@ import Database.PostgreSQL as PG
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Expr (Col(..), showCol, showExpr)
+import Expr (Col, Query(..), initState)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Type.Row (RLProxy(..))
-import Types (Query, initState)
 
 {- 
-For record { n1 ∷ Col String, n2 ∷ Col String, id ∷ Col Int }
+For record { n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }
 produce [ "alias1.id", "alias1.name", "alias2.name" ]  notice order (id, n1, n2) not (n1, n2, id)
 and function used to retrieve values from postgresql client
   \Tuple int (Tuple string1 string2) → { id: int, n1: string1, n2: string2 }
@@ -40,9 +39,9 @@ instance queryRes2
     ∷ ( IsSymbol sym , IsSymbol sym2
       , R.Lacks sym () , R.Lacks sym2 tmp
       , R.Cons sym t () tmp , R.Cons sym2 t2 tmp o
-      , R.Cons sym (Col t) i' i, R.Cons sym2 (Col t) i'' i
+      , R.Cons sym (Col s t) i' i, R.Cons sym2 (Col s t) i'' i
       )
-    ⇒ QueryRes i (RL.Cons sym (Col t) (RL.Cons sym2 (Col t2) RL.Nil)) (Tuple t t2) o
+    ⇒ QueryRes i (RL.Cons sym (Col s t) (RL.Cons sym2 (Col s t2) RL.Nil)) (Tuple t t2) o
   where
   queryRes i _ = 
     let 
@@ -55,18 +54,18 @@ instance queryRes2
           # Record.insert _sym2 t2
     in
     { f
-    , cols: [ showCol col, showCol col2 ]
+    , cols: [ show col, show col2 ]
     }
 
 else instance queryResCons
     ∷ ( IsSymbol sym
       , R.Lacks sym o'
       , R.Cons sym t o' o
-      , R.Cons sym (Col t) i' i
+      , R.Cons sym (Col s t) i' i
       , QueryRes i tail tup o'
       , FromSQLRow tup
       )
-    ⇒ QueryRes i (RL.Cons sym (Col t) tail) (Tuple t tup) o
+    ⇒ QueryRes i (RL.Cons sym (Col s t) tail) (Tuple t tup) o
   where
   queryRes i _ = 
     let 
@@ -76,7 +75,7 @@ else instance queryResCons
       col = Record.get _sym i
     in
     { f
-    , cols: showCol col : r.cols 
+    , cols: show col : r.cols 
     }
 
 rowToRecord
@@ -92,13 +91,13 @@ runQuery
   . RL.RowToList i il
   ⇒ QueryRes i il tup o
   ⇒ FromSQLRow tup
-  ⇒ Query (Record i)
+  ⇒ (∀ s. Query s (Record i))
   → Aff (Array (Record o))
-runQuery q = do
+runQuery (Query q) = do
   let
     (Tuple res st) = runState q initState
     tables = joinWith ", " $ map (\t → t.name <> " " <> t.alias) st.sources
-    wheres = joinWith " AND " $ map (\e → "(" <> showExpr e <> ")") st.restricts
+    wheres = joinWith " AND " $ map (\e → "(" <> show e <> ")") st.restricts
     { f, cols } = rowToRecord res
     q_str =
       "select " <> joinWith ", " cols
