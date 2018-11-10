@@ -1,10 +1,12 @@
-module PG.PG where
+module Selda.PG
+  ( withPG
+  , class QueryRes
+  , queryRes
+  ) where
 
 import Prelude
 
-import Control.Monad.State (runState)
 import Data.Array ((:))
-import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Data.Tuple (Tuple(..))
@@ -13,11 +15,12 @@ import Database.PostgreSQL as PG
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Expr (Col, Query(..), initState)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
+import Selda.Col (Col)
+import Selda.Query.Type (Query, runQuery)
 import Type.Row (RLProxy(..))
 
 {- 
@@ -86,23 +89,24 @@ rowToRecord
   ⇒ Record i → { f ∷ tup → Record o, cols ∷ Array String }
 rowToRecord i = queryRes i (RLProxy ∷ RLProxy il)
 
-runQuery 
+withPG
   ∷ ∀ o i il tup
   . RL.RowToList i il
   ⇒ QueryRes i il tup o
   ⇒ FromSQLRow tup
   ⇒ (∀ s. Query s (Record i))
+  → PoolConfiguration
   → Aff (Array (Record o))
-runQuery (Query q) = do
+withPG q dbconfig = do
   let
-    (Tuple res st) = runState q initState
-    tables = joinWith ", " $ map (\t → t.name <> " " <> t.alias) st.sources
-    wheres = joinWith " AND " $ map (\e → "(" <> show e <> ")") st.restricts
+    (Tuple res st) = runQuery q
+    from = aux " from " ", " (\t → t.name <> " " <> t.alias) st.sources
+    wheres = aux " where " " AND " (\e → "(" <> show e <> ")") st.restricts
     { f, cols } = rowToRecord res
     q_str =
       "select " <> joinWith ", " cols
-        <> " from " <> tables
-        <> " where " <> wheres
+        <> from
+        <> wheres
         <> ";"
 
   pool ← PG.newPool dbconfig
@@ -111,13 +115,7 @@ runQuery (Query q) = do
     rows ← PG.query conn (PG.Query q_str) PG.Row0
     pure $ map f rows
 
-dbconfig ∷ PoolConfiguration
-dbconfig =	
-  { database: "selda"	
-  , host: Just $ "127.0.0.1"	
-  , idleTimeoutMillis: Just $ 1000	
-  , max: Just $ 10	
-  , password: Just $ "qwerty"	
-  , port: Just $ 5432	
-  , user: Just $ "init"	
-  }
+aux ∷ ∀ a. String → String → (a → String) → Array a → String
+aux beg sep f l = case l of
+  [] → ""
+  _ → beg <> (joinWith sep $ map f l)
