@@ -1,5 +1,5 @@
 module Selda.Table
-  ( Column
+  ( Column, showColumn
   , AliasedTable
   , Table(..)
   , class TableColumns
@@ -21,8 +21,8 @@ type AliasedTable = { name ∷ String, alias ∷ String }
 
 newtype Column a = Column { table ∷ AliasedTable, name ∷ String }
 
-instance showColumn ∷ Show (Column a) where
-  show (Column { table, name }) = table.alias <> "." <> name
+showColumn ∷ ∀ a. Column a → String
+showColumn (Column { table, name }) = table.alias <> "." <> name
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
 class TableColumns (rl ∷ RowList) (r ∷ # Type) | rl → r where

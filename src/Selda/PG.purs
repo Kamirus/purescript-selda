@@ -17,7 +17,8 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Selda.Col (Col)
+import Selda.Col (Col, showCol)
+import Selda.Expr (showExpr)
 import Selda.Query.Type (Query, runQuery)
 import Type.Row (RLProxy(..))
 
@@ -51,7 +52,7 @@ instance queryResHead
       col = Record.get _sym i
     in
     { f
-    , cols: [ show col ]
+    , cols: [ showCol col ]
     }
 else instance queryResCons
     ∷ ( IsSymbol sym
@@ -71,7 +72,7 @@ else instance queryResCons
       col = Record.get _sym i
     in
     { f
-    , cols: show col : r.cols 
+    , cols: showCol col : r.cols 
     }
 
 rowToRecord
@@ -94,7 +95,7 @@ withPG dbconfig q = do
   let
     (Tuple res st) = runQuery q
     from = aux " from " ", " (\t → t.name <> " " <> t.alias) st.sources
-    wheres = aux " where " " AND " (\e → "(" <> show e <> ")") st.restricts
+    wheres = aux " where " " AND " (\e → "(" <> showExpr e <> ")") st.restricts
     { f, cols } = rowToRecord res
     q_str =
       "select " <> joinWith ", " cols

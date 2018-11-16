@@ -5,7 +5,7 @@ import Prelude
 import Data.Exists (Exists, runExists)
 import Data.Leibniz (type (~))
 import Prim.RowList (kind RowList)
-import Selda.Table (Column)
+import Selda.Table (Column, showColumn)
 
 data Literal a
   = LBoolean Boolean (Boolean ~ a)
@@ -24,23 +24,23 @@ data Expr o
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
-instance showLiteral ∷ Show (Literal a) where
-  show = case _ of
-    LBoolean b _ → show b
-    LString s _ → "'" <> show s <> "'"
-    LInt i _ → show i
+showLiteral ∷ ∀ a. Literal a → String
+showLiteral = case _ of
+  LBoolean b _ → show b
+  LString s _ → "'" <> show s <> "'"
+  LInt i _ → show i
 
-instance showBinOp ∷ Show (BinOp i o) where
-  show = case _ of
-    Or _ _ → " || "
-    Gt _ → " > "
-    Eq _ → " = "
+showBinOp ∷ ∀ i o. BinOp i o → String
+showBinOp = case _ of
+  Or _ _ → " || "
+  Gt _ → " > "
+  Eq _ → " = "
 
-instance showExpr ∷ Show (Expr a) where
-  show = case _ of
-    EColumn col → show col
-    ELit lit → show lit
-    EBinOp e → runExists show e
+showExpr ∷ ∀ a. Expr a → String
+showExpr = case _ of
+  EColumn col → showColumn col
+  ELit lit → showLiteral lit
+  EBinOp e → runExists showBinExp e
 
-instance showBinExp ∷ Show (BinExp o i) where
-  show (BinExp op e1 e2) = "(" <> show e1 <> show op <> show e2 <> ")"
+showBinExp ∷ ∀ o i. BinExp o i → String
+showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2 <> ")"

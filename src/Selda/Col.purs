@@ -1,5 +1,5 @@
 module Selda.Col
-  ( Col(..)
+  ( Col(..), showCol
   , class Lit
   , lit
   , class ToCols
@@ -22,14 +22,16 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..))
+import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), showExpr)
 import Selda.Table (Column)
 import Type.Proxy (Proxy)
 import Type.Row (RLProxy(..))
 
 newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
-instance showCol ∷ Show (Col s a) where show = unwrap >>> show
+
+showCol ∷ ∀ s a. Col s a → String
+showCol = unwrap >>> showExpr
 
 class Lit a where
   lit ∷ ∀ s. a → Col s a
