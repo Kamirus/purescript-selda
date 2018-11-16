@@ -41,5 +41,5 @@ freshId = Query do
   put $ st { nextId = st.nextId + 1 }
   pure st.nextId
 
-runQuery ∷ ∀ a. (∀ s. Query s a) → Tuple a GenState
+runQuery ∷ ∀ a s. Query s a → Tuple a GenState
 runQuery (Query st) = runState st initState

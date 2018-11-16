@@ -85,14 +85,14 @@ rowToRecord
 rowToRecord i = queryRes i (RLProxy ∷ RLProxy il)
 
 withPG
-  ∷ ∀ o i il tup
+  ∷ ∀ o i il tup s
   . RL.RowToList i il
   ⇒ QueryRes i il tup o
   ⇒ FromSQLRow tup
-  ⇒ (∀ s. Query s (Record i))
-  → PoolConfiguration
+  ⇒ PoolConfiguration
+  → Query s (Record i)
   → Aff (Array (Record o))
-withPG q dbconfig = do
+withPG dbconfig q = do
   let
     (Tuple res st) = runQuery q
     from = aux " from " ", " (\t → t.name <> " " <> t.alias) st.sources
@@ -106,7 +106,6 @@ withPG q dbconfig = do
 
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
-    liftEffect $ log q_str
     rows ← PG.query conn (PG.Query q_str) PG.Row0
     pure $ map f rows
 
