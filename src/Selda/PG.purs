@@ -38,28 +38,23 @@ class QueryRes (i ∷ # Type) (il ∷ RowList) tup (o ∷ # Type) | i il → tup
       , cols ∷ Array String
       }
 
-instance queryRes2
-    ∷ ( IsSymbol sym , IsSymbol sym2
-      , R.Lacks sym () , R.Lacks sym2 tmp
-      , R.Cons sym t () tmp , R.Cons sym2 t2 tmp o
-      , R.Cons sym (Col s t) i' i, R.Cons sym2 (Col s t2) i'' i
+instance queryResHead
+    ∷ ( IsSymbol sym
+      , R.Lacks sym ()
+      , R.Cons sym t () o
+      , R.Cons sym (Col s t) i' i
       )
-    ⇒ QueryRes i (RL.Cons sym (Col s t) (RL.Cons sym2 (Col s t2) RL.Nil)) (Tuple t t2) o
+    ⇒ QueryRes i (RL.Cons sym (Col s t) RL.Nil) (Tuple t Unit) o
   where
   queryRes i _ = 
     let 
       _sym = (SProxy ∷ SProxy sym)
-      _sym2 = (SProxy ∷ SProxy sym2)
+      f ( Tuple t _ ) = Record.insert _sym t {}
       col = Record.get _sym i
-      col2 = Record.get _sym2 i
-      f (Tuple t t2) = 
-        Record.insert _sym t {}
-          # Record.insert _sym2 t2
     in
     { f
-    , cols: [ show col, show col2 ]
+    , cols: [ show col ]
     }
-
 else instance queryResCons
     ∷ ( IsSymbol sym
       , R.Lacks sym o'
