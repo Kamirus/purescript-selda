@@ -135,6 +135,17 @@ main = do
               { balance } ← leftJoin bankAccounts \b → id .== b.personId
               pure { id, balance }
             assertSeqEq expected rows
+          test conn "alone left join transformed to select but with every value wrapped in Just" $ do
+            let
+              expected = 
+                [ { id: Just 1, personId: Just 1, balance: Just 100 }
+                , { id: Just 2, personId: Just 1, balance: Just 150 }
+                , { id: Just 3, personId: Just 3, balance: Just 300 }
+                ]
+            rows <- withPG dbconfig $ do
+              { id, personId, balance } ← leftJoin bankAccounts \_ → lit true
+              pure { id, balance, personId }
+            assertSeqEq expected rows
           -- test conn "test" $ do
           --   (rows ∷ Array (_ Int String Int String)) ← PG.query conn (PG.Query """
           --     select p.id, count(p.name), p.age, count(b.id) -- b.id, b.personId, b.balance
