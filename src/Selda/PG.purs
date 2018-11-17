@@ -1,13 +1,14 @@
 module Selda.PG
   ( withPG
-  , class QueryRes
-  , queryRes
+  , class BuildPGHandler
+  , buildPGHandler
   ) where
 
 import Prelude
 
 import Data.Array (foldl, reverse, (:))
 import Data.Array as Array
+import Data.Exists (Exists, runExists)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
@@ -21,116 +22,119 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Selda.Col (Col, showCol)
-import Selda.Expr (showExpr)
-import Selda.Query.Type (Query, Source(..), runQuery)
+import Selda.Col (class ExtractCols, Col, getCols)
+import Selda.Expr (Expr, showExpr)
+import Selda.Query.Type (Source(..), Query, SQL(..), GenState, runQuery)
+import Selda.Table (Alias)
 import Type.Row (RLProxy(..))
 
 {- 
-For record { n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }
-produce [ "alias1.id", "alias1.name", "alias2.name" ]  notice order (id, n1, n2) not (n1, n2, id)
-and function used to retrieve values from postgresql client
+For record
+  { n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }
+build function
   \Tuple int (Tuple string1 string2) → { id: int, n1: string1, n2: string2 }
 -}
-class QueryRes (i ∷ # Type) (il ∷ RowList) tup (o ∷ # Type) | i il → tup o where
-  queryRes
-    ∷ FromSQLRow tup
-    ⇒ Record i
-    → RLProxy il
-    → { f ∷ (tup → Record o)
-      , cols ∷ Array String
-      }
+pgHandler
+  ∷ ∀ i o tuple il
+  . RL.RowToList i il
+  ⇒ BuildPGHandler il tuple o
+  ⇒ FromSQLRow tuple
+  ⇒ Record i → (tuple → Record o)
+pgHandler _ = buildPGHandler (RLProxy ∷ RLProxy il)
 
-instance queryResHead
+class BuildPGHandler (il ∷ RowList) tup (o ∷ # Type) | il → tup o where
+  buildPGHandler
+    ∷ FromSQLRow tup
+    ⇒ RLProxy il
+    → (tup → Record o)
+
+instance buildPGHandlerHead
     ∷ ( IsSymbol sym
       , R.Lacks sym ()
       , R.Cons sym t () o
-      , R.Cons sym (Col s t) i' i
       )
-    ⇒ QueryRes i (RL.Cons sym (Col s t) RL.Nil) (Tuple t Unit) o
+    ⇒ BuildPGHandler (RL.Cons sym (Col s t) RL.Nil) (Tuple t Unit) o
   where
-  queryRes i _ = 
-    let 
-      _sym = (SProxy ∷ SProxy sym)
-      f ( Tuple t _ ) = Record.insert _sym t {}
-      col = Record.get _sym i
-    in
-    { f
-    , cols: [ showCol col ]
-    }
-else instance queryResCons
+  buildPGHandler _ =
+    \(Tuple t _) → Record.insert (SProxy ∷ SProxy sym) t {}
+else instance buildPGHandlerCons
     ∷ ( IsSymbol sym
       , R.Lacks sym o'
       , R.Cons sym t o' o
-      , R.Cons sym (Col s t) i' i
-      , QueryRes i tail tup o'
+      , BuildPGHandler tail tup o'
       , FromSQLRow tup
       )
-    ⇒ QueryRes i (RL.Cons sym (Col s t) tail) (Tuple t tup) o
+    ⇒ BuildPGHandler (RL.Cons sym (Col s t) tail) (Tuple t tup) o
   where
-  queryRes i _ = 
-    let 
-      _sym = (SProxy ∷ SProxy sym)
-      r = queryRes i (RLProxy ∷ RLProxy tail)
-      f ( Tuple t tup ) = Record.insert _sym t $ r.f tup
-      col = Record.get _sym i
-    in
-    { f
-    , cols: showCol col : r.cols 
-    }
-
-rowToRecord
-  ∷ ∀ i o tup il
-  . RL.RowToList i il
-  ⇒ QueryRes i il tup o
-  ⇒ FromSQLRow tup
-  ⇒ Record i → { f ∷ tup → Record o, cols ∷ Array String }
-rowToRecord i = queryRes i (RLProxy ∷ RLProxy il)
+  buildPGHandler _ =
+    let f' = buildPGHandler (RLProxy ∷ RLProxy tail) in
+    \(Tuple t tup) → Record.insert (SProxy ∷ SProxy sym) t $ f' tup
 
 withPG
   ∷ ∀ o i il tup s
   . RL.RowToList i il
-  ⇒ QueryRes i il tup o
+  ⇒ BuildPGHandler il tup o
+  ⇒ ExtractCols i il
   ⇒ FromSQLRow tup
   ⇒ PoolConfiguration
   → Query s (Record i)
   → Aff (Array (Record o))
 withPG dbconfig q = do
   let
-    (Tuple res st) = runQuery q
-    from = sourcesToString st.sources
-    wheres = aux " where " " AND " (\e → "(" <> showExpr e <> ")") st.restricts
-    { f, cols } = rowToRecord res
-    q_str =
-      "select " <> joinWith ", " cols
-        <> from
-        <> wheres
-        <> ";"
+    (Tuple res st') = runQuery q
+    st = st' { cols = getCols res }
+    q_str = showState st
   liftEffect $ log q_str
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
     rows ← PG.query conn (PG.Query q_str) PG.Row0
-    pure $ map f rows
+    pure $ map (pgHandler res) rows
 
-sourcesToString ∷ Array Source → String
-sourcesToString sources = case Array.uncons $ reverse sources of
+showState ∷ GenState → String
+showState { cols, sources, restricts } = 
+  showCols cols
+    <> showSources sources
+    <> showRestricts restricts
+
+showCols ∷ Array (Tuple Alias (Exists Expr)) → String
+showCols = case _ of
+  [] → ""
+  xs → "select " <> (joinWith ", " $ map showAliasedCol xs)
+
+showSources ∷ Array Source → String
+showSources sources = case Array.uncons $ reverse sources of
   Nothing →
     ""
-  Just { head: h@(CrossJoin t), tail } →
+  Just { head: h@(Product t), tail } →
     " from " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
   Just { head: LeftJoin t _, tail } →
-    -- join on the first place, drop it and interpret as crossjoin
-    sourcesToString $ CrossJoin t : tail
+    -- join on the first place, drop it and interpret as Product
+    showSources $ Product t : tail
+
+showRestricts ∷ Array (Expr Boolean) → String
+showRestricts = case _ of
+  [] → ""
+  xs → " where " <> (joinWith " AND " $ map (\e → "(" <> showExpr e <> ")") xs)
+
+showSQL ∷ SQL → String
+showSQL = case _ of
+  FromTable t →
+    t.name <> " " <> t.alias
+  SubQuery alias state → 
+    "(" <> showState state <> ") " <> alias <> " "
 
 sepFor ∷ Source → String
 sepFor = case _ of
-  CrossJoin _ → ", "
+  Product _ → ", "
   LeftJoin _ _ → " left join "
 
 showSource ∷ Source → String
 showSource = case _ of
-  CrossJoin t → t.name <> " " <> t.alias
-  LeftJoin t e → t.name <> " " <> t.alias <> " on (" <> showExpr e <> ")"
+  Product t → showSQL t
+  LeftJoin t e → showSQL t <> " on (" <> showExpr e <> ")"
+
+showAliasedCol ∷ Tuple Alias (Exists Expr) → String
+showAliasedCol (Tuple alias ee) = runExists showExpr ee <> " as " <> alias
 
 aux ∷ ∀ a. String → String → (a → String) → Array a → String
 aux beg sep f l = case l of

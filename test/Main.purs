@@ -147,15 +147,15 @@ main = do
               pure { id, balance, personId }
             assertSeqEq expected rows
           -- test conn "test" $ do
-          --   (rows ∷ Array (_ Int String Int String)) ← PG.query conn (PG.Query """
-          --     select p.id, count(p.name), p.age, count(b.id) -- b.id, b.personId, b.balance
+          --   (rows ∷ Array (_ Int String Int String Int)) ← PG.query conn (PG.Query """
+          --     select p.id, count(p.name), p.age, count(b.id), max(b.personId) -- b.id, b.personId, b.balance
           --     from people p, bank_accounts b
           --     where p.id > 0 and b.id > 0
-          --     group by p.id, p.name, p.age, b.personId
+          --     -- group by p.id, p.name, p.age, b.personId
           --   """) Row0
           --   liftEffect $ log ""
-          --   liftEffect $ for_ rows \(PG.Row4 pid name age bid) → do
-          --     log $ show pid <> " " <> show name <> " " <> show age <> " " <> show bid -- <> " " <> show bpid <> " " <> show balance
+          --   liftEffect $ for_ rows \(PG.Row5 pid name age bid bpid) → do
+          --     log $ show pid <> " " <> show name <> " " <> show age <> " " <> show bid <> " " <> show bpid -- <> " " <> show balance
           --   pure unit
 
 main' ∷ Effect Unit

@@ -14,8 +14,8 @@ import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class ToCols, Col(..), toCols)
-import Selda.Query.Type (Query(..), Source(..), freshId)
-import Selda.Table (class TableColumns, Table(..), AliasedTable, tableColumns)
+import Selda.Query.Type (Source(..), Query(..), SQL(..), freshId)
+import Selda.Table (class TableColumns, Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -36,7 +36,7 @@ select
 select table = do
   { res, aliased } ← aux table
   st ← Query get
-  Query $ put $ st { sources = CrossJoin aliased : st.sources }
+  Query $ put $ st { sources = Product aliased : st.sources }
   pure res
 
 leftJoin
@@ -60,7 +60,7 @@ aux
   ⇒ TableColumns rl i
   ⇒ RL.RowToList i il
   ⇒ ToCols s i il res
-  ⇒ Table r → Query s { res ∷ Record res , aliased ∷ AliasedTable }
+  ⇒ Table r → Query s { res ∷ Record res , aliased ∷ SQL }
 aux (Table { name }) = do
   id ← freshId
   st ← Query get
@@ -68,7 +68,7 @@ aux (Table { name }) = do
     aliased = { name, alias: name <> "_" <> show id }
     i = tableColumns aliased (RLProxy ∷ RLProxy rl)
     res = toCols (Proxy ∷ Proxy s) i (RLProxy ∷ RLProxy il)
-  pure $ { res, aliased }
+  pure $ { res, aliased: FromTable aliased }
 
 data WrapWithMaybe = WrapWithMaybe
 instance wrapWithMaybeInstance

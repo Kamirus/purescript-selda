@@ -1,6 +1,7 @@
 module Selda.Table
   ( Column, showColumn
   , AliasedTable
+  , Alias
   , Table(..)
   , class TableColumns
   , tableColumns
@@ -17,7 +18,9 @@ import Type.Row (RLProxy(..))
 
 newtype Table ( r ∷ # Type ) = Table { name ∷ String }
 
-type AliasedTable = { name ∷ String, alias ∷ String }
+type Alias = String
+
+type AliasedTable = { name ∷ String, alias ∷ Alias }
 
 newtype Column a = Column { table ∷ AliasedTable, name ∷ String }
 

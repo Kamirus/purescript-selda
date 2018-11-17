@@ -15,4 +15,5 @@
 - default, sequenced primary key - do not insert those, but do select
 
 # Known issues
+- leftJoin before select
 - nested records not working - generic part - pure $ { r1: { a, b }, r2: { c }, d }
