@@ -1,6 +1,7 @@
 module Selda.Query.Type
   ( Query(..)
   , GenState
+  , Source(..)
   , initState
   , freshId
   , runQuery
@@ -15,8 +16,12 @@ import Selda.Expr (Expr)
 import Selda.Query.Type (GenState)
 import Selda.Table (AliasedTable)
 
+data Source
+  = CrossJoin AliasedTable
+  | LeftJoin AliasedTable (Expr Boolean)
+
 type GenState = 
-  { sources ∷ Array AliasedTable
+  { sources ∷ Array Source
   , restricts ∷ Array (Expr Boolean)
   , nextId ∷ Int
   }

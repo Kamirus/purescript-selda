@@ -5,13 +5,13 @@ import Prelude
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
-import Database.PostgreSQL (PoolConfiguration, defaultPoolConfiguration)
+import Database.PostgreSQL (PoolConfiguration, Row0(..), defaultPoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect (Effect)
 import Effect.Aff (launchAff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Selda (Table(..), lit, restrict, select, withPG, (.==), (.>))
+import Selda (Table(..), leftJoin, lit, restrict, select, withPG, (.==), (.>))
 import Test.Unit (suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
@@ -122,6 +122,30 @@ main = do
               restrict $ id .== personId
               pure { id, balance }
             assertSeqEq expected rows
+          test conn "left join" $ do
+            let
+              expected = 
+                [ { id: 1, balance: Just 100 }
+                , { id: 1, balance: Just 150 }
+                , { id: 2, balance: Nothing }
+                , { id: 3, balance: Just 300 }
+                ]
+            rows <- withPG dbconfig $ do
+              { id, name, age } ← select people
+              { balance } ← leftJoin bankAccounts \b → id .== b.personId
+              pure { id, balance }
+            assertSeqEq expected rows
+          -- test conn "test" $ do
+          --   (rows ∷ Array (_ Int String Int String)) ← PG.query conn (PG.Query """
+          --     select p.id, count(p.name), p.age, count(b.id) -- b.id, b.personId, b.balance
+          --     from people p, bank_accounts b
+          --     where p.id > 0 and b.id > 0
+          --     group by p.id, p.name, p.age, b.personId
+          --   """) Row0
+          --   liftEffect $ log ""
+          --   liftEffect $ for_ rows \(PG.Row4 pid name age bid) → do
+          --     log $ show pid <> " " <> show name <> " " <> show age <> " " <> show bid -- <> " " <> show bpid <> " " <> show balance
+          --   pure unit
 
 main' ∷ Effect Unit
 main' = do 

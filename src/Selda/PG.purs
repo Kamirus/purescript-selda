@@ -6,20 +6,24 @@ module Selda.PG
 
 import Prelude
 
-import Data.Array ((:))
+import Data.Array (foldl, reverse, (:))
+import Data.Array as Array
+import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Data.Tuple (Tuple(..))
 import Database.PostgreSQL (class FromSQLRow, PoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect.Aff (Aff)
+import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Selda.Col (Col, showCol)
 import Selda.Expr (showExpr)
-import Selda.Query.Type (Query, runQuery)
+import Selda.Query.Type (Query, Source(..), runQuery)
 import Type.Row (RLProxy(..))
 
 {- 
@@ -94,7 +98,7 @@ withPG
 withPG dbconfig q = do
   let
     (Tuple res st) = runQuery q
-    from = aux " from " ", " (\t → t.name <> " " <> t.alias) st.sources
+    from = sourcesToString st.sources
     wheres = aux " where " " AND " (\e → "(" <> showExpr e <> ")") st.restricts
     { f, cols } = rowToRecord res
     q_str =
@@ -102,11 +106,31 @@ withPG dbconfig q = do
         <> from
         <> wheres
         <> ";"
-
+  liftEffect $ log q_str
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
     rows ← PG.query conn (PG.Query q_str) PG.Row0
     pure $ map f rows
+
+sourcesToString ∷ Array Source → String
+sourcesToString sources = case Array.uncons $ reverse sources of
+  Nothing →
+    ""
+  Just { head: h@(CrossJoin t), tail } →
+    " from " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
+  Just { head: LeftJoin t _, tail } →
+    -- join on the first place, drop it and interpret as crossjoin
+    sourcesToString $ CrossJoin t : tail
+
+sepFor ∷ Source → String
+sepFor = case _ of
+  CrossJoin _ → ", "
+  LeftJoin _ _ → " left join "
+
+showSource ∷ Source → String
+showSource = case _ of
+  CrossJoin t → t.name <> " " <> t.alias
+  LeftJoin t e → t.name <> " " <> t.alias <> " on (" <> showExpr e <> ")"
 
 aux ∷ ∀ a. String → String → (a → String) → Array a → String
 aux beg sep f l = case l of
