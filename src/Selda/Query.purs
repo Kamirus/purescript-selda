@@ -15,7 +15,7 @@ import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class ToCols, Col(..), toCols)
 import Selda.Query.Type (Query(..), Source(..), freshId)
-import Selda.Table (class TableColumns, Table(..), tableColumns)
+import Selda.Table (class TableColumns, Table(..), AliasedTable, tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -27,19 +27,17 @@ restrict (Col e) = Query do
 
 select
   ∷ ∀ s r rl res i il
-  . RL.RowToList r rl
+  . 
+  RL.RowToList r rl
   ⇒ TableColumns rl i
   ⇒ RL.RowToList i il
   ⇒ ToCols s i il res
   ⇒ Table r → Query s (Record res)
-select (Table { name }) = do
-  id ← freshId
+select table = do
+  { res, aliased } ← aux table
   st ← Query get
-  let
-    aliased = { name, alias: name <> "_" <> show id }
-    i = tableColumns aliased (RLProxy ∷ RLProxy rl)
   Query $ put $ st { sources = CrossJoin aliased : st.sources }
-  pure $ toCols (Proxy ∷ Proxy s) i (RLProxy ∷ RLProxy il)
+  pure res
 
 leftJoin
   ∷ ∀ r s res rl il i mres
@@ -49,16 +47,28 @@ leftJoin
   ⇒ ToCols s i il res
   ⇒ HMap WrapWithMaybe (Record res) (Record mres)
   ⇒ Table r → (Record res → Col s Boolean) → Query s (Record mres)
-leftJoin (Table { name }) on = do
+leftJoin table on = do
+  { res, aliased } ← aux table
+  let Col e = on res
+  st ← Query get
+  Query $ put $ st { sources = LeftJoin aliased e : st.sources }
+  pure $ hmap WrapWithMaybe res
+
+aux
+  ∷ ∀ r s res rl il i
+  . RL.RowToList r rl
+  ⇒ TableColumns rl i
+  ⇒ RL.RowToList i il
+  ⇒ ToCols s i il res
+  ⇒ Table r → Query s { res ∷ Record res , aliased ∷ AliasedTable }
+aux (Table { name }) = do
   id ← freshId
   st ← Query get
   let
     aliased = { name, alias: name <> "_" <> show id }
     i = tableColumns aliased (RLProxy ∷ RLProxy rl)
     res = toCols (Proxy ∷ Proxy s) i (RLProxy ∷ RLProxy il)
-    Col e = on res
-  Query $ put $ st { sources = LeftJoin aliased e : st.sources }
-  pure $ hmap WrapWithMaybe res
+  pure $ { res, aliased }
 
 data WrapWithMaybe = WrapWithMaybe
 instance wrapWithMaybeInstance
