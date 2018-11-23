@@ -11,7 +11,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Selda (Table(..), leftJoin, lit, restrict, select, withPG, (.==), (.>))
+import Selda (Table(..), leftJoin, leftJoin', lit, restrict, select, withPG, (.==), (.>))
 import Test.Unit (suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
@@ -145,6 +145,20 @@ main = do
             rows <- withPG dbconfig $ do
               { id, personId, balance } ← leftJoin bankAccounts \_ → lit true
               pure { id, balance, personId }
+            assertSeqEq expected rows
+          test conn "left join but with subquery" $ do
+            let
+              expected = 
+                [ { id: 1, balance: Just 100 }
+                , { id: 1, balance: Just 150 }
+                , { id: 2, balance: Nothing }
+                , { id: 3, balance: Just 300 }
+                ]
+            rows <- withPG dbconfig $ do
+              { id, name, age } ← select people
+              { balance } ← leftJoin' (\b → id .== b.personId) do
+                select bankAccounts
+              pure { id, balance }
             assertSeqEq expected rows
           -- test conn "test" $ do
           --   (rows ∷ Array (_ Int String Int String Int)) ← PG.query conn (PG.Query """
