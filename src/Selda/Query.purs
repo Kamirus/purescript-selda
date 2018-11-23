@@ -4,20 +4,23 @@ module Selda.Query
   , leftJoin
   , leftJoin'
   , WrapWithMaybe
+  , RenameNamespace
   ) where
 
 import Prelude
 
 import Control.Monad.State (get, put)
 import Data.Array ((:))
+import Data.Exists (Exists, mkExists, runExists)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..))
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class ExtractCols, class ToCols, Col(..), getCols, toCols)
+import Selda.Expr (BinExp(..), Expr(..))
 import Selda.Query.Type (Query(..), SQL(..), Source(..), freshId, runQuery)
-import Selda.Table (class TableColumns, Table(..), Alias, tableColumns)
+import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -50,16 +53,18 @@ leftJoin table on = do
   pure $ hmap WrapWithMaybe res
 
 leftJoin'
-  ∷ ∀ s res resl mres
-  . HMap WrapWithMaybe (Record res) (Record mres)
+  ∷ ∀ s res' res resl mres'
+  . HMap RenameNamespace (Record res) (Record res')
+  ⇒ HMap WrapWithMaybe (Record res') (Record mres')
   ⇒ RL.RowToList res resl ⇒ ExtractCols res resl
-  ⇒ (Record res → Col s Boolean) → Query s (Record res) → Query s (Record mres)
+  ⇒ (Record res' → Col s Boolean) → Query s (Record res) → Query s (Record mres')
 leftJoin' on q = do
-  { res, sql } ← fromSubQuery q
-  let Col e = on res
+  { res, sql, alias } ← fromSubQuery q
+  let res' = hmap (RenameNamespace alias) res
+  let Col e = on res'
   st ← Query get
   Query $ put $ st { sources = LeftJoin sql e : st.sources }
-  pure $ hmap WrapWithMaybe res
+  pure $ hmap WrapWithMaybe res'
 
 fromTable
   ∷ ∀ r s res rl il i
@@ -80,6 +85,12 @@ instance wrapWithMaybeInstance
   where
   mapping WrapWithMaybe = (unsafeCoerce ∷ Col s a → Col s (Maybe a))
 
+newtype RenameNamespace = RenameNamespace Alias
+instance renameNamespaceInstance
+    ∷ Mapping RenameNamespace (Col s a) (Col s a)
+  where
+  mapping (RenameNamespace s) (Col e) = Col $ renameNamespace s e
+
 subQueryAlias ∷ ∀ s. Query s Alias
 subQueryAlias = do
   id ← freshId
@@ -88,8 +99,20 @@ subQueryAlias = do
 fromSubQuery
   ∷ ∀ res s resl
   . RL.RowToList res resl ⇒ ExtractCols res resl
-  ⇒ Query s (Record res) → Query s { res ∷ Record res, sql ∷ SQL }
+  ⇒ Query s (Record res)
+  → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
 fromSubQuery q = do
   let (Tuple res st) = runQuery q
   alias ← subQueryAlias
-  pure $ { res, sql: SubQuery alias $ st { cols = getCols res } }
+  pure $ { res, sql: SubQuery alias $ st { cols = getCols res }, alias }
+
+renameNamespace ∷ ∀ a. Alias → Expr a → Expr a
+renameNamespace namespace = rename
+  where
+  rename ∷ ∀ o. Expr o → Expr o
+  rename e = case e of
+    EColumn (Column c) → EColumn $ Column $ c { namespace = namespace }
+    ELit _ → e
+    EBinOp ebinop → EBinOp $ runExists renameBinExp ebinop
+  renameBinExp ∷ ∀ o i. BinExp o i → Exists (BinExp o)
+  renameBinExp (BinExp op e1 e2) = mkExists $ BinExp op (rename e1) (rename e2)

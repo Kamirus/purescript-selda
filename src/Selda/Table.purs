@@ -1,5 +1,5 @@
 module Selda.Table
-  ( Column, showColumn
+  ( Column(..), showColumn
   , AliasedTable
   , Alias
   , Table(..)
@@ -22,10 +22,10 @@ type Alias = String
 
 type AliasedTable = { name ∷ String, alias ∷ Alias }
 
-newtype Column a = Column { table ∷ AliasedTable, name ∷ String }
+newtype Column a = Column { namespace ∷ Alias, name ∷ String }
 
 showColumn ∷ ∀ a. Column a → String
-showColumn (Column { table, name }) = table.alias <> "." <> name
+showColumn (Column { namespace, name }) = namespace <> "." <> name
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
 class TableColumns (rl ∷ RowList) (r ∷ # Type) | rl → r where
@@ -46,6 +46,6 @@ instance tableColumnsCons
     let
       _sym = (SProxy ∷ SProxy sym)
       res' = tableColumns table (RLProxy ∷ RLProxy tail)
-      col = Column { table, name: reflectSymbol _sym }
+      col = Column { namespace: table.alias, name: reflectSymbol _sym }
     in
     Record.insert _sym col res'
