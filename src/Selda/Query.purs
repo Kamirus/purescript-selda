@@ -52,19 +52,25 @@ leftJoin table on = do
   Query $ put $ st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
+-- | `leftJoin' on q`
+-- | run sub query `q`;
+-- | rename namespaces of columns in its result;
+-- | with this execute `on` to get JOIN constraint;
+-- | add sub query to sources;
+-- | return previously mapped record with each value in Col wrapped in Maybe
+-- | (because LEFT JOIN can return null for each column)
 leftJoin'
-  ∷ ∀ s res' res resl mres'
-  . HMap RenameNamespace (Record res) (Record res')
-  ⇒ HMap WrapWithMaybe (Record res') (Record mres')
-  ⇒ RL.RowToList res resl ⇒ ExtractCols res resl
-  ⇒ (Record res' → Col s Boolean) → Query s (Record res) → Query s (Record mres')
+  ∷ ∀ s res res0 resl mres
+  . HMap RenameNamespace (Record res0) (Record res)
+  ⇒ HMap WrapWithMaybe (Record res) (Record mres)
+  ⇒ RL.RowToList res0 resl ⇒ ExtractCols res0 resl
+  ⇒ (Record res → Col s Boolean) → Query s (Record res0) → Query s (Record mres)
 leftJoin' on q = do
   { res, sql, alias } ← fromSubQuery q
-  let res' = hmap (RenameNamespace alias) res
-  let Col e = on res'
+  let Col e = on res
   st ← Query get
   Query $ put $ st { sources = LeftJoin sql e : st.sources }
-  pure $ hmap WrapWithMaybe res'
+  pure $ hmap WrapWithMaybe res
 
 fromTable
   ∷ ∀ r s res rl il i
@@ -97,15 +103,23 @@ subQueryAlias = do
   pure $ "sub" <> "_q" <> show id
 
 fromSubQuery
-  ∷ ∀ res s resl
+  ∷ ∀ res s resl res'
   . RL.RowToList res resl ⇒ ExtractCols res resl
+  ⇒ HMap RenameNamespace (Record res) (Record res')
   ⇒ Query s (Record res)
-  → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
+  → Query s { res ∷ Record res' , sql ∷ SQL , alias ∷ Alias }
 fromSubQuery q = do
-  let (Tuple res st) = runQuery q
+  let (Tuple res0 st) = runQuery q
+  let cols = getCols res0
   alias ← subQueryAlias
-  pure $ { res, sql: SubQuery alias $ st { cols = getCols res }, alias }
+  let res = hmap (RenameNamespace alias) res0
+  pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }
 
+-- | `renameNamespace namespace expr`
+-- | change namespace in every column in `expr`
+-- | When namespace changes?
+-- | Columns outside of subqueries are namespaced with subquery alias.
+-- | select aux.id from (select id from people ...) aux ...
 renameNamespace ∷ ∀ a. Alias → Expr a → Expr a
 renameNamespace namespace = rename
   where

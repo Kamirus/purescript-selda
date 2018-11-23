@@ -121,7 +121,7 @@ showSQL = case _ of
   FromTable t →
     t.name <> " " <> t.alias
   SubQuery alias state → 
-    "(" <> showState state <> ") " <> alias <> " "
+    "(" <> showState state <> ") " <> alias
 
 sepFor ∷ Source → String
 sepFor = case _ of
