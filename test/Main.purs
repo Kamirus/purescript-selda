@@ -157,7 +157,9 @@ main = do
             rows <- withPG dbconfig $ do
               { id, name, age } ← select people
               { balance } ← leftJoin' (\b → id .== b.personId) do
-                select bankAccounts
+                b ← select bankAccounts
+                -- restrict $ id .== b.personId -- type error
+                pure b
               pure { id, balance }
             assertSeqEq expected rows
           -- test conn "test" $ do

@@ -19,6 +19,7 @@ import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class ExtractCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (BinExp(..), Expr(..))
+import Selda.Inner (Inner, OuterCols, outer)
 import Selda.Query.Type (Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
@@ -60,11 +61,14 @@ leftJoin table on = do
 -- | return previously mapped record with each value in Col wrapped in Maybe
 -- | (because LEFT JOIN can return null for each column)
 leftJoin'
-  ∷ ∀ s res res0 resl mres
-  . HMap RenameNamespace (Record res0) (Record res)
+  ∷ ∀ s res res0 rl mres inner
+  . HMap OuterCols (Record inner) (Record res0)
+  ⇒ HMap RenameNamespace (Record res0) (Record res)
   ⇒ HMap WrapWithMaybe (Record res) (Record mres)
-  ⇒ RL.RowToList res0 resl ⇒ ExtractCols res0 resl
-  ⇒ (Record res → Col s Boolean) → Query s (Record res0) → Query s (Record mres)
+  ⇒ RL.RowToList res0 rl ⇒ ExtractCols res0 rl
+  ⇒ (Record res → Col s Boolean)
+  → Query (Inner s) (Record inner)
+  → Query s (Record mres)
 leftJoin' on q = do
   { res, sql, alias } ← fromSubQuery q
   let Col e = on res
@@ -103,13 +107,15 @@ subQueryAlias = do
   pure $ "sub" <> "_q" <> show id
 
 fromSubQuery
-  ∷ ∀ res s resl res'
-  . RL.RowToList res resl ⇒ ExtractCols res resl
-  ⇒ HMap RenameNamespace (Record res) (Record res')
-  ⇒ Query s (Record res)
-  → Query s { res ∷ Record res' , sql ∷ SQL , alias ∷ Alias }
+  ∷ ∀ inner s rl res res0
+  . HMap OuterCols (Record inner) (Record res0)
+  ⇒ RL.RowToList res0 rl ⇒ ExtractCols res0 rl
+  ⇒ HMap RenameNamespace (Record res0) (Record res)
+  ⇒ Query (Inner s) (Record inner)
+  → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
 fromSubQuery q = do
-  let (Tuple res0 st) = runQuery q
+  let (Tuple innerRes st) = runQuery q
+  let res0 = outer innerRes
   let cols = getCols res0
   alias ← subQueryAlias
   let res = hmap (RenameNamespace alias) res0
