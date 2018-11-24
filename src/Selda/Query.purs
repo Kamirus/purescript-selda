@@ -4,22 +4,22 @@ module Selda.Query
   , leftJoin
   , leftJoin'
   , WrapWithMaybe
-  , RenameNamespace
+  , SubQueryResult
   ) where
 
 import Prelude
 
-import Control.Monad.State (get, modify_, put)
+import Control.Monad.State (modify_)
 import Data.Array ((:))
-import Data.Exists (Exists, mkExists, runExists)
 import Data.Maybe (Maybe)
+import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
-import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
+import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Aggr (UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class ExtractCols, class ToCols, Col(..), getCols, toCols)
-import Selda.Expr (BinExp(..), Expr(..))
+import Selda.Expr (Expr(..))
 import Selda.Inner (Inner, OuterCols, outer)
 import Selda.Query.Type (Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
@@ -75,7 +75,6 @@ leftJoin table on = do
 
 -- | `leftJoin' on q`
 -- | run sub query `q`;
--- | rename namespaces of columns in its result;
 -- | with this execute `on` to get JOIN constraint;
 -- | add sub query to sources;
 -- | return previously mapped record with each value in Col wrapped in Maybe
@@ -83,7 +82,7 @@ leftJoin table on = do
 leftJoin'
   ∷ ∀ s res res0 rl mres inner
   . HMap OuterCols (Record inner) (Record res0)
-  ⇒ HMap RenameNamespace (Record res0) (Record res)
+  ⇒ HMapWithIndex SubQueryResult (Record res0) (Record res)
   ⇒ HMap WrapWithMaybe (Record res) (Record mres)
   ⇒ RL.RowToList res0 rl ⇒ ExtractCols res0 rl
   ⇒ (Record res → Col s Boolean)
@@ -101,7 +100,6 @@ fromTable
   ⇒ Table r → Query s { res ∷ Record res , sql ∷ SQL }
 fromTable (Table { name }) = do
   id ← freshId
-  st ← Query get
   let
     aliased = { name, alias: name <> "_" <> show id }
     i = tableColumns aliased (RLProxy ∷ RLProxy rl)
@@ -114,12 +112,6 @@ instance wrapWithMaybeInstance
   where
   mapping WrapWithMaybe = (unsafeCoerce ∷ Col s a → Col s (Maybe a))
 
-newtype RenameNamespace = RenameNamespace Alias
-instance renameNamespaceInstance
-    ∷ Mapping RenameNamespace (Col s a) (Col s a)
-  where
-  mapping (RenameNamespace s) (Col e) = Col $ renameNamespace s e
-
 subQueryAlias ∷ ∀ s. Query s Alias
 subQueryAlias = do
   id ← freshId
@@ -129,7 +121,7 @@ fromSubQuery
   ∷ ∀ inner s rl res res0
   . HMap OuterCols (Record inner) (Record res0)
   ⇒ RL.RowToList res0 rl ⇒ ExtractCols res0 rl
-  ⇒ HMap RenameNamespace (Record res0) (Record res)
+  ⇒ HMapWithIndex SubQueryResult { | res0 } { | res }
   ⇒ Query (Inner s) (Record inner)
   → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
 fromSubQuery q = do
@@ -137,21 +129,34 @@ fromSubQuery q = do
   let res0 = outer innerRes
   let cols = getCols res0
   alias ← subQueryAlias
-  let res = hmap (RenameNamespace alias) res0
+  let res = createSubQueryResult alias res0
   pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }
 
--- | `renameNamespace namespace expr`
--- | change namespace in every column in `expr`
--- | When namespace changes?
--- | Columns outside of subqueries are namespaced with subquery alias.
--- | select aux.id from (select id from people ...) aux ...
-renameNamespace ∷ ∀ a. Alias → Expr a → Expr a
-renameNamespace namespace = rename
+-- | Outside of the subquery, every returned col (in SELECT ...) 
+-- | (no matter if it's just a column of some table or expression or function or ...)
+-- | is seen as a column of this subquery.
+-- | So it can just be `<subquery alias>.<col alias>`.
+-- | 
+-- | Creates record of Columns with namespace set as subquery alias
+-- | and column name as its symbol in record
+-- | 
+-- | ```purescript
+-- | i ∷ { a ∷ Col s Int , b ∷ Col s String } = { a: lit 1, b: people.name }
+-- | createSubQueryResult namespace i
+-- | ==
+-- | ({ a: ...{ namespace, name: "a" }, b: ...{ namespace, name: "b" } }
+-- |   ∷ { a ∷ Col s Int , b ∷ Col s String })
+-- | ```
+createSubQueryResult
+  ∷ ∀ i o
+  . HMapWithIndex SubQueryResult { | i } { | o }
+  ⇒ Alias → { | i } → { | o }
+createSubQueryResult = hmapWithIndex <<< SubQueryResult
+
+data SubQueryResult = SubQueryResult Alias
+instance subQueryResultInstance
+    ∷ IsSymbol sym
+    ⇒ MappingWithIndex SubQueryResult (SProxy sym) (Col s a) (Col s a)
   where
-  rename ∷ ∀ o. Expr o → Expr o
-  rename e = case e of
-    EColumn (Column c) → EColumn $ Column $ c { namespace = namespace }
-    ELit _ → e
-    EBinOp ebinop → EBinOp $ runExists renameBinExp ebinop
-  renameBinExp ∷ ∀ o i. BinExp o i → Exists (BinExp o)
-  renameBinExp (BinExp op e1 e2) = mkExists $ BinExp op (rename e1) (rename e2)
+  mappingWithIndex (SubQueryResult namespace) sym (Col e) = 
+    Col $ EColumn $ Column { namespace, name: reflectSymbol sym }
