@@ -40,6 +40,7 @@ type GenState =
   , restricts ∷ Array (Expr Boolean)
   , nextId ∷ Int
   , cols ∷ Array (Tuple Alias (Exists Expr))
+  , aggr ∷ Array (Exists Expr)
   }
 
 newtype Query s a = Query (State GenState a)
@@ -55,6 +56,7 @@ initState =
   , restricts: []
   , nextId: 0
   , cols: []
+  , aggr: []
   }
 
 freshId ∷ ∀ s. Query s Int

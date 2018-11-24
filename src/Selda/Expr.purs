@@ -21,8 +21,13 @@ data Expr o
   = EColumn (Column o)
   | ELit (Literal o)
   | EBinOp (Exists (BinExp o))
+  | EFn (Fn o)
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
+
+data Fn o
+  = FnMax (Expr o)
+  | FnCount (Exists Expr) (String ~ o)
 
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
@@ -41,6 +46,12 @@ showExpr = case _ of
   EColumn col → showColumn col
   ELit lit → showLiteral lit
   EBinOp e → runExists showBinExp e
+  EFn fn → showFn fn
 
 showBinExp ∷ ∀ o i. BinExp o i → String
 showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2 <> ")"
+
+showFn ∷ ∀ o. Fn o → String
+showFn = case _ of
+  FnMax e → showExpr e
+  FnCount ee _ → runExists showExpr ee

@@ -4,13 +4,6 @@ module Selda.Col
   , lit
   , class ToCols, toCols, getCols
   , class ExtractCols, extractCols
-  , (.==), expEq
-  , (.>), expGt
-  -- , (.<)
-  -- , (.>=)
-  -- , (.<=)
-  -- , (.&&)
-  , (.||), expOr
   ) where
 
 import Prelude
@@ -24,7 +17,7 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), showExpr)
+import Selda.Expr (Expr(..), Literal(..), showExpr)
 import Selda.Table (Column, Alias)
 import Type.Proxy (Proxy)
 import Type.Row (RLProxy(..))
@@ -103,26 +96,3 @@ else instance extractColsCons
     _sym = (SProxy ∷ SProxy sym)
     cols = extractCols i (RLProxy ∷ RLProxy tail)
     Col e = Record.get _sym i
-
-expOr ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
-expOr = binOp (Or identity identity)
-
-expGt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expGt = binOp (Gt identity)
-
-expEq ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expEq = binOp (Eq identity)
-
-binOp ∷ ∀ s o i. BinOp i o -> Col s i -> Col s i -> Col s o
-binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
-
--- instance colHeytingAlgebra ∷ HeytingAlgebra (Col s Boolean) where
-
--- infixl 4 `like`
-infixl 4 expEq as .==
-infixl 4 expGt as .>
--- infixl 4 expLt as .<
--- infixl 4 expGe as .>=
--- infixl 4 expLe as .<=
--- infixr 3 expAnd as .&&
-infixr 2 expOr as .||

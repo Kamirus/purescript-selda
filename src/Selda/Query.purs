@@ -9,14 +9,15 @@ module Selda.Query
 
 import Prelude
 
-import Control.Monad.State (get, put)
+import Control.Monad.State (get, modify_, put)
 import Data.Array ((:))
 import Data.Exists (Exists, mkExists, runExists)
 import Data.Maybe (Maybe)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
+import Selda.Aggr (UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class ExtractCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (BinExp(..), Expr(..))
 import Selda.Inner (Inner, OuterCols, outer)
@@ -27,9 +28,7 @@ import Type.Row (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
-restrict (Col e) = Query do
-  st ← get
-  put $ st { restricts = e : st.restricts }
+restrict (Col e) = Query $ modify_ \st → st { restricts = e : st.restricts }
 
 select
   ∷ ∀ s r rl res i il
@@ -37,9 +36,31 @@ select
   ⇒ Table r → Query s (Record res)
 select table = do
   { res, sql } ← fromTable table
-  st ← Query get
-  Query $ put $ st { sources = Product sql : st.sources }
+  Query $ modify_ $ \st → st { sources = Product sql : st.sources }
   pure res
+
+aggregate
+  ∷ ∀ i o s
+  . HMap UnAggr { | i } { | o }
+  ⇒ Query (Inner s) { | i }
+  → Query s { | o }
+aggregate qi = do 
+  let (Tuple i st) = runQuery qi
+  let o = hmap UnAggr i
+  Query $ modify_ $ const st
+  pure $ o
+
+groupBy
+  ∷ ∀ i o s il
+  . RL.RowToList i il
+  ⇒ ExtractCols i il
+  ⇒ HMap WrapWithAggr { | i } { | o }
+  ⇒ { | i }
+  → Query s { | o }
+groupBy i = do
+  let aggr = map snd $ getCols i
+  Query $ modify_ \st → st { aggr = st.aggr <> aggr }
+  pure $ hmap WrapWithAggr i 
 
 leftJoin
   ∷ ∀ r s res rl il i mres
@@ -49,8 +70,7 @@ leftJoin
 leftJoin table on = do
   { res, sql } ← fromTable table
   let Col e = on res
-  st ← Query get
-  Query $ put $ st { sources = LeftJoin sql e : st.sources }
+  Query $ modify_ \ st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
 -- | `leftJoin' on q`
@@ -72,8 +92,7 @@ leftJoin'
 leftJoin' on q = do
   { res, sql, alias } ← fromSubQuery q
   let Col e = on res
-  st ← Query get
-  Query $ put $ st { sources = LeftJoin sql e : st.sources }
+  Query $ modify_ \st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
 fromTable

@@ -91,22 +91,23 @@ withPG dbconfig q = do
     pure $ map (pgHandler res) rows
 
 showState ∷ GenState → String
-showState { cols, sources, restricts } = 
+showState { cols, sources, restricts, aggr } = 
   showCols cols
     <> showSources sources
     <> showRestricts restricts
+    <> showGrouping aggr
 
 showCols ∷ Array (Tuple Alias (Exists Expr)) → String
 showCols = case _ of
   [] → ""
-  xs → "select " <> (joinWith ", " $ map showAliasedCol xs)
+  xs → "SELECT " <> (joinWith ", " $ map showAliasedCol xs)
 
 showSources ∷ Array Source → String
 showSources sources = case Array.uncons $ reverse sources of
   Nothing →
     ""
   Just { head: h@(Product t), tail } →
-    " from " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
+    " FROM " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
   Just { head: LeftJoin t _, tail } →
     -- join on the first place, drop it and interpret as Product
     showSources $ Product t : tail
@@ -114,7 +115,12 @@ showSources sources = case Array.uncons $ reverse sources of
 showRestricts ∷ Array (Expr Boolean) → String
 showRestricts = case _ of
   [] → ""
-  xs → " where " <> (joinWith " AND " $ map (\e → "(" <> showExpr e <> ")") xs)
+  xs → " WHERE " <> (joinWith " AND " $ map (\e → "(" <> showExpr e <> ")") xs)
+
+showGrouping ∷ Array (Exists Expr) → String
+showGrouping = case _ of
+  [] → ""
+  xs → " GROUP BY " <> (joinWith ", " $ map (runExists showExpr) xs)
 
 showSQL ∷ SQL → String
 showSQL = case _ of
@@ -126,17 +132,12 @@ showSQL = case _ of
 sepFor ∷ Source → String
 sepFor = case _ of
   Product _ → ", "
-  LeftJoin _ _ → " left join "
+  LeftJoin _ _ → " LEFT JOIN "
 
 showSource ∷ Source → String
 showSource = case _ of
   Product t → showSQL t
-  LeftJoin t e → showSQL t <> " on (" <> showExpr e <> ")"
+  LeftJoin t e → showSQL t <> " ON (" <> showExpr e <> ")"
 
 showAliasedCol ∷ Tuple Alias (Exists Expr) → String
-showAliasedCol (Tuple alias ee) = runExists showExpr ee <> " as " <> alias
-
-aux ∷ ∀ a. String → String → (a → String) → Array a → String
-aux beg sep f l = case l of
-  [] → ""
-  _ → beg <> (joinWith sep $ map f l)
+showAliasedCol (Tuple alias ee) = runExists showExpr ee <> " AS " <> alias
