@@ -5,8 +5,7 @@ module Selda.Aggr
   ) where
 
 import Heterogeneous.Mapping (class Mapping)
-import Selda.Col (Col(..))
-import Selda.Inner (Inner)
+import Selda.Col (Col)
 
 newtype Aggr s a = Aggr (Col s a)
 
@@ -17,5 +16,5 @@ instance wrapWithAggrInstance
   mapping _ = Aggr
 
 data UnAggr = UnAggr
-instance unAggrInstance ∷ Mapping UnAggr (Aggr (Inner s) a) (Col s a) where
-  mapping _ (Aggr (Col e)) = Col e
+instance unAggrInstance ∷ Mapping UnAggr (Aggr s a) (Col s a) where
+  mapping _ (Aggr col) = col

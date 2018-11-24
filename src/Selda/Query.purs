@@ -3,6 +3,7 @@ module Selda.Query
   , select
   , aggregate
   , groupBy
+  , groupBy'
   , leftJoin
   , leftJoin'
   , WrapWithMaybe
@@ -13,13 +14,14 @@ import Prelude
 
 import Control.Monad.State (modify_)
 import Data.Array ((:))
+import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
 import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
-import Selda.Aggr (UnAggr(..), WrapWithAggr(..))
+import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class ExtractCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..))
 import Selda.Inner (Inner, OuterCols, outer)
@@ -42,27 +44,35 @@ select table = do
   pure res
 
 aggregate
-  ∷ ∀ i o s
-  . HMap UnAggr { | i } { | o }
-  ⇒ Query (Inner s) { | i }
-  → Query s { | o }
-aggregate qi = do 
-  let (Tuple i st) = runQuery qi
-  let o = hmap UnAggr i
-  Query $ modify_ $ const st
-  pure $ o
+  ∷ ∀ s aggrInner outer rl res inner
+  . HMap UnAggr { | aggrInner } { | inner }
+  ⇒ HMap OuterCols { | inner } { | outer }
+  ⇒ RL.RowToList outer rl ⇒ ExtractCols outer rl
+  ⇒ HMapWithIndex SubQueryResult { | outer } { | res }
+  ⇒ Query (Inner s) { | aggrInner }
+  → Query s { | res }
+aggregate qai = do
+  let (qi ∷ Query (Inner s) { | inner }) = map (hmap UnAggr) qai
+  { res, sql } ← fromSubQuery qi
+  Query $ modify_ $ \st → st { sources = Product sql : st.sources }
+  pure $ res
 
-groupBy
+groupBy ∷ ∀ s a. Col s a → Query s (Aggr s a)
+groupBy col@(Col e) = do
+  Query $ modify_ \st → st { aggr = st.aggr <> [mkExists e] }
+  pure $ Aggr col
+
+groupBy'
   ∷ ∀ i o s il
   . RL.RowToList i il
   ⇒ ExtractCols i il
   ⇒ HMap WrapWithAggr { | i } { | o }
   ⇒ { | i }
   → Query s { | o }
-groupBy i = do
+groupBy' i = do
   let aggr = map snd $ getCols i
   Query $ modify_ \st → st { aggr = st.aggr <> aggr }
-  pure $ hmap WrapWithAggr i 
+  pure $ hmap WrapWithAggr i
 
 leftJoin
   ∷ ∀ r s res rl il i mres

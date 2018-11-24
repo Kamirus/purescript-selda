@@ -161,8 +161,19 @@ main = do
             ]
             $ aggregate do
               { personId, balance } ← select bankAccounts
-              g ← groupBy { personId }
-              pure { pid: g.personId, m: max_ balance, c: count personId }
+              pid ← groupBy personId
+              pure { pid, m: max_ balance, c: count personId }
+
+          test' conn "aggr: max people id having count > 1"
+            [ { pid: 1, m: 150, c: "2" }
+            ]
+            $ do
+              r@{ c } ← aggregate do
+                { personId, balance } ← select bankAccounts
+                pid ← groupBy personId
+                pure { pid, m: max_ balance, c: count personId }
+              restrict $ c .> lit "1"
+              pure r
 
 test'
   ∷ ∀ s o i il tup ol

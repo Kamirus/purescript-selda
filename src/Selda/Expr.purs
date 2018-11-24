@@ -32,7 +32,7 @@ data Fn o
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
   LBoolean b _ → show b
-  LString s _ → "'" <> show s <> "'"
+  LString s _ → "'" <> s <> "'"
   LInt i _ → show i
 
 showBinOp ∷ ∀ i o. BinOp i o → String
