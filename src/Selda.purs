@@ -11,7 +11,7 @@ module Selda
   -- , (.<=)
   -- , (.&&)
   , (.||), expOr
-  -- , count
+  , count
   , max_
   ) where
 
@@ -23,7 +23,7 @@ import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..))
 import Selda.PG (withPG) as PG
-import Selda.Query (select, restrict, leftJoin, leftJoin') as Query
+import Selda.Query (select, restrict, leftJoin, leftJoin', aggregate, groupBy) as Query
 import Selda.Query.Type (Query(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
 
@@ -39,8 +39,8 @@ expEq = binOp (Eq identity)
 binOp ∷ ∀ s o i. BinOp i o -> Col s i -> Col s i -> Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
 
-count ∷ ∀ s a. Col s a → Col s String
-count (Col e) = Col $ EFn $ FnCount (mkExists e) identity
+count ∷ ∀ s a. Col s a → Aggr s String
+count (Col e) = Aggr $ Col $ EFn $ FnCount (mkExists e) identity
 
 max_ ∷ ∀ s a. Col s a → Aggr s a
 max_ (Col e) = Aggr $ Col $ EFn $ FnMax e

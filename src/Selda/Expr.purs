@@ -53,5 +53,5 @@ showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2
 
 showFn ∷ ∀ o. Fn o → String
 showFn = case _ of
-  FnMax e → showExpr e
-  FnCount ee _ → runExists showExpr ee
+  FnMax e → "max(" <> showExpr e <> ")"
+  FnCount ee _ → "count(" <> runExists showExpr ee <> ")"

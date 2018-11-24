@@ -2,17 +2,20 @@ module Test.Main where
 
 import Prelude
 
-import Data.Foldable (for_)
+import Data.Eq (class EqRecord)
 import Data.Maybe (Maybe(..))
+import Data.Show (class ShowRecordFields)
 import Data.Tuple.Nested ((/\))
-import Database.PostgreSQL (PoolConfiguration, Row0(..), defaultPoolConfiguration)
+import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect (Effect)
-import Effect.Aff (launchAff, launchAff_)
+import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
-import Selda (Table(..), leftJoin, leftJoin', lit, restrict, select, withPG, (.==), (.>))
-import Test.Unit (suite)
+import Prim.RowList as RL
+import Selda (Query, Table(..), aggregate, count, groupBy, leftJoin, leftJoin', lit, max_, restrict, select, withPG, (.==), (.>))
+import Selda.Col (class ExtractCols)
+import Selda.PG (class BuildPGHandler)
+import Test.Unit (TestSuite, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
 
@@ -62,129 +65,112 @@ main = do
 
       liftEffect $ runTest $ do
         suite "Selda" $ do
-          test conn "simple select people" $ do
-            let
-              expected = 
-                [ { id: 1, name: "name1", age: 11 }
-                , { id: 2, name: "name2", age: 22 }
-                , { id: 3, name: "name3", age: 33 }
-                ]
-            rows <- withPG dbconfig $ do
+          test' conn "simple select people"
+            [ { id: 1, name: "name1", age: 11 }
+            , { id: 2, name: "name2", age: 22 }
+            , { id: 3, name: "name3", age: 33 }
+            ]
+            $ do
               r ← select people
               pure r
-            assertSeqEq expected rows
-          test conn "select people, return different record" $ do
-            let
-              expected = 
-                [ { x: 1, y: 11 }
-                , { x: 2, y: 22 }
-                , { x: 3, y: 33 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "select people, return different record"
+            [ { x: 1, y: 11 }
+            , { x: 2, y: 22 }
+            , { x: 3, y: 33 }
+            ]
+            $ do
               { id, age } ← select people
               pure { x: id, y: age }
-            assertSeqEq expected rows
-          test conn "simple select people restrict" $ do
-            let
-              expected = 
-                [ { id: 2, name: "name2", age: 22 }
-                , { id: 3, name: "name3", age: 33 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "simple select people restrict"
+            [ { id: 2, name: "name2", age: 22 }
+            , { id: 3, name: "name3", age: 33 }
+            ]
+            $ do
               r@{ age } ← select people
               restrict $ age .> lit 20
               pure r
-            assertSeqEq expected rows
-          test conn "cross product with restrict" $ do
-            let
-              expected = 
-                [ { id1: 2, age1: 22, age2: 11 }
-                , { id1: 3, age1: 33, age2: 11 }
-                , { id1: 3, age1: 33, age2: 22 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "cross product with restrict"
+            [ { id1: 2, age1: 22, age2: 11 }
+            , { id1: 3, age1: 33, age2: 11 }
+            , { id1: 3, age1: 33, age2: 22 }
+            ]
+            $ do
               r1 ← select people
               r2 ← select people
               restrict $ r1.age .> r2.age
               pure { id1: r1.id, age1: r1.age, age2: r2.age }
-            assertSeqEq expected rows
-          test conn "cross product as natural join" $ do
-            let
-              expected = 
-                [ { id: 1, balance: 100 }
-                , { id: 1, balance: 150 }
-                -- , { id: 2, balance: Nothing }
-                , { id: 3, balance: 300 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "cross product as natural join"
+            [ { id: 1, balance: 100 }
+            , { id: 1, balance: 150 }
+            -- , { id: 2, balance: Nothing }
+            , { id: 3, balance: 300 }
+            ]
+            $ do
               { id, name, age } ← select people
               { balance, personId } ← select bankAccounts
               restrict $ id .== personId
               pure { id, balance }
-            assertSeqEq expected rows
-          test conn "left join" $ do
-            let
-              expected = 
-                [ { id: 1, balance: Just 100 }
-                , { id: 1, balance: Just 150 }
-                , { id: 2, balance: Nothing }
-                , { id: 3, balance: Just 300 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "left join"
+            [ { id: 1, balance: Just 100 }
+            , { id: 1, balance: Just 150 }
+            , { id: 2, balance: Nothing }
+            , { id: 3, balance: Just 300 }
+            ]
+            $ do
               { id, name, age } ← select people
               { balance } ← leftJoin bankAccounts \b → id .== b.personId
               pure { id, balance }
-            assertSeqEq expected rows
-          test conn "alone left join transformed to select but with every value wrapped in Just" $ do
-            let
-              expected = 
-                [ { id: Just 1, personId: Just 1, balance: Just 100 }
-                , { id: Just 2, personId: Just 1, balance: Just 150 }
-                , { id: Just 3, personId: Just 3, balance: Just 300 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "alone left join transformed to select but with every value wrapped in Just"
+            [ { id: Just 1, personId: Just 1, balance: Just 100 }
+            , { id: Just 2, personId: Just 1, balance: Just 150 }
+            , { id: Just 3, personId: Just 3, balance: Just 300 }
+            ]
+            $ do
               { id, personId, balance } ← leftJoin bankAccounts \_ → lit true
               pure { id, balance, personId }
-            assertSeqEq expected rows
-          test conn "left join but with subquery" $ do
-            let
-              expected = 
-                [ { id: 1, balance: Just 100 }
-                , { id: 1, balance: Just 150 }
-                , { id: 2, balance: Nothing }
-                , { id: 3, balance: Just 300 }
-                ]
-            rows <- withPG dbconfig $ do
+
+          test' conn "left join but with subquery"
+            [ { id: 1, balance: Just 100 }
+            , { id: 1, balance: Just 150 }
+            , { id: 2, balance: Nothing }
+            , { id: 3, balance: Just 300 }
+            ]
+            $ do
               { id, name, age } ← select people
               { balance } ← leftJoin' (\b → id .== b.personId) do
                 b ← select bankAccounts
                 -- restrict $ id .== b.personId -- type error
                 pure b
               pure { id, balance }
-            assertSeqEq expected rows
-          -- test conn "test" $ do
-          --   (rows ∷ Array (_ Int String Int String Int)) ← PG.query conn (PG.Query """
-          --     select p.id, count(p.name), p.age, count(b.id), max(b.personId) -- b.id, b.personId, b.balance
-          --     from people p, bank_accounts b
-          --     where p.id > 0 and b.id > 0
-          --     -- group by p.id, p.name, p.age, b.personId
-          --   """) Row0
-          --   liftEffect $ log ""
-          --   liftEffect $ for_ rows \(PG.Row5 pid name age bid bpid) → do
-          --     log $ show pid <> " " <> show name <> " " <> show age <> " " <> show bid <> " " <> show bpid -- <> " " <> show balance
-          --   pure unit
 
-main' ∷ Effect Unit
-main' = do 
-  launchAff_ $ do
-    rows ← withPG dbconfig $ do
-      p1 ← select people
-      p2 ← select people
-      restrict $ p1.id .== p2.id
-      restrict $ p1.id .> lit 1
-      pure $ { id: p1.id, n1: p1.name, n2: p2.name }
-    liftEffect $ log "id\tn1\tn2"
-    liftEffect $ for_ rows \{ id, n1, n2 } → log (show id <> "\t" <> n1 <> "\t" <> n2 )
+          test' conn "aggr: max people id"
+            [ { maxId: 3 } ]
+            $ aggregate do
+              { id, name, age } ← select people
+              pure { maxId: max_ id }
+
+          test' conn "aggr: max people id"
+            [ { pid: 1, m: 150, c: "2" }
+            , { pid: 3, m: 300, c: "1" }
+            ]
+            $ aggregate do
+              { personId, balance } ← select bankAccounts
+              g ← groupBy { personId }
+              pure { pid: g.personId, m: max_ balance, c: count personId }
+
+test'
+  ∷ ∀ s o i il tup ol
+  . RL.RowToList i il ⇒ BuildPGHandler il tup o ⇒ ExtractCols i il ⇒ FromSQLRow tup
+  ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
+  ⇒ Connection → String → Array { | o } → Query s { | i } → TestSuite
+test' conn msg expected q = do
+  test conn msg $ withPG dbconfig q >>= assertSeqEq expected 
 
 dbconfig ∷ PoolConfiguration
 dbconfig = (defaultPoolConfiguration "purspg")

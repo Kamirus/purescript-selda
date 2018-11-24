@@ -1,6 +1,8 @@
 module Selda.Query
   ( restrict
   , select
+  , aggregate
+  , groupBy
   , leftJoin
   , leftJoin'
   , WrapWithMaybe
