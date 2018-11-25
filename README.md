@@ -4,7 +4,7 @@
 
 Supported by [Lambda Terms](https://github.com/lambdaterms/)
 
-Based on [selda](https://github.com/valderman/selda)
+Inspired by [selda](https://github.com/valderman/selda)
 
 ## TODO
 
