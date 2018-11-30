@@ -14,7 +14,7 @@ import Effect.Class (liftEffect)
 import Prim.RowList as RL
 import Selda (Query, Table(..), aggregate, count, groupBy, leftJoin, leftJoin', lit, max_, restrict, select, withPG, (.==), (.>))
 import Selda.Col (class ExtractCols)
-import Selda.PG (class BuildPGHandler)
+import Selda.PG (class BuildPGHandler, class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
@@ -177,7 +177,8 @@ main = do
 
 test'
   ∷ ∀ s o i il tup ol
-  . RL.RowToList i il ⇒ BuildPGHandler il tup o ⇒ ExtractCols i il ⇒ FromSQLRow tup
+  . ColsToPGHandler s i tup o
+  ⇒ RL.RowToList i il ⇒ ExtractCols i il ⇒ FromSQLRow tup
   ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
   ⇒ Connection → String → Array { | o } → Query s { | i } → TestSuite
 test' conn msg expected q = do

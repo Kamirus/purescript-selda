@@ -1,7 +1,9 @@
 module Selda.PG
   ( withPG
   , class BuildPGHandler
+  , class ValidateSInCols
   , buildPGHandler
+  , class ColsToPGHandler, colsToPGHandler
   ) where
 
 import Prelude
@@ -26,6 +28,7 @@ import Selda.Col (class ExtractCols, Col, getCols)
 import Selda.Expr (Expr, showExpr)
 import Selda.Query.Type (Source(..), Query, SQL(..), GenState, runQuery)
 import Selda.Table (Alias)
+import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 
 {- 
@@ -34,13 +37,23 @@ For record
 build function
   \Tuple int (Tuple string1 string2) → { id: int, n1: string1, n2: string2 }
 -}
-pgHandler
-  ∷ ∀ i o tuple il
-  . RL.RowToList i il
-  ⇒ BuildPGHandler il tuple o
-  ⇒ FromSQLRow tuple
-  ⇒ Record i → (tuple → Record o)
-pgHandler _ = buildPGHandler (RLProxy ∷ RLProxy il)
+class ColsToPGHandler s i tup o | s i → tup o where
+  colsToPGHandler ∷ Proxy s → { | i } → (tup → { | o })
+instance colsToPGHandlerI
+    ∷ ( RL.RowToList i il
+      , ValidateSInCols s il ol
+      , BuildPGHandler ol tup o
+      , FromSQLRow tup
+      )
+    ⇒ ColsToPGHandler s i tup o
+  where
+  colsToPGHandler _ i = buildPGHandler (RLProxy ∷ RLProxy ol)
+
+class ValidateSInCols s (il ∷ RowList) (ol ∷ RowList) | s il → ol
+instance rLUnColNil ∷ ValidateSInCols s RL.Nil RL.Nil
+else instance rLUnColCons
+  ∷ ValidateSInCols s tail tail'
+  ⇒ ValidateSInCols s (RL.Cons sym (Col s t) tail) (RL.Cons sym t tail')
 
 class BuildPGHandler (il ∷ RowList) tup (o ∷ # Type) | il → tup o where
   buildPGHandler
@@ -53,7 +66,7 @@ instance buildPGHandlerHead
       , R.Lacks sym ()
       , R.Cons sym t () o
       )
-    ⇒ BuildPGHandler (RL.Cons sym (Col s t) RL.Nil) (Tuple t Unit) o
+    ⇒ BuildPGHandler (RL.Cons sym t RL.Nil) (Tuple t Unit) o
   where
   buildPGHandler _ =
     \(Tuple t _) → Record.insert (SProxy ∷ SProxy sym) t {}
@@ -64,7 +77,7 @@ else instance buildPGHandlerCons
       , BuildPGHandler tail tup o'
       , FromSQLRow tup
       )
-    ⇒ BuildPGHandler (RL.Cons sym (Col s t) tail) (Tuple t tup) o
+    ⇒ BuildPGHandler (RL.Cons sym t tail) (Tuple t tup) o
   where
   buildPGHandler _ =
     let f' = buildPGHandler (RLProxy ∷ RLProxy tail) in
@@ -86,7 +99,7 @@ else instance buildPGHandlerCons
 withPG
   ∷ ∀ o i il tup s
   . RL.RowToList i il
-  ⇒ BuildPGHandler il tup o
+  ⇒ ColsToPGHandler s i tup o
   ⇒ ExtractCols i il
   ⇒ FromSQLRow tup
   ⇒ PoolConfiguration
@@ -101,7 +114,7 @@ withPG dbconfig q = do
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
     rows ← PG.query conn (PG.Query q_str) PG.Row0
-    pure $ map (pgHandler res) rows
+    pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 
 showState ∷ GenState → String
 showState { cols, sources, restricts, aggr } = 
