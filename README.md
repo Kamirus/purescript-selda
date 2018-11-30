@@ -7,10 +7,11 @@ Supported by [Lambda Terms](https://github.com/lambdaterms/)
 Inspired by [selda](https://github.com/valderman/selda)
 
 ## TODO
-
-- maybe (maybe a) ? with left join
-- literal in group by
+- check:
+  - maybe (maybe a) ? with left join
+  - literal in group by
 - explicit having
+- typeclass for record validation - better type errors
 - more tests
 - more restrict operators
 - add restrictions to operators (Ord? Eq?)
