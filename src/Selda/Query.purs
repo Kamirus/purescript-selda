@@ -8,6 +8,8 @@ module Selda.Query
   , leftJoin'
   , WrapWithMaybe
   , SubQueryResult
+  , class FromTable, fromTable
+  , class FromSubQuery, fromSubQuery
   ) where
 
 import Prelude
@@ -34,21 +36,16 @@ import Unsafe.Coerce (unsafeCoerce)
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = Query $ modify_ \st → st { restricts = e : st.restricts }
 
-select
-  ∷ ∀ s r rl res i il
-  . RL.RowToList r rl ⇒ TableColumns rl i ⇒ RL.RowToList i il ⇒ ToCols s i il res
-  ⇒ Table r → Query s (Record res)
+select ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
 select table = do
   { res, sql } ← fromTable table
   Query $ modify_ $ \st → st { sources = Product sql : st.sources }
   pure res
 
 aggregate
-  ∷ ∀ s aggrInner outer rl res inner
+  ∷ ∀ s aggrInner res inner
   . HMap UnAggr { | aggrInner } { | inner }
-  ⇒ HMap OuterCols { | inner } { | outer }
-  ⇒ RL.RowToList outer rl ⇒ ExtractCols outer rl
-  ⇒ HMapWithIndex SubQueryResult { | outer } { | res }
+  ⇒ FromSubQuery s inner res
   ⇒ Query (Inner s) { | aggrInner }
   → Query s { | res }
 aggregate qai = do
@@ -75,10 +72,10 @@ groupBy' i = do
   pure $ hmap WrapWithAggr i
 
 leftJoin
-  ∷ ∀ r s res rl il i mres
-  . RL.RowToList r rl ⇒ TableColumns rl i ⇒ RL.RowToList i il ⇒ ToCols s i il res
-  ⇒ HMap WrapWithMaybe (Record res) (Record mres)
-  ⇒ Table r → (Record res → Col s Boolean) → Query s (Record mres)
+  ∷ ∀ r s res mres
+  . FromTable s r res
+  ⇒ HMap WrapWithMaybe { | res } { | mres }
+  ⇒ Table r → (Record res → Col s Boolean) → Query s { | mres }
 leftJoin table on = do
   { res, sql } ← fromTable table
   let Col e = on res
@@ -92,11 +89,9 @@ leftJoin table on = do
 -- | return previously mapped record with each value in Col wrapped in Maybe
 -- | (because LEFT JOIN can return null for each column)
 leftJoin'
-  ∷ ∀ s res res0 rl mres inner
-  . HMap OuterCols (Record inner) (Record res0)
-  ⇒ HMapWithIndex SubQueryResult (Record res0) (Record res)
+  ∷ ∀ s res mres inner
+  . FromSubQuery s inner res
   ⇒ HMap WrapWithMaybe (Record res) (Record mres)
-  ⇒ RL.RowToList res0 rl ⇒ ExtractCols res0 rl
   ⇒ (Record res → Col s Boolean)
   → Query (Inner s) (Record inner)
   → Query s (Record mres)
@@ -106,17 +101,24 @@ leftJoin' on q = do
   Query $ modify_ \st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
-fromTable
-  ∷ ∀ r s res rl il i
-  . RL.RowToList r rl ⇒ TableColumns rl i ⇒ RL.RowToList i il ⇒ ToCols s i il res
-  ⇒ Table r → Query s { res ∷ Record res , sql ∷ SQL }
-fromTable (Table { name }) = do
-  id ← freshId
-  let
-    aliased = { name, alias: name <> "_" <> show id }
-    i = tableColumns aliased (RLProxy ∷ RLProxy rl)
-    res = toCols (Proxy ∷ Proxy s) i (RLProxy ∷ RLProxy il)
-  pure $ { res, sql: FromTable aliased }
+class FromTable s t c | s t → c where
+  fromTable ∷ Table t → Query s { res ∷ Record c , sql ∷ SQL }
+
+instance tableToColsI
+    ∷ ( RL.RowToList t tl
+      , TableColumns tl i
+      , RL.RowToList i il
+      , ToCols s i il c
+      )
+    ⇒ FromTable s t c
+  where
+  fromTable t@(Table { name }) = do
+    id ← freshId
+    let
+      aliased = { name, alias: name <> "_" <> show id }
+      i = tableColumns aliased (RLProxy ∷ RLProxy tl)
+      res = toCols (Proxy ∷ Proxy s) i (RLProxy ∷ RLProxy il)
+    pure $ { res, sql: FromTable aliased }
 
 data WrapWithMaybe = WrapWithMaybe
 instance wrapWithMaybeInstance
@@ -129,20 +131,26 @@ subQueryAlias = do
   id ← freshId
   pure $ "sub" <> "_q" <> show id
 
-fromSubQuery
-  ∷ ∀ inner s rl res res0
-  . HMap OuterCols (Record inner) (Record res0)
-  ⇒ RL.RowToList res0 rl ⇒ ExtractCols res0 rl
-  ⇒ HMapWithIndex SubQueryResult { | res0 } { | res }
-  ⇒ Query (Inner s) (Record inner)
-  → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
-fromSubQuery q = do
-  let (Tuple innerRes st) = runQuery q
-  let res0 = outer innerRes
-  let cols = getCols res0
-  alias ← subQueryAlias
-  let res = createSubQueryResult alias res0
-  pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }
+class FromSubQuery s inner res | s inner → res where
+  fromSubQuery
+    ∷ Query (Inner s) (Record inner)
+    → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
+
+instance fromSubQueryI 
+    ∷ ( HMap OuterCols (Record inner) (Record res0)
+      , RL.RowToList res0 rl
+      , ExtractCols res0 rl
+      , HMapWithIndex SubQueryResult { | res0 } { | res }
+      )
+    ⇒ FromSubQuery s inner res
+  where
+  fromSubQuery q = do
+    let (Tuple innerRes st) = runQuery q
+    let res0 = outer innerRes
+    let cols = getCols res0
+    alias ← subQueryAlias
+    let res = createSubQueryResult alias res0
+    pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }
 
 -- | Outside of the subquery, every returned col (in SELECT ...) 
 -- | (no matter if it's just a column of some table or expression or function or ...)

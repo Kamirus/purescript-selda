@@ -70,6 +70,19 @@ else instance buildPGHandlerCons
     let f' = buildPGHandler (RLProxy ∷ RLProxy tail) in
     \(Tuple t tup) → Record.insert (SProxy ∷ SProxy sym) t $ f' tup
 
+-- insert
+--   ∷ ∀ r
+--   ⇒ PoolConfiguration → Table r → Array { | r } → Aff (Array { | r })
+-- insert dbconfig = case _ of
+--   [] → pure []
+--   xs → do
+--     let q_str = "INSERT INTO "
+
+--     pool ← PG.newPool dbconfig
+--     PG.withConnection pool \conn → do
+--       rows ← PG.query conn (PG.Query q_str) PG.Row0
+--       pure $ map (pgHandler res) rows
+
 withPG
   ∷ ∀ o i il tup s
   . RL.RowToList i il
@@ -84,7 +97,7 @@ withPG dbconfig q = do
     (Tuple res st') = runQuery q
     st = st' { cols = getCols res }
     q_str = showState st
-  liftEffect $ log q_str
+  -- liftEffect $ log q_str
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
     rows ← PG.query conn (PG.Query q_str) PG.Row0

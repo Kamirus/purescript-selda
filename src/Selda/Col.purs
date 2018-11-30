@@ -18,7 +18,7 @@ import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Selda.Expr (Expr(..), Literal(..), showExpr)
-import Selda.Table (Column, Alias)
+import Selda.Table (Alias, Column)
 import Type.Proxy (Proxy)
 import Type.Row (RLProxy(..))
 
