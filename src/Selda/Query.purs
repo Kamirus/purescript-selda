@@ -170,5 +170,5 @@ instance subQueryResultInstance
     ∷ IsSymbol sym
     ⇒ MappingWithIndex SubQueryResult (SProxy sym) (Col s a) (Col s a)
   where
-  mappingWithIndex (SubQueryResult namespace) sym (Col e) = 
+  mappingWithIndex (SubQueryResult namespace) sym (Col _) = 
     Col $ EColumn $ Column { namespace, name: reflectSymbol sym }

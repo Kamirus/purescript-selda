@@ -8,6 +8,8 @@ Inspired by [selda](https://github.com/valderman/selda)
 
 ## TODO
 
+- maybe (maybe a) ? with left join
+- literal in group by
 - explicit having
 - more tests
 - more restrict operators
