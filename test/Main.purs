@@ -12,9 +12,9 @@ import Effect (Effect)
 import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (Query, Table(..), aggregate, count, groupBy, leftJoin, leftJoin', lit, max_, restrict, select, withPG, (.==), (.>))
-import Selda.Col (class ExtractCols)
-import Selda.PG (class BuildPGHandler, class ColsToPGHandler)
+import Selda (Query, Table(..), aggregate, count, groupBy, insert_, leftJoin, leftJoin', lit, max_, restrict, select, withPG, (.==), (.>))
+import Selda.Col (class GetCols)
+import Selda.PG (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
@@ -45,14 +45,17 @@ main = do
           balance INTEGER NOT NULL
         );
       """) PG.Row0
-      PG.execute conn (PG.Query """
-        INSERT INTO people (id, name, age)
-        VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)
-      """)
-        (( (1 /\ "name1" /\ 11)
-        /\ (2 /\ "name2" /\ 22)
-        /\ (3 /\ "name3" /\ 33)
-        ))
+      insert_ dbconfig people { id: 1, name: "name1", age: 11 }
+      insert_ dbconfig people { id: 2, name: "name2", age: 22 }
+      insert_ dbconfig people { id: 3, name: "name3", age: 33 }
+      -- PG.execute conn (PG.Query """
+      --   INSERT INTO people (id, name, age)
+      --   VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)
+      -- """)
+      --   (( (1 /\ "name1" /\ 11)
+      --   /\ (2 /\ "name2" /\ 22)
+      --   /\ (3 /\ "name3" /\ 33)
+      --   ))
 
       PG.execute conn (PG.Query """
         INSERT INTO bank_accounts (id, personId, balance)
@@ -176,9 +179,9 @@ main = do
               pure r
 
 test'
-  ∷ ∀ s o i il tup ol
+  ∷ ∀ s o i tup ol
   . ColsToPGHandler s i tup o
-  ⇒ RL.RowToList i il ⇒ ExtractCols i il ⇒ FromSQLRow tup
+  ⇒ GetCols i ⇒ FromSQLRow tup
   ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
   ⇒ Connection → String → Array { | o } → Query s { | i } → TestSuite
 test' conn msg expected q = do

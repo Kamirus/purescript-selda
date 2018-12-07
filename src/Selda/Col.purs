@@ -1,9 +1,11 @@
 module Selda.Col
   ( Col(..), showCol
   , class Lit
+  , class GetCols, getCols
+  , ExtractCols(..)
   , lit
-  , class ToCols, toCols, getCols
-  , class ExtractCols, extractCols
+  , class ToCols, toCols
+  -- , class ExtractCols, extractCols
   ) where
 
 import Prelude
@@ -13,6 +15,7 @@ import Data.Exists (Exists, mkExists)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
+import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, foldingWithIndex, hfoldlWithIndex)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
@@ -58,41 +61,58 @@ instance toColsCons
 
 {- 
 For record { n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }
-produce [(id, Expr Int), (n1, Expr String), (n2, Expr String)]
+→ [(id, Expr Int), (n1, Expr String), (n2, Expr String)]
+→ [(id, Exists Expr), (n1, Exists Expr), (n2, Exists Expr)]
 -}
-getCols
-  ∷ ∀ i il
-  . RL.RowToList i il
-  ⇒ ExtractCols i il
-  ⇒ Record i → Array (Tuple Alias (Exists Expr))
-getCols i = extractCols i (RLProxy ∷ RLProxy il)
-
-class ExtractCols (i ∷ # Type) (il ∷ RowList) where
-  extractCols
-    ∷ Record i
-    → RLProxy il
-    → Array (Tuple Alias (Exists Expr))
-
-instance extractColsHead
-    ∷ ( IsSymbol sym
-      , R.Cons sym (Col s t) i' i
-      )
-    ⇒ ExtractCols i (RL.Cons sym (Col s t) RL.Nil)
+class GetCols r where
+  getCols ∷ { | r } → Array (Tuple Alias (Exists Expr))
+instance getcols 
+    ∷ HFoldlWithIndex ExtractCols 
+      (Array (Tuple String (Exists Expr)))
+      { | r }
+      (Array (Tuple String (Exists Expr))) 
+    ⇒ GetCols r
   where
-  extractCols i _ = [ Tuple (reflectSymbol _sym) (mkExists e) ]
-    where
-    _sym = (SProxy ∷ SProxy sym)
-    Col e = Record.get _sym i
+  getCols r = hfoldlWithIndex ExtractCols ([] ∷ Array (Tuple String (Exists Expr))) r
+-- getCols i = extractCols i (RLProxy ∷ RLProxy il)
 
-else instance extractColsCons
-    ∷ ( IsSymbol sym
-      , R.Cons sym (Col s t) i' i
-      , ExtractCols i tail
-      )
-    ⇒ ExtractCols i (RL.Cons sym (Col s t) tail)
+data ExtractCols = ExtractCols
+instance extractcols 
+    ∷ IsSymbol sym 
+    ⇒ FoldingWithIndex ExtractCols (SProxy sym) 
+      (Array (Tuple String (Exists Expr)))
+      (Col s a) 
+      (Array (Tuple String (Exists Expr)))
   where
-  extractCols i _ = Tuple (reflectSymbol _sym) (mkExists e) : cols
-    where
-    _sym = (SProxy ∷ SProxy sym)
-    cols = extractCols i (RLProxy ∷ RLProxy tail)
-    Col e = Record.get _sym i
+  foldingWithIndex ExtractCols sym acc (Col e) = 
+    Tuple (reflectSymbol (SProxy ∷ SProxy sym)) (mkExists e) : acc
+
+-- class ExtractCols (i ∷ # Type) (il ∷ RowList) where
+--   extractCols
+--     ∷ Record i
+--     → RLProxy il
+--     → Array (Tuple Alias (Exists Expr))
+
+-- instance extractColsHead
+--     ∷ ( IsSymbol sym
+--       , R.Cons sym (Col s t) i' i
+--       )
+--     ⇒ ExtractCols i (RL.Cons sym (Col s t) RL.Nil)
+--   where
+--   extractCols i _ = [ Tuple (reflectSymbol _sym) (mkExists e) ]
+--     where
+--     _sym = (SProxy ∷ SProxy sym)
+--     Col e = Record.get _sym i
+
+-- else instance extractColsCons
+--     ∷ ( IsSymbol sym
+--       , R.Cons sym (Col s t) i' i
+--       , ExtractCols i tail
+--       )
+--     ⇒ ExtractCols i (RL.Cons sym (Col s t) tail)
+--   where
+--   extractCols i _ = cols <> [Tuple (reflectSymbol _sym) (mkExists e)]
+--     where
+--     _sym = (SProxy ∷ SProxy sym)
+--     cols = extractCols i (RLProxy ∷ RLProxy tail)
+--     Col e = Record.get _sym i

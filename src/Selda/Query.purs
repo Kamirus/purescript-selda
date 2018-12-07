@@ -24,7 +24,7 @@ import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, cl
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
-import Selda.Col (class ExtractCols, class ToCols, Col(..), getCols, toCols)
+import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..))
 import Selda.Inner (Inner, OuterCols, outer)
 import Selda.Query.Type (Query(..), SQL(..), Source(..), freshId, runQuery)
@@ -60,9 +60,8 @@ groupBy col@(Col e) = do
   pure $ Aggr col
 
 groupBy'
-  ∷ ∀ i o s il
-  . RL.RowToList i il
-  ⇒ ExtractCols i il
+  ∷ ∀ i o s
+  . GetCols i
   ⇒ HMap WrapWithAggr { | i } { | o }
   ⇒ { | i }
   → Query s { | o }
@@ -96,7 +95,7 @@ leftJoin'
   → Query (Inner s) (Record inner)
   → Query s (Record mres)
 leftJoin' on q = do
-  { res, sql, alias } ← fromSubQuery q
+  { res, sql } ← fromSubQuery q
   let Col e = on res
   Query $ modify_ \st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
@@ -129,7 +128,7 @@ instance wrapWithMaybeInstance
 subQueryAlias ∷ ∀ s. Query s Alias
 subQueryAlias = do
   id ← freshId
-  pure $ "sub" <> "_q" <> show id
+  pure $ "sub_q" <> show id
 
 class FromSubQuery s inner res | s inner → res where
   fromSubQuery
@@ -138,8 +137,7 @@ class FromSubQuery s inner res | s inner → res where
 
 instance fromSubQueryI 
     ∷ ( HMap OuterCols (Record inner) (Record res0)
-      , RL.RowToList res0 rl
-      , ExtractCols res0 rl
+      , GetCols res0
       , HMapWithIndex SubQueryResult { | res0 } { | res }
       )
     ⇒ FromSubQuery s inner res
@@ -147,7 +145,6 @@ instance fromSubQueryI
   fromSubQuery q = do
     let (Tuple innerRes st) = runQuery q
     let res0 = outer innerRes
-    let cols = getCols res0
     alias ← subQueryAlias
     let res = createSubQueryResult alias res0
     pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }

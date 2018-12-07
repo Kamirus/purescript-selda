@@ -3,8 +3,8 @@ module Selda.Table
   , AliasedTable
   , Alias
   , Table(..)
-  , class TableColumns
-  , tableColumns
+  , class TableColumns, tableColumns
+  , class TableColumnNames, tableColumnNames
   ) where
 
 import Prelude
@@ -49,3 +49,16 @@ instance tableColumnsCons
       col = Column { namespace: table.alias, name: reflectSymbol _sym }
     in
     Record.insert _sym col res'
+
+class TableColumnNames rl where
+  tableColumnNames ∷ RLProxy rl → Array String
+instance tableColumnNamesHead ∷ TableColumnNames RL.Nil where
+  tableColumnNames _ = []
+else instance tableColumnNamesCons
+    ∷ ( IsSymbol sym , TableColumnNames tail )
+    ⇒ TableColumnNames (RL.Cons sym t tail)
+  where
+  tableColumnNames _ = tableColumnNames _tail <> [reflectSymbol _sym]
+    where
+    _tail = (RLProxy ∷ RLProxy tail)
+    _sym = (SProxy ∷ SProxy sym)

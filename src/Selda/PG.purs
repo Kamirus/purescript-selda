@@ -1,8 +1,14 @@
 module Selda.PG
   ( withPG
-  , class BuildPGHandler
+  , insert_
+  , TupleToRecordFunc
+  , RecordToTuple
+  , RecordLength
+  , class ChangeType
+  -- , class BuildPGHandler
   , class ValidateSInCols
-  , buildPGHandler
+  , class TupleRev, tupleRev
+  -- , buildPGHandler
   , class ColsToPGHandler, colsToPGHandler
   ) where
 
@@ -15,19 +21,20 @@ import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow, PoolConfiguration)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, PoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
+import Heterogeneous.Folding (class Folding, class FoldingWithIndex, class HFoldl, class HFoldlWithIndex, hfoldl, hfoldlWithIndex)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Selda.Col (class ExtractCols, Col, getCols)
+import Selda.Col (class GetCols, Col, getCols)
 import Selda.Expr (Expr, showExpr)
 import Selda.Query.Type (Source(..), Query, SQL(..), GenState, runQuery)
-import Selda.Table (Alias)
+import Selda.Table (class TableColumnNames, Alias, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 
@@ -42,12 +49,14 @@ class ColsToPGHandler s i tup o | s i → tup o where
 instance colsToPGHandlerI
     ∷ ( RL.RowToList i il
       , ValidateSInCols s il ol
-      , BuildPGHandler ol tup o
-      , FromSQLRow tup
+      -- , BuildPGHandler ol tup o
+      , HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | i } (tup → { | o })
       )
     ⇒ ColsToPGHandler s i tup o
   where
-  colsToPGHandler _ i = buildPGHandler (RLProxy ∷ RLProxy ol)
+  colsToPGHandler _ i = hfoldlWithIndex TupleToRecordFunc f i
+    where f = (const {} ∷ Unit → {})
+  -- colsToPGHandler _ i = buildPGHandler (RLProxy ∷ RLProxy ol)
 
 class ValidateSInCols s (il ∷ RowList) (ol ∷ RowList) | s il → ol
 instance rLUnColNil ∷ ValidateSInCols s RL.Nil RL.Nil
@@ -55,52 +64,105 @@ else instance rLUnColCons
   ∷ ValidateSInCols s tail tail'
   ⇒ ValidateSInCols s (RL.Cons sym (Col s t) tail) (RL.Cons sym t tail')
 
-class BuildPGHandler (il ∷ RowList) tup (o ∷ # Type) | il → tup o where
-  buildPGHandler
-    ∷ FromSQLRow tup
-    ⇒ RLProxy il
-    → (tup → Record o)
+-- class BuildPGHandler (il ∷ RowList) tup (o ∷ # Type) | il → tup o where
+--   buildPGHandler
+--     ∷ RLProxy il
+--     → (tup → Record o)
 
-instance buildPGHandlerHead
+-- instance buildPGHandlerHead
+--     ∷ ( IsSymbol sym
+--       , R.Lacks sym ()
+--       , R.Cons sym t () o
+--       )
+--     ⇒ BuildPGHandler (RL.Cons sym t RL.Nil) (Tuple t Unit) o
+--   where
+--   buildPGHandler _ =
+--     \(Tuple t _) → Record.insert (SProxy ∷ SProxy sym) t {}
+-- else instance buildPGHandlerCons
+--     ∷ ( IsSymbol sym
+--       , R.Lacks sym o'
+--       , R.Cons sym t o' o
+--       , BuildPGHandler tail tup o'
+--       )
+--     ⇒ BuildPGHandler (RL.Cons sym t tail) (Tuple t tup) o
+--   where
+--   buildPGHandler _ =
+--     let f' = buildPGHandler (RLProxy ∷ RLProxy tail) in
+--     \(Tuple t tup) → Record.insert (SProxy ∷ SProxy sym) t $ f' tup
+
+class ChangeType i o | i → o
+instance mapTypeCol ∷ ChangeType (Col s a) a
+else instance mapType ∷ ChangeType a a
+
+data TupleToRecordFunc = TupleToRecordFunc
+instance tupToRec
     ∷ ( IsSymbol sym
-      , R.Lacks sym ()
-      , R.Cons sym t () o
+      , R.Lacks sym r
+      , R.Cons sym a r r'
+      , ChangeType i a
       )
-    ⇒ BuildPGHandler (RL.Cons sym t RL.Nil) (Tuple t Unit) o
+    ⇒ FoldingWithIndex TupleToRecordFunc 
+      (SProxy sym) (tup → { | r }) i (Tuple a tup → { | r' })
   where
-  buildPGHandler _ =
-    \(Tuple t _) → Record.insert (SProxy ∷ SProxy sym) t {}
-else instance buildPGHandlerCons
-    ∷ ( IsSymbol sym
-      , R.Lacks sym o'
-      , R.Cons sym t o' o
-      , BuildPGHandler tail tup o'
-      , FromSQLRow tup
-      )
-    ⇒ BuildPGHandler (RL.Cons sym t tail) (Tuple t tup) o
+  foldingWithIndex TupleToRecordFunc sym f _ =
+    \(Tuple a tup) → Record.insert (SProxy ∷ SProxy sym) a $ f tup
+
+data RecordToTuple = RecordToTuple
+instance rToTuple ∷ Folding RecordToTuple tail a (Tuple a tail) where
+  folding _ tail a = Tuple a tail
+
+class TupleRev t1 acc t2 | t1 acc → t2 where
+  tupleRev ∷ t1 → acc → t2
+instance tuplerevh ∷ TupleRev Unit acc acc where
+  tupleRev _ t = t
+else instance tuplerevc
+    ∷ TupleRev b (Tuple a acc) res
+    ⇒ TupleRev (Tuple a b) acc res
   where
-  buildPGHandler _ =
-    let f' = buildPGHandler (RLProxy ∷ RLProxy tail) in
-    \(Tuple t tup) → Record.insert (SProxy ∷ SProxy sym) t $ f' tup
+  tupleRev (Tuple a b) acc = tupleRev b (Tuple a acc)
 
--- insert
---   ∷ ∀ r
---   ⇒ PoolConfiguration → Table r → Array { | r } → Aff (Array { | r })
--- insert dbconfig = case _ of
---   [] → pure []
---   xs → do
---     let q_str = "INSERT INTO "
+data RecordLength = RecordLength
+instance rlen ∷ Folding RecordLength Int a Int where
+  folding _ acc _ = acc + 1
 
---     pool ← PG.newPool dbconfig
---     PG.withConnection pool \conn → do
---       rows ← PG.query conn (PG.Query q_str) PG.Row0
---       pure $ map (pgHandler res) rows
+insert_
+  ∷ ∀ r rl tup
+  -- HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | o })
+  -- ⇒ BuildPGHandler rl tup o
+  . FromSQLRow tup
+  ⇒ ToSQLRow tup
+  ⇒ Show tup
+  ⇒ RL.RowToList r rl
+  ⇒ TableColumnNames rl
+  ⇒ HFoldl RecordToTuple Unit { | r } tup
+  ⇒ HFoldl RecordLength Int { | r } Int
+  ⇒ PoolConfiguration → Table r → { | r } → Aff Unit
+insert_ dbconfig (Table { name }) x = do
+  -- case _ of
+  -- [] → pure []
+  -- xs → do
+  let
+    cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
+    xTup = hfoldl RecordToTuple unit x
+    xLen = hfoldl RecordLength 0 x
+    placeholders = Array.range 1 xLen # map (\i → "$" <> show i) # joinWith ", "
+    q_str = 
+      "INSERT INTO " <> name <> " (" <> cols <> ") " 
+        <> "VALUES " <> "(" <> placeholders <> ") "
+        <> "RETURNING *"
+  -- liftEffect $ log q_str
+  -- liftEffect $ log $ show xTup
+  pool ← PG.newPool dbconfig
+  PG.withConnection pool \conn → do
+    PG.execute conn (PG.Query q_str) xTup
+    -- rows ← PG.query conn (PG.Query q_str) xTup
+    -- pure $ map (hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) x) rows
+    -- pure $ map (buildPGHandler (RLProxy ∷ RLProxy rl)) rows
 
 withPG
-  ∷ ∀ o i il tup s
-  . RL.RowToList i il
-  ⇒ ColsToPGHandler s i tup o
-  ⇒ ExtractCols i il
+  ∷ ∀ o i tup s
+  . ColsToPGHandler s i tup o
+  ⇒ GetCols i
   ⇒ FromSQLRow tup
   ⇒ PoolConfiguration
   → Query s (Record i)
@@ -110,7 +172,7 @@ withPG dbconfig q = do
     (Tuple res st') = runQuery q
     st = st' { cols = getCols res }
     q_str = showState st
-  -- liftEffect $ log q_str
+  liftEffect $ log q_str
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
     rows ← PG.query conn (PG.Query q_str) PG.Row0
