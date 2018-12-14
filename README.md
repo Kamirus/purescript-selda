@@ -20,6 +20,8 @@ Inspired by [selda](https://github.com/valderman/selda)
 - order by
 - limit
 - default, sequenced primary key - do not insert those, but do select
+- error handling
+- delete and update with RETURNING
 
 ## Known issues
 - groupBy not a column, results in runtime error
