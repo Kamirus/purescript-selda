@@ -1,10 +1,19 @@
-module Selda.PG where
+module Selda.PG
+  ( withPG
+  , MonadSelda
+  , query
+  , insert_
+  , insert
+  , deleteFrom
+  , update
+  ) where
 
 import Prelude
 
 import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Data.Array (concat)
 import Data.Array as Array
+import Data.Exists (runExists)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -18,6 +27,7 @@ import Heterogeneous.Folding (class HFoldl, class HFoldlWithIndex, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
+import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
 import Selda.Query.Type (Query, runQuery)
@@ -103,6 +113,28 @@ deleteFrom table@(Table { name }) pred = do
     recordWithCols = tableToColsWithoutAlias table
     pred_str = showCol $ pred recordWithCols
     q_str = "DELETE FROM " <> name <> " WHERE " <> pred_str
+  -- liftEffect $ log q_str
+  { pool } ← ask
+  liftAff $ PG.withConnection pool \conn → do
+    PG.execute conn (PG.Query q_str) PG.Row0
+
+update
+  ∷  ∀ r s r'
+  . TableToColsWithoutAlias r r'
+  ⇒ GetCols r'
+  ⇒ Table r
+  → ({ | r' } → Col s Boolean)
+  → ({ | r' } → { | r' })
+  → MonadSelda Unit
+update table@(Table { name }) pred up = do
+  let
+    recordWithCols = tableToColsWithoutAlias table
+    pred_str = showCol $ pred recordWithCols
+    vals =
+      getCols (up recordWithCols)
+        # map (\(Tuple n e) → n <> " = " <> runExists showExpr e)
+        # joinWith ", "
+    q_str = "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
   -- liftEffect $ log q_str
   { pool } ← ask
   liftAff $ PG.withConnection pool \conn → do
