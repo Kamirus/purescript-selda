@@ -22,7 +22,7 @@ import Selda.Aggr (Aggr(..))
 import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..))
-import Selda.PG (withPG, insert_, insert) as PG
+import Selda.PG (withPG, query, insert_, insert) as PG
 import Selda.Query (select, restrict, leftJoin, leftJoin', aggregate, groupBy, groupBy') as Query
 import Selda.Query.Type (Query(..)) as Query.Type
 import Selda.Table (Table(..)) as Table

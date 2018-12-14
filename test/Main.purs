@@ -11,11 +11,10 @@ import Database.PostgreSQL as PG
 import Effect (Effect)
 import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
-import Effect.Console (logShow)
 import Prim.RowList as RL
-import Selda (Query, Table(..), aggregate, count, groupBy, insert_, leftJoin, leftJoin', lit, max_, restrict, select, withPG, (.==), (.>))
+import Selda (Query, Table(..), aggregate, count, groupBy, insert_, leftJoin, leftJoin', lit, max_, query, restrict, select, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
-import Selda.PG (class ColsToPGHandler)
+import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
@@ -46,7 +45,7 @@ main = do
           balance INTEGER NOT NULL
         );
       """) PG.Row0
-      insert_ dbconfig people 
+      withPG dbconfig $ insert_ people 
         [ { id: 1, name: "name1", age: 11 }
         , { id: 2, name: "name2", age: 22 }
         , { id: 3, name: "name3", age: 33 }
@@ -188,7 +187,7 @@ test'
   ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
   ⇒ Connection → String → Array { | o } → Query s { | i } → TestSuite
 test' conn msg expected q = do
-  test conn msg $ withPG dbconfig q >>= assertSeqEq expected 
+  test conn msg $ (withPG dbconfig $ query q) >>= assertSeqEq expected 
 
 dbconfig ∷ PoolConfiguration
 dbconfig = (defaultPoolConfiguration "purspg")
