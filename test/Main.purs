@@ -12,7 +12,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (Query, Table(..), aggregate, count, groupBy, insert_, leftJoin, leftJoin', lit, max_, query, restrict, select, withPG, (.==), (.>))
+import Selda (Query, Table(..), aggregate, count, deleteFrom, groupBy, insert_, leftJoin, leftJoin', lit, max_, query, restrict, select, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
@@ -49,7 +49,11 @@ main = do
         [ { id: 1, name: "name1", age: 11 }
         , { id: 2, name: "name2", age: 22 }
         , { id: 3, name: "name3", age: 33 }
+        , { id: 4, name: "delete", age: 999 }
         ]
+      
+      withPG dbconfig $ deleteFrom people \r → r.id .== lit 4
+
       -- PG.execute conn (PG.Query """
       --   INSERT INTO people (id, name, age)
       --   VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)

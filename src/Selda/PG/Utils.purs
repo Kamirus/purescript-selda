@@ -9,8 +9,10 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Selda.Col (Col)
-import Type.Proxy (Proxy)
+import Selda.Col (class ToCols, Col, toCols)
+import Selda.Table (class TableColumns, Table(..), tableColumns)
+import Type.Proxy (Proxy(..))
+import Type.Row (RLProxy(..))
 
 -- | For record
 -- |   `{ n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }`
@@ -78,3 +80,24 @@ else instance tuplerevc
 data RecordLength = RecordLength
 instance rlen ∷ Folding RecordLength Int a Int where
   folding _ acc _ = acc + 1
+
+-- | ```purescript
+-- | Table ( a1 ∷ A1 , a2 ∷ A2 ... )
+-- | →
+-- | { a1 ∷ Col s A1, a2 ∷ Col s A2 ... }
+-- | ```
+class TableToColsWithoutAlias r o | r → o where
+  tableToColsWithoutAlias ∷ Table r → { | o }
+
+instance tableToColsI
+    ∷ ( RL.RowToList r rl
+      , TableColumns rl i
+      , ToCols s i o
+      )
+    ⇒ TableToColsWithoutAlias r o
+  where
+  tableToColsWithoutAlias (Table { name }) = recordWithCols
+    where
+    aliased = { name, alias: "" }
+    recordWithColumns = tableColumns aliased (RLProxy ∷ RLProxy rl)
+    recordWithCols = toCols (Proxy ∷ Proxy s) recordWithColumns

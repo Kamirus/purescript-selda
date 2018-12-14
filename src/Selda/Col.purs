@@ -10,11 +10,9 @@ import Data.Tuple (Tuple(..))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Prim.RowList (kind RowList)
-import Prim.RowList as RL
 import Selda.Expr (Expr(..), Literal(..), showExpr)
-import Selda.Table (class TableColumns, Alias, Column, Table(..), tableColumns)
-import Type.Proxy (Proxy(..))
-import Type.Row (RLProxy(..))
+import Selda.Table (Alias, Column)
+import Type.Proxy (Proxy)
 
 newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
@@ -67,24 +65,3 @@ instance extractcols
   where
   foldingWithIndex ExtractCols sym acc (Col e) = 
     Tuple (reflectSymbol (SProxy ∷ SProxy sym)) (mkExists e) : acc
-
--- | ```purescript
--- | Table ( a1 ∷ A1 , a2 ∷ A2 ... )
--- | →
--- | { a1 ∷ Col s A1, a2 ∷ Col s A2 ... }
--- | ```
-class TableToCols r o | r → o where
-  tableToCols ∷ Table r → { | o }
-
-instance tableToColsI
-    ∷ ( RL.RowToList r rl
-      , TableColumns rl i
-      , ToCols s i o
-      )
-    ⇒ TableToCols r o
-  where
-  tableToCols (Table { name }) = recordWithCols
-    where
-    aliased = { name, alias: name }
-    recordWithColumns = tableColumns aliased (RLProxy ∷ RLProxy rl)
-    recordWithCols = toCols (Proxy ∷ Proxy s) recordWithColumns
