@@ -49,9 +49,9 @@ main = do
         [ { id: 1, name: "name1", age: 11 }
         , { id: 2, name: "name2", age: 22 }
         , { id: 3, name: "name3", age: 33 }
-        , { id: 4, name: "delete", age: 999 }
         ]
       
+      withPG dbconfig $ insert_ people [{ id: 4, name: "delete", age: 999 }]
       withPG dbconfig $ deleteFrom people \r → r.id .== lit 4
 
       -- PG.execute conn (PG.Query """

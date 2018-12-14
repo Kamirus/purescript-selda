@@ -103,7 +103,7 @@ deleteFrom table@(Table { name }) pred = do
     recordWithCols = tableToColsWithoutAlias table
     pred_str = showCol $ pred recordWithCols
     q_str = "DELETE FROM " <> name <> " WHERE " <> pred_str
-  liftEffect $ log q_str
+  -- liftEffect $ log q_str
   { pool } ← ask
   liftAff $ PG.withConnection pool \conn → do
     PG.execute conn (PG.Query q_str) PG.Row0
