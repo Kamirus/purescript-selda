@@ -12,17 +12,16 @@ import Record as Record
 import Selda.Col (Col)
 import Type.Proxy (Proxy)
 
-{- 
-For record
-  { n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }
-build function
-  \Tuple int (Tuple string1 string2) → { id: int, n1: string1, n2: string2 }
--}
+-- | For record
+-- |   `{ n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }`
+-- | build function
+-- |   \Tuple int (Tuple string1 string2) 
+-- |     → { id: int, n1: string1, n2: string2 }
 class ColsToPGHandler s i tup o | s i → tup o where
   colsToPGHandler ∷ Proxy s → { | i } → (tup → { | o })
 instance colsToPGHandlerI
     ∷ ( RL.RowToList i il
-      , ValidateSInCols s il ol
+      , ValidateSInCols s il
       , HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | i } (tup → { | o })
       )
     ⇒ ColsToPGHandler s i tup o
@@ -30,11 +29,11 @@ instance colsToPGHandlerI
   colsToPGHandler _ i = hfoldlWithIndex TupleToRecordFunc f i
     where f = (const {} ∷ Unit → {})
 
-class ValidateSInCols s (il ∷ RowList) (ol ∷ RowList) | s il → ol
-instance rLUnColNil ∷ ValidateSInCols s RL.Nil RL.Nil
+class ValidateSInCols s (il ∷ RowList)
+instance rLUnColNil ∷ ValidateSInCols s RL.Nil
 else instance rLUnColCons
-  ∷ ValidateSInCols s tail tail'
-  ⇒ ValidateSInCols s (RL.Cons sym (Col s t) tail) (RL.Cons sym t tail')
+  ∷ ValidateSInCols s tail
+  ⇒ ValidateSInCols s (RL.Cons sym (Col s t) tail)
 
 class ChangeType i o | i → o
 instance mapTypeCol ∷ ChangeType (Col s a) a
