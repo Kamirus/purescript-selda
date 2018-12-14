@@ -106,8 +106,7 @@ class FromTable s t c | s t → c where
 instance tableToColsI
     ∷ ( RL.RowToList t tl
       , TableColumns tl i
-      , RL.RowToList i il
-      , ToCols s i il c
+      , ToCols s i c
       )
     ⇒ FromTable s t c
   where
@@ -116,7 +115,7 @@ instance tableToColsI
     let
       aliased = { name, alias: name <> "_" <> show id }
       i = tableColumns aliased (RLProxy ∷ RLProxy tl)
-      res = toCols (Proxy ∷ Proxy s) i (RLProxy ∷ RLProxy il)
+      res = toCols (Proxy ∷ Proxy s) i
     pure $ { res, sql: FromTable aliased }
 
 data WrapWithMaybe = WrapWithMaybe

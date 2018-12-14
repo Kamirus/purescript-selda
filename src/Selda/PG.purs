@@ -15,7 +15,7 @@ import Effect.Aff.Class (liftAff)
 import Heterogeneous.Folding (class HFoldl, class HFoldlWithIndex, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
-import Selda.Col (class GetCols, getCols)
+import Selda.Col (class GetCols, Col(..), getCols, showCol)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tupleToRecord)
 import Selda.Query.Type (Query, runQuery)
@@ -89,3 +89,17 @@ query q = do
   liftAff $ PG.withConnection pool \conn → do
     rows ← PG.query conn (PG.Query q_str) PG.Row0
     pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
+
+-- delete
+--   ∷  ∀ r s r'
+--   . Table r
+--   → ({ | r' } → Col s Boolean)
+--   → MonadSelda Unit
+-- delete (Table { name }) pred = do
+--   let
+--     rColumns =
+--     pred_str = showCol $ pred 
+--     q_str = "DELETE FROM " <> name <> " WHERE " <> pred_str
+--   { pool } ← ask
+--   liftAff $ PG.withConnection pool \conn → do
+--     PG.execute conn (PG.Query q_str) xTup
