@@ -46,9 +46,11 @@ main = do
           balance INTEGER NOT NULL
         );
       """) PG.Row0
-      insert_ dbconfig people { id: 1, name: "name1", age: 11 }
-      insert_ dbconfig people { id: 2, name: "name2", age: 22 }
-      insert_ dbconfig people { id: 3, name: "name3", age: 33 }
+      insert_ dbconfig people 
+        [ { id: 1, name: "name1", age: 11 }
+        , { id: 2, name: "name2", age: 22 }
+        , { id: 3, name: "name3", age: 33 }
+        ]
       -- PG.execute conn (PG.Query """
       --   INSERT INTO people (id, name, age)
       --   VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)

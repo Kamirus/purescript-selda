@@ -3,24 +3,24 @@ module Selda.PG
   , insert
   , insert_
   , TupleToRecordFunc
+  , class TupleToRecord, tupleToRecord
   , RecordToTuple
   , RecordLength
   , class ChangeType
-  -- , class BuildPGHandler
   , class ValidateSInCols
   , class TupleRev, tupleRev
-  -- , buildPGHandler
   , class ColsToPGHandler, colsToPGHandler
   ) where
 
 import Prelude
 
-import Data.Array (foldl, reverse, (:))
+import Data.Array (concat, foldl, reverse, (:))
 import Data.Array as Array
 import Data.Exists (Exists, runExists)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Symbol (class IsSymbol, SProxy(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, PoolConfiguration)
 import Database.PostgreSQL as PG
@@ -108,6 +108,15 @@ instance tupToRec
   foldingWithIndex TupleToRecordFunc sym f _ =
     \(Tuple a tup) → Record.insert (SProxy ∷ SProxy sym) a $ f tup
 
+class TupleToRecord tup r | r → tup where
+  tupleToRecord ∷ { | r } → (tup → { | r })
+
+instance tupTR
+    ∷ HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | r })
+    ⇒ TupleToRecord tup r
+  where
+  tupleToRecord r = hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) r
+
 data RecordToTuple = RecordToTuple
 instance rToTuple ∷ Folding RecordToTuple tail a (Tuple a tail) where
   folding _ tail a = Tuple a tail
@@ -127,8 +136,8 @@ instance rlen ∷ Folding RecordLength Int a Int where
   folding _ acc _ = acc + 1
 
 insert_
-  ∷ ∀ r rl tup o
-  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | o })
+  ∷ ∀ r rl tup
+  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | r })
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
   ⇒ Show tup
@@ -136,12 +145,12 @@ insert_
   ⇒ TableColumnNames rl
   ⇒ HFoldl RecordToTuple Unit { | r } tup
   ⇒ HFoldl RecordLength Int { | r } Int
-  ⇒ PoolConfiguration → Table r → { | r } → Aff Unit
+  ⇒ PoolConfiguration → Table r → Array { | r } → Aff Unit
 insert_ cfg t r = void $ insert cfg t r
 
 insert
-  ∷ ∀ r rl tup o
-  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | o })
+  ∷ ∀ r rl tup
+  . TupleToRecord tup r
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
   ⇒ Show tup
@@ -149,26 +158,26 @@ insert
   ⇒ TableColumnNames rl
   ⇒ HFoldl RecordToTuple Unit { | r } tup
   ⇒ HFoldl RecordLength Int { | r } Int
-  ⇒ PoolConfiguration → Table r → { | r } → Aff (Array { | o })
-insert dbconfig (Table { name }) x = do
-  -- case _ of
-  -- [] → pure []
-  -- xs → do
-  let
-    cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
-    xTup = hfoldl RecordToTuple unit x
-    xLen = hfoldl RecordLength 0 x
-    placeholders = Array.range 1 xLen # map (\i → "$" <> show i) # joinWith ", "
-    q_str = 
-      "INSERT INTO " <> name <> " (" <> cols <> ") " 
-        <> "VALUES " <> "(" <> placeholders <> ") "
-        <> "RETURNING " <> cols
-  liftEffect $ log q_str
-  liftEffect $ log $ show xTup
-  pool ← PG.newPool dbconfig
-  PG.withConnection pool \conn → do
-    rows ← PG.query conn (PG.Query q_str) xTup
-    pure $ map (hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) x) rows
+  ⇒ PoolConfiguration → Table r → Array { | r } → Aff (Array { | r })
+insert dbconfig (Table { name }) xs = concat <$> traverse insert1 xs
+  where
+  insert1 x = do
+    let
+      cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
+      xTup = hfoldl RecordToTuple unit x
+      xLen = hfoldl RecordLength 0 x
+      placeholders = 
+        Array.range 1 xLen # map (\i → "$" <> show i) # joinWith ", "
+      q_str = 
+        "INSERT INTO " <> name <> " (" <> cols <> ") " 
+          <> "VALUES " <> "(" <> placeholders <> ") "
+          <> "RETURNING " <> cols
+    liftEffect $ log q_str
+    liftEffect $ log $ show xTup
+    pool ← PG.newPool dbconfig
+    PG.withConnection pool \conn → do
+      rows ← PG.query conn (PG.Query q_str) xTup
+      pure $ map (tupleToRecord x) rows
 
 withPG
   ∷ ∀ o i tup s
