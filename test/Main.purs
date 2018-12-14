@@ -11,6 +11,7 @@ import Database.PostgreSQL as PG
 import Effect (Effect)
 import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
+import Effect.Console (logShow)
 import Prim.RowList as RL
 import Selda (Query, Table(..), aggregate, count, groupBy, insert_, leftJoin, leftJoin', lit, max_, restrict, select, withPG, (.==), (.>))
 import Selda.Col (class GetCols)

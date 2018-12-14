@@ -1,5 +1,6 @@
 module Selda.PG
   ( withPG
+  , insert
   , insert_
   , TupleToRecordFunc
   , RecordToTuple
@@ -126,10 +127,9 @@ instance rlen ∷ Folding RecordLength Int a Int where
   folding _ acc _ = acc + 1
 
 insert_
-  ∷ ∀ r rl tup
-  -- HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | o })
-  -- ⇒ BuildPGHandler rl tup o
-  . FromSQLRow tup
+  ∷ ∀ r rl tup o
+  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | o })
+  ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
   ⇒ Show tup
   ⇒ RL.RowToList r rl
@@ -137,7 +137,20 @@ insert_
   ⇒ HFoldl RecordToTuple Unit { | r } tup
   ⇒ HFoldl RecordLength Int { | r } Int
   ⇒ PoolConfiguration → Table r → { | r } → Aff Unit
-insert_ dbconfig (Table { name }) x = do
+insert_ cfg t r = void $ insert cfg t r
+
+insert
+  ∷ ∀ r rl tup o
+  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | o })
+  ⇒ FromSQLRow tup
+  ⇒ ToSQLRow tup
+  ⇒ Show tup
+  ⇒ RL.RowToList r rl
+  ⇒ TableColumnNames rl
+  ⇒ HFoldl RecordToTuple Unit { | r } tup
+  ⇒ HFoldl RecordLength Int { | r } Int
+  ⇒ PoolConfiguration → Table r → { | r } → Aff (Array { | o })
+insert dbconfig (Table { name }) x = do
   -- case _ of
   -- [] → pure []
   -- xs → do
@@ -149,15 +162,13 @@ insert_ dbconfig (Table { name }) x = do
     q_str = 
       "INSERT INTO " <> name <> " (" <> cols <> ") " 
         <> "VALUES " <> "(" <> placeholders <> ") "
-        <> "RETURNING *"
-  -- liftEffect $ log q_str
-  -- liftEffect $ log $ show xTup
+        <> "RETURNING " <> cols
+  liftEffect $ log q_str
+  liftEffect $ log $ show xTup
   pool ← PG.newPool dbconfig
   PG.withConnection pool \conn → do
-    PG.execute conn (PG.Query q_str) xTup
-    -- rows ← PG.query conn (PG.Query q_str) xTup
-    -- pure $ map (hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) x) rows
-    -- pure $ map (buildPGHandler (RLProxy ∷ RLProxy rl)) rows
+    rows ← PG.query conn (PG.Query q_str) xTup
+    pure $ map (hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) x) rows
 
 withPG
   ∷ ∀ o i tup s
