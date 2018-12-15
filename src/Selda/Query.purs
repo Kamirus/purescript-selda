@@ -2,7 +2,7 @@ module Selda.Query where
 
 import Prelude
 
-import Control.Monad.State (modify_, put)
+import Control.Monad.State (modify_)
 import Data.Array ((:))
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
@@ -16,7 +16,7 @@ import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..))
 import Selda.Inner (Inner, OuterCols(..))
-import Selda.Query.Type (IQuery(..), Query(..), SQL(..), Source(..), freshId, runQuery)
+import Selda.Query.Type (FullQuery(..), Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
@@ -27,22 +27,16 @@ selectFrom
   . FromTable s r cols
   ⇒ Table r
   → ({ | cols } → Query s { | res })
-  → IQuery s { | res }
-selectFrom table k = IQuery $ crossJoin table >>= k
-  -- { res, sql } ← fromTable table
-  -- Query $ modify_ $ \st → st { sources = [Product sql] }
-  -- k res
+  → FullQuery s { | res }
+selectFrom table k = FullQuery $ crossJoin table >>= k
 
 selectFrom_
   ∷ ∀ inner s resi reso
   . FromSubQuery s inner resi
-  ⇒ IQuery (Inner s) { | inner }
+  ⇒ FullQuery (Inner s) { | inner }
   → ({ | resi } → Query s { | reso })
-  → IQuery s { | reso }
-selectFrom_ iq k = IQuery $ crossJoin_ iq >>= k
-  -- { res, sql } ← fromSubQuery q
-  -- Query $ modify_ $ \st → st { sources = Product sql : st.sources }
-  -- k res
+  → FullQuery s { | reso }
+selectFrom_ iq k = FullQuery $ crossJoin_ iq >>= k
 
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = Query $ modify_ \st → st { restricts = e : st.restricts }
@@ -56,7 +50,7 @@ crossJoin table = do
 crossJoin_
   ∷ ∀ inner s res
   . FromSubQuery s inner res
-  ⇒ IQuery (Inner s) { | inner }
+  ⇒ FullQuery (Inner s) { | inner }
   → Query s { | res }
 crossJoin_ iq = do
   let q = unwrap iq
@@ -111,7 +105,7 @@ leftJoin_
   . FromSubQuery s inner res
   ⇒ HMap WrapWithMaybe { | res } { | mres }
   ⇒ ({ | res } → Col s Boolean)
-  → IQuery (Inner s) { | inner }
+  → FullQuery (Inner s) { | inner }
   → Query s { | mres }
 leftJoin_ on iq = do
   let q = unwrap iq

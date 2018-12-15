@@ -24,7 +24,7 @@ data Source
   | LeftJoin SQL (Expr Boolean)
 
 -- main state
--- FROM components in `sources`
+-- FROM+JOIN[S] components in `sources`
 -- WHERE components in `restricts`
 -- SELECT components in `cols`, list of `Expr a`, where type `a` is irrelevant
 -- `nextId` provides fresh identifiers
@@ -36,8 +36,9 @@ type GenState =
   , aggr ∷ Array (Exists Expr)
   }
 
--- type IGenState = { head ∷ SQL, st ∷ GenState }
-
+-- | Represents an intermediate query state.
+-- | Before being wrapped with FullQuery this state represents SQL query without
+-- | FROM component, but having every other including JOIN[s]
 newtype Query s a = Query (State GenState a)
 derive newtype instance functorQuery ∷ Functor (Query s)
 derive newtype instance applyQuery ∷ Apply (Query s)
@@ -45,13 +46,11 @@ derive newtype instance applicativeQuery ∷ Applicative (Query s)
 derive newtype instance bindQuery ∷ Bind (Query s)
 derive newtype instance monadQuery ∷ Monad (Query s)
 
-newtype IQuery s a = IQuery (Query s a)
-derive instance newtypeIQuery ∷ Newtype (IQuery s a) _
-derive newtype instance functorIQuery ∷ Functor (IQuery s)
-derive newtype instance applyIQuery ∷ Apply (IQuery s)
-derive newtype instance applicativeIQuery ∷ Applicative (IQuery s)
-derive newtype instance bindIQuery ∷ Bind (IQuery s)
-derive newtype instance monadIQuery ∷ Monad (IQuery s)
+-- | wrapper for query that is ready for SQL generation
+-- | This could be simple record `{ head ∷ SQL, st ∷ GenState }`
+-- | where `st` is state from wrapped query
+newtype FullQuery s a = FullQuery (Query s a)
+derive instance newtypeFullQuery ∷ Newtype (FullQuery s a) _
 
 initState ∷ GenState
 initState = 

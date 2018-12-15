@@ -12,7 +12,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (IQuery, Table(..), aggregate, count, crossJoin, deleteFrom, groupBy, insert_, leftJoin, leftJoin_, lit, max_, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, groupBy, insert_, leftJoin, leftJoin_, lit, max_, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
@@ -228,7 +228,7 @@ test'
   . ColsToPGHandler s i tup o
   ⇒ GetCols i ⇒ FromSQLRow tup
   ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
-  ⇒ Connection → String → Array { | o } → IQuery s { | i } → TestSuite
+  ⇒ Connection → String → Array { | o } → FullQuery s { | i } → TestSuite
 test' conn msg expected q = do
   test conn msg $ (withPG dbconfig $ query q) >>= assertSeqEq expected 
 

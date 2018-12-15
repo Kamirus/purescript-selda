@@ -31,7 +31,7 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
-import Selda.Query.Type (IQuery, runQuery)
+import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
@@ -90,7 +90,7 @@ query
   . ColsToPGHandler s i tup o
   ⇒ GetCols i
   ⇒ FromSQLRow tup
-  ⇒ IQuery s (Record i)
+  ⇒ FullQuery s (Record i)
   → MonadSelda (Array (Record o))
 query q = do
   let

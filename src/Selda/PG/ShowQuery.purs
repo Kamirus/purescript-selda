@@ -2,7 +2,7 @@ module Selda.PG.ShowQuery where
 
 import Prelude
 
-import Data.Array (foldl, reverse, (:))
+import Data.Array (foldl, reverse)
 import Data.Array as Array
 import Data.Exists (Exists, runExists)
 import Data.Maybe (Maybe(..))
