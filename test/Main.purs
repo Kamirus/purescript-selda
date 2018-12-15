@@ -19,7 +19,7 @@ import Test.Unit (TestSuite, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, test)
 
-people ∷ Table ( name ∷ String , age ∷ Int , id ∷ Int )
+people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
 people = Table { name: "people" }
 
 bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int )
@@ -35,7 +35,7 @@ main = do
         CREATE TABLE people (
           id INTEGER PRIMARY KEY,
           name TEXT NOT NULL,
-          age INTEGER NULL
+          age INTEGER
         );
 
         DROP TABLE IF EXISTS bank_accounts;
@@ -46,23 +46,23 @@ main = do
         );
       """) PG.Row0
       withPG dbconfig $ insert_ people 
-        [ { id: 1, name: "name1", age: 11 }
-        , { id: 2, name: "name2", age: 22 }
-        , { id: 3, name: "name3", age: 33 }
+        [ { id: 1, name: "name1", age: Just 11 }
+        , { id: 2, name: "name2", age: Just 22 }
+        , { id: 3, name: "name3", age: Just 33 }
         ]
       
       -- simple test delete
       withPG dbconfig do
-        insert_ people [{ id: 4, name: "delete", age: 999 }]
+        insert_ people [{ id: 4, name: "delete", age: Just 999 }]
         deleteFrom people \r → r.id .== lit 4
 
       -- simple test update
       withPG dbconfig do
-        insert_ people [{ id: 5, name: "update", age: 999 }]
+        insert_ people [{ id: 5, name: "update", age: Just 999 }]
         update people
           (\r → r.name .== lit "update")
-          (\r → r { age = lit 1000 })
-        deleteFrom people \r → r.age .> lit 999
+          (\r → r { age = lit $ Just 1000 })
+        deleteFrom people \r → r.age .> lit (Just 999)
 
       -- PG.execute conn (PG.Query """
       --   INSERT INTO people (id, name, age)
@@ -87,9 +87,9 @@ main = do
           -- SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
           -- FROM people people_0
           test' conn "simple select people"
-            [ { id: 1, name: "name1", age: 11 }
-            , { id: 2, name: "name2", age: 22 }
-            , { id: 3, name: "name3", age: 33 }
+            [ { id: 1, name: "name1", age: Just 11 }
+            , { id: 2, name: "name2", age: Just 22 }
+            , { id: 3, name: "name3", age: Just 33 }
             ]
             $ selectFrom people \r → do
                 pure r
@@ -97,9 +97,9 @@ main = do
           -- SELECT people_0.age AS y, people_0.id AS x
           -- FROM people people_0
           test' conn "select people, return different record"
-            [ { x: 1, y: 11 }
-            , { x: 2, y: 22 }
-            , { x: 3, y: 33 }
+            [ { x: 1, y: Just 11 }
+            , { x: 2, y: Just 22 }
+            , { x: 3, y: Just 33 }
             ]
             $ selectFrom people \{ id, age } → do
                 pure { x: id, y: age }
@@ -107,20 +107,20 @@ main = do
           -- SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
           -- FROM people people_0 WHERE ((people_0.age > 20))
           test' conn "simple select people restrict"
-            [ { id: 2, name: "name2", age: 22 }
-            , { id: 3, name: "name3", age: 33 }
+            [ { id: 2, name: "name2", age: Just 22 }
+            , { id: 3, name: "name3", age: Just 33 }
             ]
             $ selectFrom people \r@{ age } → do
-                restrict $ age .> lit 20
+                restrict $ age .> lit (Just 20)
                 pure r
 
           -- SELECT people_0.id AS id1, people_1.age AS age2, people_0.age AS age1
           -- FROM people people_0, people people_1
           -- WHERE ((people_0.age > people_1.age))
           test' conn "cross product with restrict"
-            [ { id1: 2, age1: 22, age2: 11 }
-            , { id1: 3, age1: 33, age2: 11 }
-            , { id1: 3, age1: 33, age2: 22 }
+            [ { id1: 2, age1: Just 22, age2: Just 11 }
+            , { id1: 3, age1: Just 33, age2: Just 11 }
+            , { id1: 3, age1: Just 33, age2: Just 22 }
             ]
             $ selectFrom people \r1 → do
                 r2 ← crossJoin people

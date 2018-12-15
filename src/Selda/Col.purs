@@ -4,13 +4,14 @@ import Prelude
 
 import Data.Array ((:))
 import Data.Exists (Exists, mkExists)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Prim.RowList (kind RowList)
-import Selda.Expr (Expr(..), Literal(..), showExpr)
+import Selda.Expr (Expr(..), Literal(..), None(..), Some(..), showExpr)
 import Selda.Table (Alias, Column)
 import Type.Proxy (Proxy)
 
@@ -22,9 +23,25 @@ showCol = unwrap >>> showExpr
 
 class Lit a where
   lit ∷ ∀ s. a → Col s a
-instance litBoolean ∷ Lit Boolean where lit x = Col $ ELit $ LBoolean x identity
-instance litString ∷ Lit String where lit x = Col $ ELit $ LString x identity
-instance litInt ∷ Lit Int where lit x = Col $ ELit $ LInt x identity
+  literal ∷ a → Literal a
+
+instance litBoolean ∷ Lit Boolean where
+  literal x = LBoolean x identity
+  lit x = Col $ ELit $ literal x
+
+instance litString ∷ Lit String where
+  literal x = LString x identity
+  lit x = Col $ ELit $ literal x
+
+instance litInt ∷ Lit Int where
+  literal x = LInt x identity
+  lit x = Col $ ELit $ literal x
+
+instance litMaybe ∷ Lit a ⇒ Lit (Maybe a) where
+  literal = case _ of
+    Nothing → LNull $ mkExists $ None identity
+    Just l → LJust $ mkExists $ Some (literal l) identity
+  lit x = Col $ ELit $ literal x
 
 -- | ```purescript
 -- | { name ∷ Column String, id ∷ Column Int }
