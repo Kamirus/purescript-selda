@@ -14,6 +14,7 @@ import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Data.Array (concat)
 import Data.Array as Array
 import Data.Exists (runExists)
+import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -30,7 +31,7 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
-import Selda.Query.Type (Query, runQuery)
+import Selda.Query.Type (IQuery, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
@@ -89,11 +90,11 @@ query
   . ColsToPGHandler s i tup o
   ⇒ GetCols i
   ⇒ FromSQLRow tup
-  ⇒ Query s (Record i)
+  ⇒ IQuery s (Record i)
   → MonadSelda (Array (Record o))
 query q = do
   let
-    (Tuple res st') = runQuery q
+    (Tuple res st') = runQuery $ unwrap q
     st = st' { cols = getCols res }
     q_str = showState st
   -- liftEffect $ log q_str

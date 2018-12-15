@@ -1,17 +1,10 @@
-module Selda.Query.Type
-  ( Query(..)
-  , GenState
-  , SQL(..)
-  , Source(..)
-  , initState
-  , freshId
-  , runQuery
-  ) where
+module Selda.Query.Type where
 
 import Prelude
 
 import Control.Monad.State (State, get, put, runState)
 import Data.Exists (Exists)
+import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple)
 import Prim.RowList (kind RowList)
 import Selda.Expr (Expr)
@@ -43,12 +36,22 @@ type GenState =
   , aggr ∷ Array (Exists Expr)
   }
 
+-- type IGenState = { head ∷ SQL, st ∷ GenState }
+
 newtype Query s a = Query (State GenState a)
 derive newtype instance functorQuery ∷ Functor (Query s)
 derive newtype instance applyQuery ∷ Apply (Query s)
 derive newtype instance applicativeQuery ∷ Applicative (Query s)
 derive newtype instance bindQuery ∷ Bind (Query s)
 derive newtype instance monadQuery ∷ Monad (Query s)
+
+newtype IQuery s a = IQuery (Query s a)
+derive instance newtypeIQuery ∷ Newtype (IQuery s a) _
+derive newtype instance functorIQuery ∷ Functor (IQuery s)
+derive newtype instance applyIQuery ∷ Apply (IQuery s)
+derive newtype instance applicativeIQuery ∷ Applicative (IQuery s)
+derive newtype instance bindIQuery ∷ Bind (IQuery s)
+derive newtype instance monadIQuery ∷ Monad (IQuery s)
 
 initState ∷ GenState
 initState = 

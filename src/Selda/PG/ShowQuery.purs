@@ -26,13 +26,14 @@ showCols = case _ of
 
 showSources ∷ Array Source → String
 showSources sources = case Array.uncons $ reverse sources of
-  Nothing →
-    ""
-  Just { head: h@(Product t), tail } →
-    " FROM " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
-  Just { head: LeftJoin t _, tail } →
-    -- join on the first place, drop it and interpret as Product
-    showSources $ Product t : tail
+  Nothing → ""
+  Just { head, tail } → " FROM "
+    <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource head) tail
+  -- Just { head: h@(Product t), tail } →
+  --   " FROM " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
+  -- Just { head: LeftJoin t _, tail } →
+  --   -- join on the first place, drop it and interpret as Product
+  --   showSources $ Product t : tail
 
 showRestricts ∷ Array (Expr Boolean) → String
 showRestricts = case _ of

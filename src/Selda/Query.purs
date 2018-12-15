@@ -1,23 +1,12 @@
-module Selda.Query
-  ( restrict
-  , select
-  , aggregate
-  , groupBy
-  , groupBy'
-  , leftJoin
-  , leftJoin'
-  , WrapWithMaybe
-  , SubQueryResult
-  , class FromTable, fromTable
-  , class FromSubQuery, fromSubQuery
-  ) where
+module Selda.Query where
 
 import Prelude
 
-import Control.Monad.State (modify_)
+import Control.Monad.State (modify_, put)
 import Data.Array ((:))
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
+import Data.Newtype (unwrap)
 import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
@@ -26,33 +15,61 @@ import Prim.RowList as RL
 import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..))
-import Selda.Inner (Inner, OuterCols, outer)
-import Selda.Query.Type (Query(..), SQL(..), Source(..), freshId, runQuery)
+import Selda.Inner (Inner, OuterCols(..))
+import Selda.Query.Type (IQuery(..), Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
+selectFrom
+  ∷ ∀ r s cols res
+  . FromTable s r cols
+  ⇒ Table r
+  → ({ | cols } → Query s { | res })
+  → IQuery s { | res }
+selectFrom table k = IQuery $ crossJoin table >>= k
+  -- { res, sql } ← fromTable table
+  -- Query $ modify_ $ \st → st { sources = [Product sql] }
+  -- k res
+
+selectFrom_
+  ∷ ∀ inner s resi reso
+  . FromSubQuery s inner resi
+  ⇒ IQuery (Inner s) { | inner }
+  → ({ | resi } → Query s { | reso })
+  → IQuery s { | reso }
+selectFrom_ iq k = IQuery $ crossJoin_ iq >>= k
+  -- { res, sql } ← fromSubQuery q
+  -- Query $ modify_ $ \st → st { sources = Product sql : st.sources }
+  -- k res
+
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = Query $ modify_ \st → st { restricts = e : st.restricts }
 
-select ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
-select table = do
+crossJoin ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
+crossJoin table = do
   { res, sql } ← fromTable table
   Query $ modify_ $ \st → st { sources = Product sql : st.sources }
   pure res
 
-aggregate
-  ∷ ∀ s aggrInner res inner
-  . HMap UnAggr { | aggrInner } { | inner }
-  ⇒ FromSubQuery s inner res
-  ⇒ Query (Inner s) { | aggrInner }
+crossJoin_
+  ∷ ∀ inner s res
+  . FromSubQuery s inner res
+  ⇒ IQuery (Inner s) { | inner }
   → Query s { | res }
-aggregate qai = do
-  let (qi ∷ Query (Inner s) { | inner }) = map (hmap UnAggr) qai
-  { res, sql } ← fromSubQuery qi
+crossJoin_ iq = do
+  let q = unwrap iq
+  { res, sql } ← fromSubQuery q
   Query $ modify_ $ \st → st { sources = Product sql : st.sources }
-  pure $ res
+  pure res
+
+aggregate
+  ∷ ∀ s aggr res
+  . HMap UnAggr { | aggr } { | res }
+  ⇒ Query s { | aggr }
+  → Query s { | res }
+aggregate q = map (hmap UnAggr) q
 
 groupBy ∷ ∀ s a. Col s a → Query s (Aggr s a)
 groupBy col@(Col e) = do
@@ -74,34 +91,37 @@ leftJoin
   ∷ ∀ r s res mres
   . FromTable s r res
   ⇒ HMap WrapWithMaybe { | res } { | mres }
-  ⇒ Table r → (Record res → Col s Boolean) → Query s { | mres }
+  ⇒ Table r
+  → ({ | res } → Col s Boolean)
+  → Query s { | mres }
 leftJoin table on = do
   { res, sql } ← fromTable table
   let Col e = on res
   Query $ modify_ \ st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
--- | `leftJoin' on q`
+-- | `leftJoin_ on q`
 -- | run sub query `q`;
 -- | with this execute `on` to get JOIN constraint;
 -- | add sub query to sources;
 -- | return previously mapped record with each value in Col wrapped in Maybe
 -- | (because LEFT JOIN can return null for each column)
-leftJoin'
+leftJoin_
   ∷ ∀ s res mres inner
   . FromSubQuery s inner res
-  ⇒ HMap WrapWithMaybe (Record res) (Record mres)
-  ⇒ (Record res → Col s Boolean)
-  → Query (Inner s) (Record inner)
-  → Query s (Record mres)
-leftJoin' on q = do
+  ⇒ HMap WrapWithMaybe { | res } { | mres }
+  ⇒ ({ | res } → Col s Boolean)
+  → IQuery (Inner s) { | inner }
+  → Query s { | mres }
+leftJoin_ on iq = do
+  let q = unwrap iq
   { res, sql } ← fromSubQuery q
   let Col e = on res
   Query $ modify_ \st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
 class FromTable s t c | s t → c where
-  fromTable ∷ Table t → Query s { res ∷ Record c , sql ∷ SQL }
+  fromTable ∷ Table t → Query s { res ∷ { | c } , sql ∷ SQL }
 
 instance tableToColsI
     ∷ ( RL.RowToList t tl
@@ -131,11 +151,11 @@ subQueryAlias = do
 
 class FromSubQuery s inner res | s inner → res where
   fromSubQuery
-    ∷ Query (Inner s) (Record inner)
-    → Query s { res ∷ Record res , sql ∷ SQL , alias ∷ Alias }
+    ∷ Query (Inner s) { | inner }
+    → Query s { res ∷ { | res } , sql ∷ SQL , alias ∷ Alias }
 
 instance fromSubQueryI 
-    ∷ ( HMap OuterCols (Record inner) (Record res0)
+    ∷ ( HMap OuterCols { | inner } { | res0 }
       , GetCols res0
       , HMapWithIndex SubQueryResult { | res0 } { | res }
       )
@@ -143,7 +163,7 @@ instance fromSubQueryI
   where
   fromSubQuery q = do
     let (Tuple innerRes st) = runQuery q
-    let res0 = outer innerRes
+    let res0 = hmap OuterCols innerRes
     alias ← subQueryAlias
     let res = createSubQueryResult alias res0
     pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }

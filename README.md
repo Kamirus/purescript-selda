@@ -25,5 +25,4 @@ Inspired by [selda](https://github.com/valderman/selda)
 
 ## Known issues
 - groupBy not a column, results in runtime error
-- leftJoin before select
 - nested records not working - generic part - pure $ { r1: { a, b }, r2: { c }, d }

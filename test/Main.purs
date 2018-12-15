@@ -12,7 +12,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (Query, Table(..), aggregate, count, deleteFrom, groupBy, insert_, leftJoin, leftJoin', lit, max_, query, restrict, select, update, withPG, (.==), (.>))
+import Selda (IQuery, Table(..), aggregate, count, crossJoin, deleteFrom, groupBy, insert_, leftJoin, leftJoin_, lit, max_, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
@@ -84,122 +84,151 @@ main = do
 
       liftEffect $ runTest $ do
         suite "Selda" $ do
+          -- SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
+          -- FROM people people_0
           test' conn "simple select people"
             [ { id: 1, name: "name1", age: 11 }
             , { id: 2, name: "name2", age: 22 }
             , { id: 3, name: "name3", age: 33 }
             ]
-            $ do
-              r ← select people
-              pure r
+            $ selectFrom people \r → do
+                pure r
 
+          -- SELECT people_0.age AS y, people_0.id AS x
+          -- FROM people people_0
           test' conn "select people, return different record"
             [ { x: 1, y: 11 }
             , { x: 2, y: 22 }
             , { x: 3, y: 33 }
             ]
-            $ do
-              { id, age } ← select people
-              pure { x: id, y: age }
+            $ selectFrom people \{ id, age } → do
+                pure { x: id, y: age }
 
+          -- SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
+          -- FROM people people_0 WHERE ((people_0.age > 20))
           test' conn "simple select people restrict"
             [ { id: 2, name: "name2", age: 22 }
             , { id: 3, name: "name3", age: 33 }
             ]
-            $ do
-              r@{ age } ← select people
-              restrict $ age .> lit 20
-              pure r
+            $ selectFrom people \r@{ age } → do
+                restrict $ age .> lit 20
+                pure r
 
+          -- SELECT people_0.id AS id1, people_1.age AS age2, people_0.age AS age1
+          -- FROM people people_0, people people_1
+          -- WHERE ((people_0.age > people_1.age))
           test' conn "cross product with restrict"
             [ { id1: 2, age1: 22, age2: 11 }
             , { id1: 3, age1: 33, age2: 11 }
             , { id1: 3, age1: 33, age2: 22 }
             ]
-            $ do
-              r1 ← select people
-              r2 ← select people
-              restrict $ r1.age .> r2.age
-              pure { id1: r1.id, age1: r1.age, age2: r2.age }
+            $ selectFrom people \r1 → do
+                r2 ← crossJoin people
+                restrict $ r1.age .> r2.age
+                pure { id1: r1.id, age1: r1.age, age2: r2.age }
 
+          -- SELECT people_0.id AS id, bank_accounts_1.balance AS balance
+          -- FROM people people_0, bank_accounts bank_accounts_1
+          -- WHERE ((people_0.id = bank_accounts_1.personId))
           test' conn "cross product as natural join"
             [ { id: 1, balance: 100 }
             , { id: 1, balance: 150 }
             -- , { id: 2, balance: Nothing }
             , { id: 3, balance: 300 }
             ]
-            $ do
-              { id, name, age } ← select people
-              { balance, personId } ← select bankAccounts
-              restrict $ id .== personId
-              pure { id, balance }
+            $ selectFrom people \{ id, name, age } → do
+                { balance, personId } ← crossJoin bankAccounts
+                restrict $ id .== personId
+                pure { id, balance }
 
+          -- SELECT people_0.id AS id, bank_accounts_1.balance AS balance
+          -- FROM people people_0
+          -- LEFT JOIN bank_accounts bank_accounts_1
+          --   ON ((people_0.id = bank_accounts_1.personId))
           test' conn "left join"
             [ { id: 1, balance: Just 100 }
             , { id: 1, balance: Just 150 }
             , { id: 2, balance: Nothing }
             , { id: 3, balance: Just 300 }
             ]
-            $ do
-              { id, name, age } ← select people
-              { balance } ← leftJoin bankAccounts \b → id .== b.personId
-              pure { id, balance }
+            $ selectFrom people \{ id, name, age } → do
+                { balance } ← leftJoin bankAccounts \b → id .== b.personId
+                pure { id, balance }
 
-          test' conn "alone left join transformed to select but with every value wrapped in Just"
-            [ { id: Just 1, personId: Just 1, balance: Just 100 }
-            , { id: Just 2, personId: Just 1, balance: Just 150 }
-            , { id: Just 3, personId: Just 3, balance: Just 300 }
-            ]
-            $ do
-              { id, personId, balance } ← leftJoin bankAccounts \_ → lit true
-              pure { id, balance, personId }
-
+          -- SELECT people_0.id AS id, sub_q1.balance AS balance
+          -- FROM people people_0
+          -- LEFT JOIN
+          --   ( SELECT 
+          --       bank_accounts_0.personId AS personId,
+          --       bank_accounts_0.id AS id,
+          --       bank_accounts_0.balance AS balance
+          --     FROM bank_accounts bank_accounts_0
+          --   ) sub_q1
+          --   ON ((people_0.id = sub_q1.personId))
           test' conn "left join but with subquery"
             [ { id: 1, balance: Just 100 }
             , { id: 1, balance: Just 150 }
             , { id: 2, balance: Nothing }
             , { id: 3, balance: Just 300 }
             ]
-            $ do
-              { id, name, age } ← select people
-              { balance } ← leftJoin' (\b → id .== b.personId) do
-                b ← select bankAccounts
-                -- restrict $ id .== b.personId -- type error
-                pure b
-              pure { id, balance }
+            $ selectFrom people \{ id, name, age } → do
+                { balance } ← leftJoin_ (\b → id .== b.personId) do
+                  selectFrom bankAccounts \b → do
+                    -- restrict $ id .== b.personId -- type error
+                    pure b
+                pure { id, balance }
 
+          -- SELECT max(people_0.id) AS maxId
+          -- FROM people people_0
           test' conn "aggr: max people id"
             [ { maxId: 3 } ]
-            $ aggregate do
-              { id, name, age } ← select people
-              pure { maxId: max_ id }
+            $ selectFrom people \{ id, name, age } → aggregate do
+                pure { maxId: max_ id }
 
+          -- SELECT
+          --   bank_accounts_0.personId AS pid,
+          --   max(bank_accounts_0.balance) AS m,
+          --   count(bank_accounts_0.personId) AS c
+          -- FROM bank_accounts bank_accounts_0
+          -- GROUP BY bank_accounts_0.personId
           test' conn "aggr: max people id"
             [ { pid: 1, m: 150, c: "2" }
             , { pid: 3, m: 300, c: "1" }
             ]
-            $ aggregate do
-              { personId, balance } ← select bankAccounts
-              pid ← groupBy personId
-              pure { pid, m: max_ balance, c: count personId }
+            $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+                pid ← groupBy personId
+                pure { pid, m: max_ balance, c: count personId }
 
+          -- SELECT
+          --   sub_q0.pid AS pid,
+          --   sub_q0.m AS m,
+          --   sub_q0.c AS c
+          -- FROM 
+          --   ( SELECT
+          --       bank_accounts_0.personId AS pid,
+          --       max(bank_accounts_0.balance) AS m,
+          --       count(bank_accounts_0.personId) AS c
+          --     FROM bank_accounts bank_accounts_0
+          --     GROUP BY bank_accounts_0.personId
+          --   ) sub_q0
+          -- WHERE ((sub_q0.c > '1'))
           test' conn "aggr: max people id having count > 1"
             [ { pid: 1, m: 150, c: "2" }
             ]
-            $ do
-              r@{ c } ← aggregate do
-                { personId, balance } ← select bankAccounts
-                pid ← groupBy personId
-                pure { pid, m: max_ balance, c: count personId }
-              restrict $ c .> lit "1"
-              pure r
+            $ selectFrom_ do
+                selectFrom bankAccounts \{ personId, balance } → aggregate do
+                    pid ← groupBy personId
+                    pure { pid, m: max_ balance, c: count personId }
+                $ \r@{ c } → do
+                    restrict $ c .> lit "1"
+                    pure r
 
 test'
   ∷ ∀ s o i tup ol
   . ColsToPGHandler s i tup o
   ⇒ GetCols i ⇒ FromSQLRow tup
   ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
-  ⇒ Connection → String → Array { | o } → Query s { | i } → TestSuite
+  ⇒ Connection → String → Array { | o } → IQuery s { | i } → TestSuite
 test' conn msg expected q = do
   test conn msg $ (withPG dbconfig $ query q) >>= assertSeqEq expected 
 
