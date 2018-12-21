@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Monad.State (State, get, put, runState)
 import Data.Exists (Exists)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple)
 import Prim.RowList (kind RowList)
@@ -34,6 +35,8 @@ type GenState =
   , nextId ∷ Int
   , cols ∷ Array (Tuple Alias (Exists Expr))
   , aggr ∷ Array (Exists Expr)
+  , order ∷ Array (Tuple Order (Exists Expr))
+  , limit ∷ Maybe Int
   }
 
 -- | Represents an intermediate query state.
@@ -52,6 +55,8 @@ derive newtype instance monadQuery ∷ Monad (Query s)
 newtype FullQuery s a = FullQuery (Query s a)
 derive instance newtypeFullQuery ∷ Newtype (FullQuery s a) _
 
+data Order = Asc | Desc
+
 initState ∷ GenState
 initState = 
   { sources: []
@@ -59,6 +64,8 @@ initState =
   , nextId: 0
   , cols: []
   , aggr: []
+  , order: []
+  , limit: Nothing
   }
 
 freshId ∷ ∀ s. Query s Int

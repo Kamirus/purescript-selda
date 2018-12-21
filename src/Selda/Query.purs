@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.State (modify_)
 import Data.Array ((:))
 import Data.Exists (mkExists)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
@@ -16,7 +16,7 @@ import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..))
 import Selda.Inner (Inner, OuterCols(..))
-import Selda.Query.Type (FullQuery(..), Query(..), SQL(..), Source(..), freshId, runQuery)
+import Selda.Query.Type (FullQuery(..), Order, Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
@@ -80,6 +80,13 @@ groupBy' i = do
   let aggr = map snd $ getCols i
   Query $ modify_ \st → st { aggr = st.aggr <> aggr }
   pure $ hmap WrapWithAggr i
+
+orderBy ∷ ∀ s a. Order → Aggr s a → Query s Unit
+orderBy order (Aggr (Col e)) =
+  Query $ modify_ \st → st { order = st.order <> [Tuple order $ mkExists e] }
+
+limit ∷ ∀ s. Int → Query s Unit
+limit i = Query $ modify_ $ _ { limit = Just i }
 
 leftJoin
   ∷ ∀ r s res mres

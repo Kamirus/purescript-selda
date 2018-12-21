@@ -9,15 +9,17 @@ import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
 import Selda.Expr (Expr, showExpr)
-import Selda.Query.Type (GenState, SQL(..), Source(..))
+import Selda.Query.Type (GenState, Order(..), SQL(..), Source(..))
 import Selda.Table (Alias)
 
 showState ∷ GenState → String
-showState { cols, sources, restricts, aggr } = 
+showState { cols, sources, restricts, aggr, order, limit } = 
   showCols cols
     <> showSources sources
     <> showRestricts restricts
     <> showGrouping aggr
+    <> showOrdering order
+    <> showLimit limit
 
 showCols ∷ Array (Tuple Alias (Exists Expr)) → String
 showCols = case _ of
@@ -44,6 +46,23 @@ showGrouping ∷ Array (Exists Expr) → String
 showGrouping = case _ of
   [] → ""
   xs → " GROUP BY " <> (joinWith ", " $ map (runExists showExpr) xs)
+
+showOrdering ∷ Array (Tuple Order (Exists Expr)) → String
+showOrdering = case _ of
+  [] → ""
+  xs → " ORDER BY " <> (joinWith ", " $ map showOrder xs)
+
+showOrder ∷ Tuple Order (Exists Expr) → String
+showOrder (Tuple order e) =
+  runExists showExpr e <> " "
+    <> case order of
+      Asc → "ASC"
+      Desc → "DESC"
+
+showLimit ∷ Maybe Int → String
+showLimit = case _ of
+  Nothing → ""
+  Just i → " LIMIT " <> (show $ max 0 i)
 
 showSQL ∷ SQL → String
 showSQL = case _ of

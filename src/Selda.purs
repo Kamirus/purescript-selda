@@ -23,7 +23,8 @@ import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..))
 import Selda.PG (withPG, query, insert_, insert, deleteFrom, update) as PG
-import Selda.Query (crossJoin, crossJoin_, restrict, leftJoin, leftJoin_, aggregate, groupBy, groupBy', selectFrom, selectFrom_) as Query
+import Selda.Query (crossJoin, crossJoin_, restrict, leftJoin, leftJoin_, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
+import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
 
@@ -44,6 +45,12 @@ count (Col e) = Aggr $ Col $ EFn $ FnCount (mkExists e) identity
 
 max_ ∷ ∀ s a. Col s a → Aggr s a
 max_ (Col e) = Aggr $ Col $ EFn $ FnMax e
+
+asc ∷ Order
+asc = Asc
+
+desc ∷ Order
+desc = Desc
 
 -- instance colHeytingAlgebra ∷ HeytingAlgebra (Col s Boolean) where
 
