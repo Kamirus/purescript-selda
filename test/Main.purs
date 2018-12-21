@@ -9,15 +9,15 @@ import Data.Tuple.Nested ((/\))
 import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect (Effect)
-import Effect.Aff (launchAff)
+import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, groupBy, insert_, leftJoin, leftJoin_, lit, max_, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
 import Test.Unit.Main (runTest)
-import Test.Utils (assertSeqEq, test)
+import Test.Utils (assertSeqEq, assertUnorderedSeqEq, test)
 
 people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
 people = Table { name: "people" }
@@ -45,12 +45,19 @@ main = do
           balance INTEGER NOT NULL
         );
       """) PG.Row0
-      withPG dbconfig $ insert_ people 
-        [ { id: 1, name: "name1", age: Just 11 }
-        , { id: 2, name: "name2", age: Just 22 }
-        , { id: 3, name: "name3", age: Just 33 }
-        ]
-      
+
+      withPG dbconfig do
+        insert_ people 
+          [ { id: 1, name: "name1", age: Just 11 }
+          , { id: 2, name: "name2", age: Just 22 }
+          , { id: 3, name: "name3", age: Just 33 }
+          ]
+        insert_ bankAccounts
+          [ { id: 1, personId: 1, balance: 100 }
+          , { id: 2, personId: 1, balance: 150 }
+          , { id: 3, personId: 3, balance: 300 }
+          ]
+
       -- simple test delete
       withPG dbconfig do
         insert_ people [{ id: 4, name: "delete", age: Just 999 }]
@@ -64,28 +71,8 @@ main = do
           (\r → r { age = lit $ Just 1000 })
         deleteFrom people \r → r.age .> lit (Just 999)
 
-      -- PG.execute conn (PG.Query """
-      --   INSERT INTO people (id, name, age)
-      --   VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)
-      -- """)
-      --   (( (1 /\ "name1" /\ 11)
-      --   /\ (2 /\ "name2" /\ 22)
-      --   /\ (3 /\ "name3" /\ 33)
-      --   ))
-
-      PG.execute conn (PG.Query """
-        INSERT INTO bank_accounts (id, personId, balance)
-        VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)
-      """)
-        (( (1 /\ 1 /\ 100)
-        /\ (2 /\ 1 /\ 150)
-        /\ (3 /\ 3 /\ 300)
-        ))
-
       liftEffect $ runTest $ do
         suite "Selda" $ do
-          -- SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
-          -- FROM people people_0
           test' conn "simple select people"
             [ { id: 1, name: "name1", age: Just 11 }
             , { id: 2, name: "name2", age: Just 22 }
@@ -94,8 +81,6 @@ main = do
             $ selectFrom people \r → do
                 pure r
 
-          -- SELECT people_0.age AS y, people_0.id AS x
-          -- FROM people people_0
           test' conn "select people, return different record"
             [ { x: 1, y: Just 11 }
             , { x: 2, y: Just 22 }
@@ -104,8 +89,6 @@ main = do
             $ selectFrom people \{ id, age } → do
                 pure { x: id, y: age }
 
-          -- SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
-          -- FROM people people_0 WHERE ((people_0.age > 20))
           test' conn "simple select people restrict"
             [ { id: 2, name: "name2", age: Just 22 }
             , { id: 3, name: "name3", age: Just 33 }
@@ -114,9 +97,6 @@ main = do
                 restrict $ age .> lit (Just 20)
                 pure r
 
-          -- SELECT people_0.id AS id1, people_1.age AS age2, people_0.age AS age1
-          -- FROM people people_0, people people_1
-          -- WHERE ((people_0.age > people_1.age))
           test' conn "cross product with restrict"
             [ { id1: 2, age1: Just 22, age2: Just 11 }
             , { id1: 3, age1: Just 33, age2: Just 11 }
@@ -127,9 +107,6 @@ main = do
                 restrict $ r1.age .> r2.age
                 pure { id1: r1.id, age1: r1.age, age2: r2.age }
 
-          -- SELECT people_0.id AS id, bank_accounts_1.balance AS balance
-          -- FROM people people_0, bank_accounts bank_accounts_1
-          -- WHERE ((people_0.id = bank_accounts_1.personId))
           test' conn "cross product as natural join"
             [ { id: 1, balance: 100 }
             , { id: 1, balance: 150 }
@@ -141,10 +118,6 @@ main = do
                 restrict $ id .== personId
                 pure { id, balance }
 
-          -- SELECT people_0.id AS id, bank_accounts_1.balance AS balance
-          -- FROM people people_0
-          -- LEFT JOIN bank_accounts bank_accounts_1
-          --   ON ((people_0.id = bank_accounts_1.personId))
           test' conn "left join"
             [ { id: 1, balance: Just 100 }
             , { id: 1, balance: Just 150 }
@@ -155,16 +128,6 @@ main = do
                 { balance } ← leftJoin bankAccounts \b → id .== b.personId
                 pure { id, balance }
 
-          -- SELECT people_0.id AS id, sub_q1.balance AS balance
-          -- FROM people people_0
-          -- LEFT JOIN
-          --   ( SELECT 
-          --       bank_accounts_0.personId AS personId,
-          --       bank_accounts_0.id AS id,
-          --       bank_accounts_0.balance AS balance
-          --     FROM bank_accounts bank_accounts_0
-          --   ) sub_q1
-          --   ON ((people_0.id = sub_q1.personId))
           test' conn "left join but with subquery"
             [ { id: 1, balance: Just 100 }
             , { id: 1, balance: Just 150 }
@@ -178,19 +141,11 @@ main = do
                     pure b
                 pure { id, balance }
 
-          -- SELECT max(people_0.id) AS maxId
-          -- FROM people people_0
           test' conn "aggr: max people id"
             [ { maxId: 3 } ]
             $ selectFrom people \{ id, name, age } → aggregate do
                 pure { maxId: max_ id }
 
-          -- SELECT
-          --   bank_accounts_0.personId AS pid,
-          --   max(bank_accounts_0.balance) AS m,
-          --   count(bank_accounts_0.personId) AS c
-          -- FROM bank_accounts bank_accounts_0
-          -- GROUP BY bank_accounts_0.personId
           test' conn "aggr: max people id"
             [ { pid: 1, m: 150, c: "2" }
             , { pid: 3, m: 300, c: "1" }
@@ -199,19 +154,15 @@ main = do
                 pid ← groupBy personId
                 pure { pid, m: max_ balance, c: count personId }
 
-          -- SELECT
-          --   sub_q0.pid AS pid,
-          --   sub_q0.m AS m,
-          --   sub_q0.c AS c
-          -- FROM 
-          --   ( SELECT
-          --       bank_accounts_0.personId AS pid,
-          --       max(bank_accounts_0.balance) AS m,
-          --       count(bank_accounts_0.personId) AS c
-          --     FROM bank_accounts bank_accounts_0
-          --     GROUP BY bank_accounts_0.personId
-          --   ) sub_q0
-          -- WHERE ((sub_q0.c > '1'))
+          testWith assertSeqEq conn "aggr: max people id + order desc"
+            [ { pid: 3, m: 300, c: "1" }
+            , { pid: 1, m: 150, c: "2" }
+            ]
+            $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+                pid ← groupBy personId
+                orderBy desc $ max_ balance
+                pure { pid, m: max_ balance, c: count personId }
+
           test' conn "aggr: max people id having count > 1"
             [ { pid: 1, m: 150, c: "2" }
             ]
@@ -223,14 +174,41 @@ main = do
                     restrict $ c .> lit "1"
                     pure r
 
+          test' conn "limit negative returns 0"
+            [ ]
+            $ selectFrom people \r → do
+                limit $ -7
+                pure r
+          
+          test' conn "limit + order by: return first"
+            [ { pid: 3, maxBalance: 300 } ]
+            $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+                pid ← groupBy personId
+                limit 1
+                orderBy desc $ max_ balance
+                pure { pid, maxBalance: max_ balance }
+
 test'
   ∷ ∀ s o i tup ol
   . ColsToPGHandler s i tup o
   ⇒ GetCols i ⇒ FromSQLRow tup
   ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
   ⇒ Connection → String → Array { | o } → FullQuery s { | i } → TestSuite
-test' conn msg expected q = do
-  test conn msg $ (withPG dbconfig $ query q) >>= assertSeqEq expected 
+test' = testWith assertUnorderedSeqEq
+
+testWith
+  ∷ ∀ s o i tup ol
+  . ColsToPGHandler s i tup o
+  ⇒ GetCols i ⇒ FromSQLRow tup
+  ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
+  ⇒ (Array { | o } → Array { | o } → Aff Unit) 
+  → Connection
+  → String
+  → Array { | o }
+  → FullQuery s { | i }
+  → TestSuite
+testWith assertFunc conn msg expected q = do
+  test conn msg $ (withPG dbconfig $ query q) >>= assertFunc expected 
 
 dbconfig ∷ PoolConfiguration
 dbconfig = (defaultPoolConfiguration "purspg")

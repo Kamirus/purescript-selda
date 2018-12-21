@@ -13,6 +13,7 @@ module Selda
   , (.||), expOr
   , count
   , max_
+  , asc, desc
   ) where
 
 import Prelude

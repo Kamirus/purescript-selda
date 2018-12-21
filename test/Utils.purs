@@ -3,6 +3,7 @@ module Test.Utils where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Data.Array (fromFoldable)
 import Data.Foldable (class Foldable, find, foldl, for_)
 import Data.Maybe (Maybe(..))
 import Database.PostgreSQL (Connection, Query(..), Row0(..), execute)
@@ -36,7 +37,14 @@ assertIn l1 l2 = for_ l1 \x1 → do
     Nothing → assert ((show x1) <> " not found in [" <> foldl (\acc x → acc <> show x <> " ") " " l2 <> "]") false
     Just _ → pure unit
 
-assertSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
-assertSeqEq l1 l2 = do
+assertUnorderedSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
+assertUnorderedSeqEq l1 l2 = do
   assertIn l1 l2
   assertIn l2 l1
+
+assertSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
+assertSeqEq l1 l2 = assert msg $ xs == ys
+  where
+  msg = show xs <> " != " <> show ys
+  xs = fromFoldable l1
+  ys = fromFoldable l2
