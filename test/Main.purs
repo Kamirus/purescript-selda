@@ -5,14 +5,13 @@ import Prelude
 import Data.Eq (class EqRecord)
 import Data.Maybe (Maybe(..))
 import Data.Show (class ShowRecordFields)
-import Data.Tuple.Nested ((/\))
 import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, asc, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
@@ -24,6 +23,9 @@ people = Table { name: "people" }
 
 bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int )
 bankAccounts = Table { name: "bank_accounts" }
+
+descriptions ∷ Table ( id ∷ Int, text ∷ Maybe String )
+descriptions = Table { name: "descriptions" }
 
 main ∷ Effect Unit
 main = do
@@ -44,6 +46,12 @@ main = do
           personId INTEGER NOT NULL,
           balance INTEGER NOT NULL
         );
+
+        DROP TABLE IF EXISTS descriptions;
+        CREATE TABLE descriptions (
+          id INTEGER PRIMARY KEY,
+          text TEXT
+        );
       """) PG.Row0
 
       withPG dbconfig do
@@ -56,6 +64,10 @@ main = do
           [ { id: 1, personId: 1, balance: 100 }
           , { id: 2, personId: 1, balance: 150 }
           , { id: 3, personId: 3, balance: 300 }
+          ]
+        insert_ descriptions
+          [ { id: 1, text: Just "text1" }
+          , { id: 3, text: Nothing }
           ]
 
       -- simple test delete
@@ -106,6 +118,32 @@ main = do
                 r2 ← crossJoin people
                 restrict $ r1.age .> r2.age
                 pure { id1: r1.id, age1: r1.age, age2: r2.age }
+
+          test' conn "leftJoin: just Maybe Int insead of Maybe Maybe Int "
+            [ { id: 1
+              -- , age1: Just 11, age2: Just $ Just 11
+              , age1: Just 11, age2: Just 11
+              , name1: "name1", name2: Just "name1" }
+            ]
+            $ selectFrom people \r1 → do
+                r2 ← leftJoin people \{ id } → id .== r1.id
+                restrict $ r1.id .== lit 1
+                -- error
+                -- orderBy asc $ max_ r1.id
+                pure
+                  { id: r1.id
+                  , age1: r1.age, age2: r2.age
+                  , name1: r1.name, name2: r2.name }
+          
+          test' conn "leftJoin maybe column: Just Nothing vs Nothing"
+            [ { id: 1, text: Just "text1" }
+            , { id: 2, text: Nothing }
+            , { id: 3, text: Nothing }
+            -- , { id: 3, text: Just Nothing }
+            ]
+            $ selectFrom people \r → do
+                { text } ← leftJoin descriptions \{ id } → r.id .== id
+                pure { id: r.id, text }
 
           test' conn "cross product as natural join"
             [ { id: 1, balance: 100 }

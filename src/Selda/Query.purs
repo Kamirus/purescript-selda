@@ -140,10 +140,14 @@ instance tableToColsI
     pure $ { res, sql: FromTable aliased }
 
 data WrapWithMaybe = WrapWithMaybe
-instance wrapWithMaybeInstance
+instance wrapWithMaybeLeaveMaybe
+    ∷ Mapping WrapWithMaybe (Col s (Maybe a)) (Col s (Maybe a))
+  where
+  mapping _ = identity
+else instance wrapWithMaybeInstance
     ∷ Mapping WrapWithMaybe (Col s a) (Col s (Maybe a))
   where
-  mapping WrapWithMaybe = (unsafeCoerce ∷ Col s a → Col s (Maybe a))
+  mapping _ = (unsafeCoerce ∷ Col s a → Col s (Maybe a))
 
 subQueryAlias ∷ ∀ s. Query s Alias
 subQueryAlias = do

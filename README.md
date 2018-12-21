@@ -24,5 +24,6 @@ Inspired by [selda](https://github.com/valderman/selda)
 - delete and update with RETURNING
 
 ## Known issues
+- orderBy in a query without groupBy (also orderBy max sth that is not in the group by)
 - groupBy not a column, results in runtime error
 - nested records not working - generic part - pure $ { r1: { a, b }, r2: { c }, d }
