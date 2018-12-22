@@ -11,7 +11,7 @@
     "purescript-console": "^4.1.0",
     "purescript-transformers": "^4.1.0",
     "purescript-heterogeneous": "^0.3.0",
-    "purescript-postgresql-client": "kamirus/purescript-postgresql-client#master",
+    "purescript-postgresql-client": "rightfold/purescript-postgresql-client#simple-core",
     "purescript-strings": "^4.0.0"
   },
   "devDependencies": {
