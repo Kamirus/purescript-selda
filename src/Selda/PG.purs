@@ -15,7 +15,8 @@ import Prelude
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except (ExceptT)
 import Control.Monad.Except.Trans (runExceptT)
-import Control.Monad.Reader (ask, runReaderT)
+import Control.Monad.Reader (class MonadReader, ask, runReaderT)
+import Control.Monad.Reader.Class (asks)
 import Control.Monad.Reader.Trans (ReaderT)
 import Data.Array (concat)
 import Data.Array as Array
@@ -53,19 +54,22 @@ hoistSelda
   ∷ ∀ m
   . MonadAff m
   ⇒ MonadError PGError m
-  ⇒ PostgreSQL.Connection → MonadSelda ~> m
-hoistSelda = hoistSeldaWith identity
+  ⇒ MonadReader PostgreSQL.Connection m
+  ⇒ MonadSelda ~> m
+hoistSelda = hoistSeldaWith identity identity
 
 hoistSeldaWith
-  ∷ ∀ e m
+  ∷ ∀ e m r
   . MonadAff m
   ⇒ MonadError e m
-  ⇒ (PGError → e) → PostgreSQL.Connection → MonadSelda ~> m
-hoistSeldaWith f conn m = do
+  ⇒ MonadReader r m
+  ⇒ (PGError → e) → (r → PostgreSQL.Connection) → MonadSelda ~> m
+hoistSeldaWith fe fr m = do
+  conn ← asks fr
   r ← liftAff $ runReaderT (runExceptT m) conn
   case r of
     Right a → pure a
-    Left pgError → throwError (f pgError)
+    Left pgError → throwError (fe pgError)
 
 pgQuery ∷ ∀ i o. ToSQLRow i ⇒ FromSQLRow o ⇒ PostgreSQL.Query i o → i → MonadSelda (Array o)
 pgQuery q xTup = do
