@@ -181,14 +181,14 @@ main = do
 
           test' conn "aggr: max people id"
             [ { maxId: 3 } ]
-            $ selectFrom people \{ id, name, age } → aggregate do
+            $ aggregate $ selectFrom people \{ id, name, age } → do
                 pure { maxId: max_ id }
 
           test' conn "aggr: max people id"
             [ { pid: 1, m: 150, c: "2" }
             , { pid: 3, m: 300, c: "1" }
             ]
-            $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+            $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                 pid ← groupBy personId
                 pure { pid, m: max_ balance, c: count personId }
 
@@ -196,7 +196,7 @@ main = do
             [ { pid: 3, m: 300, c: "1" }
             , { pid: 1, m: 150, c: "2" }
             ]
-            $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+            $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                 pid ← groupBy personId
                 orderBy desc $ max_ balance
                 pure { pid, m: max_ balance, c: count personId }
@@ -205,7 +205,7 @@ main = do
             [ { pid: 1, m: 150, c: "2" }
             ]
             $ selectFrom_ do
-                selectFrom bankAccounts \{ personId, balance } → aggregate do
+                aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                     pid ← groupBy personId
                     pure { pid, m: max_ balance, c: count personId }
                 $ \r@{ c } → do
@@ -220,7 +220,7 @@ main = do
           
           test' conn "limit + order by: return first"
             [ { pid: 3, maxBalance: 300 } ]
-            $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+            $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                 pid ← groupBy personId
                 limit 1
                 orderBy desc $ max_ balance

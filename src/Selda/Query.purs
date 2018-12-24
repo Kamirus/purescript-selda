@@ -61,8 +61,8 @@ crossJoin_ iq = do
 aggregate
   ∷ ∀ s aggr res
   . HMap UnAggr { | aggr } { | res }
-  ⇒ Query s { | aggr }
-  → Query s { | res }
+  ⇒ FullQuery s { | aggr }
+  → FullQuery s { | res }
 aggregate q = map (hmap UnAggr) q
 
 groupBy ∷ ∀ s a. Col s a → Query s (Aggr s a)
