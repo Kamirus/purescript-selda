@@ -192,14 +192,17 @@ main = do
                 pid ← groupBy personId
                 pure { pid, m: max_ balance, c: count personId }
 
-          testWith assertSeqEq conn "aggr: max people id + order desc"
+          testWith assertSeqEq conn "aggr: order by max people id desc"
             [ { pid: 3, m: 300, c: "1" }
             , { pid: 1, m: 150, c: "2" }
             ]
-            $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
-                pid ← groupBy personId
-                orderBy desc $ max_ balance
-                pure { pid, m: max_ balance, c: count personId }
+            $ selectFrom_ do
+                aggregate $ selectFrom bankAccounts \{ personId, balance } → do
+                    pid ← groupBy personId
+                    pure { pid, m: max_ balance, c: count personId }
+                $ \r@{ m } → do
+                    orderBy desc m
+                    pure r
 
           test' conn "aggr: max people id having count > 1"
             [ { pid: 1, m: 150, c: "2" }
@@ -217,13 +220,13 @@ main = do
             $ selectFrom people \r → do
                 limit $ -7
                 pure r
-          
+
           test' conn "limit + order by: return first"
             [ { pid: 3, maxBalance: 300 } ]
             $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                 pid ← groupBy personId
                 limit 1
-                orderBy desc $ max_ balance
+                orderBy desc personId
                 pure { pid, maxBalance: max_ balance }
 
 test'
