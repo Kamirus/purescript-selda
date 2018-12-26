@@ -7,6 +7,7 @@ module Selda.PG
   , deleteFrom
   , query
   , runSelda
+  , selectFrom
   , update
   ) where
 
@@ -40,7 +41,7 @@ import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
 import Selda.Query (class FromTable)
 import Selda.Query (selectFrom) as Query
-import Selda.Query.Type (FullQuery, Query(..), runQuery)
+import Selda.Query.Type (FullQuery, Query, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
