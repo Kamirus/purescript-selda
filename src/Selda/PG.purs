@@ -38,7 +38,9 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
-import Selda.Query.Type (FullQuery, runQuery)
+import Selda.Query (class FromTable)
+import Selda.Query (selectFrom) as Query
+import Selda.Query.Type (FullQuery, Query(..), runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
@@ -133,6 +135,17 @@ query q = do
     q_str = showState st
   rows ← pgQuery (PostgreSQL.Query q_str) PostgreSQL.Row0
   pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
+
+selectFrom
+  ∷ ∀ cols o i r s tup
+  . ColsToPGHandler s i tup o
+  ⇒ FromSQLRow tup
+  ⇒ FromTable s r cols
+  ⇒ GetCols i
+  ⇒ Table r
+  → ({ | cols } → Query s { | i })
+  → MonadSelda (Array (Record o))
+selectFrom table q = query (Query.selectFrom table q)
 
 deleteFrom
   ∷  ∀ r s r'
