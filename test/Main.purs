@@ -11,7 +11,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, asc, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, withPG, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Test.Unit (TestSuite, suite)
@@ -178,6 +178,18 @@ main = do
                     -- restrict $ id .== b.personId -- type error
                     pure b
                 pure { id, balance }
+
+          test' conn "subquery with aggregate max"
+            [ { balance: Just 150, id: 1 }
+            , { balance: Nothing, id: 2 }
+            , { balance: Just 300, id: 3 }
+            ] $ selectFrom people \{ id, name, age } -> do
+                  { balance } <- leftJoin_ (\b -> id .== b.personId) $
+                    aggregate $ selectFrom bankAccounts \b -> do
+                      personId <- groupBy b.personId
+                      -- restrict $ id .> lit 1
+                      pure { personId, balance: max_ b.balance }
+                  pure { id, balance }
 
           test' conn "aggr: max people id"
             [ { maxId: 3 } ]
