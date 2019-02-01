@@ -183,33 +183,48 @@ main = do
                       pure b
                   pure { id, balance }
 
+            test' conn "subquery with aggregate max"
+              [ { balance: Just 150, id: 1 }
+              , { balance: Nothing, id: 2 }
+              , { balance: Just 300, id: 3 }
+              ] $ selectFrom people \{ id, name, age } -> do
+                    { balance } <- leftJoin_ (\b -> id .== b.personId) $
+                      aggregate $ selectFrom bankAccounts \b -> do
+                        personId <- groupBy b.personId
+                        -- restrict $ id .> lit 1
+                        pure { personId, balance: max_ b.balance }
+                    pure { id, balance }
+
             test' conn "aggr: max people id"
               [ { maxId: 3 } ]
-              $ selectFrom people \{ id, name, age } → aggregate do
+              $ aggregate $ selectFrom people \{ id, name, age } → do
                   pure { maxId: max_ id }
 
             test' conn "aggr: max people id"
               [ { pid: 1, m: 150, c: "2" }
               , { pid: 3, m: 300, c: "1" }
               ]
-              $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+              $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                   pid ← groupBy personId
                   pure { pid, m: max_ balance, c: count personId }
 
-            testWith assertSeqEq conn "aggr: max people id + order desc"
+            testWith assertSeqEq conn "aggr: order by max people id desc"
               [ { pid: 3, m: 300, c: "1" }
               , { pid: 1, m: 150, c: "2" }
               ]
-              $ selectFrom bankAccounts \{ personId, balance } → aggregate do
-                  pid ← groupBy personId
-                  orderBy desc $ max_ balance
-                  pure { pid, m: max_ balance, c: count personId }
+              $ selectFrom_ do
+                  aggregate $ selectFrom bankAccounts \{ personId, balance } → do
+                      pid ← groupBy personId
+                      pure { pid, m: max_ balance, c: count personId }
+                  $ \r@{ m } → do
+                      orderBy desc m
+                      pure r
 
             test' conn "aggr: max people id having count > 1"
               [ { pid: 1, m: 150, c: "2" }
               ]
               $ selectFrom_ do
-                  selectFrom bankAccounts \{ personId, balance } → aggregate do
+                  aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                       pid ← groupBy personId
                       pure { pid, m: max_ balance, c: count personId }
                   $ \r@{ c } → do
@@ -224,10 +239,10 @@ main = do
 
             test' conn "limit + order by: return first"
               [ { pid: 3, maxBalance: 300 } ]
-              $ selectFrom bankAccounts \{ personId, balance } → aggregate do
+              $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                   pid ← groupBy personId
                   limit 1
-                  orderBy desc $ max_ balance
+                  orderBy desc personId
                   pure { pid, maxBalance: max_ balance }
 
 test'

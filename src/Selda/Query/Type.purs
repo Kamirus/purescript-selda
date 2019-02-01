@@ -54,6 +54,7 @@ derive newtype instance monadQuery ∷ Monad (Query s)
 -- | where `st` is state from wrapped query
 newtype FullQuery s a = FullQuery (Query s a)
 derive instance newtypeFullQuery ∷ Newtype (FullQuery s a) _
+derive newtype instance functorFullQuery ∷ Functor (FullQuery s)
 
 data Order = Asc | Desc
 

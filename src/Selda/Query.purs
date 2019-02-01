@@ -61,8 +61,8 @@ crossJoin_ iq = do
 aggregate
   ∷ ∀ s aggr res
   . HMap UnAggr { | aggr } { | res }
-  ⇒ Query s { | aggr }
-  → Query s { | res }
+  ⇒ FullQuery s { | aggr }
+  → FullQuery s { | res }
 aggregate q = map (hmap UnAggr) q
 
 groupBy ∷ ∀ s a. Col s a → Query s (Aggr s a)
@@ -81,8 +81,8 @@ groupBy' i = do
   Query $ modify_ \st → st { aggr = st.aggr <> aggr }
   pure $ hmap WrapWithAggr i
 
-orderBy ∷ ∀ s a. Order → Aggr s a → Query s Unit
-orderBy order (Aggr (Col e)) =
+orderBy ∷ ∀ s a. Order → Col s a → Query s Unit
+orderBy order (Col e) =
   Query $ modify_ \st → st { order = st.order <> [Tuple order $ mkExists e] }
 
 limit ∷ ∀ s. Int → Query s Unit
