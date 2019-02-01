@@ -11,7 +11,7 @@
     "purescript-console": "^4.1.0",
     "purescript-transformers": "^4.1.0",
     "purescript-heterogeneous": "^0.3.0",
-    "purescript-postgresql-client": "rightfold/purescript-postgresql-client#master",
+    "purescript-postgresql-client": "rightfold/purescript-postgresql-client#4d8dfd4c00f7971691a81f2ccfa2d4ab8c1f9bed",
     "purescript-strings": "^4.0.0"
   },
   "devDependencies": {
