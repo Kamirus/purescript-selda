@@ -5,6 +5,7 @@ import Prelude
 import Data.Exists (Exists, runExists)
 import Data.Leibniz (type (~))
 import Data.Maybe (Maybe)
+import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Prim.RowList (kind RowList)
 import Selda.Table (Column, showColumn)
 
@@ -14,6 +15,7 @@ data Literal a
   | LInt Int (Int ~ a)
   | LNull (Exists (None a))
   | LJust (Exists (Some a))
+  | Any String
 
 data Some a b = Some (Literal b) (Maybe b ~ a)
 
@@ -36,13 +38,23 @@ data Fn o
   = FnMax (Expr o)
   | FnCount (Exists Expr) (String ~ o)
 
+primPGEscape ∷ String → String
+primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
+  where
+  escape ∷ Char → Array Char
+  escape c = case c of
+    '\'' → [c, c]
+    '\\' → [c, c]
+    _ → pure c
+
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
   LBoolean b _ → show b
-  LString s _ → "'" <> s <> "'"
+  LString s _ → "E'" <> primPGEscape s <> "'"
   LInt i _ → show i
   LNull _ → "null"
   LJust x → runExists (\(Some l _) → showLiteral l) x
+  Any s → "E'" <> primPGEscape s <> "'"
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
