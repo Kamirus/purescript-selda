@@ -1,14 +1,18 @@
 module Selda.PG
   ( MonadSelda
+  , runSelda
   , hoistSelda
   , hoistSeldaWith
   , insert_
   , insert
-  , deleteFrom
+  , showInsert1
   , query
-  , runSelda
+  , showQuery
   , selectFrom
+  , deleteFrom
+  , showDeleteFrom
   , update
+  , showUpdate
   ) where
 
 import Prelude
@@ -38,7 +42,7 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
-import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordLength(..), RecordToTuple(..), colsToPGHandler, mkTupleToRecord, rowListLength, tableToColsWithoutAlias)
+import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, mkTupleToRecord, rowListLength, tableToColsWithoutAlias)
 import Selda.Query (class FromTable)
 import Selda.Query (selectFrom) as Query
 import Selda.Query.Type (FullQuery, Query, runQuery)
@@ -141,12 +145,15 @@ query
   ⇒ FullQuery s (Record i)
   → MonadSelda (Array (Record o))
 query q = do
-  let
+  let (Tuple res _) = runQuery $ unwrap q
+  rows ← pgQuery (PostgreSQL.Query (showQuery q)) PostgreSQL.Row0
+  pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
+
+showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → String
+showQuery q = showState st
+  where
     (Tuple res st') = runQuery $ unwrap q
     st = st' { cols = getCols res }
-    q_str = showState st
-  rows ← pgQuery (PostgreSQL.Query q_str) PostgreSQL.Row0
-  pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 
 selectFrom
   ∷ ∀ cols o i r s tup
@@ -165,12 +172,20 @@ deleteFrom
   ⇒ Table r
   → ({ | r' } → Col s Boolean)
   → MonadSelda Unit
-deleteFrom table@(Table { name }) pred = do
-  let
-    recordWithCols = tableToColsWithoutAlias table
-    pred_str = showCol $ pred recordWithCols
-    q_str = "DELETE FROM " <> name <> " WHERE " <> pred_str
-  pgExecute (PostgreSQL.Query q_str) PostgreSQL.Row0
+deleteFrom table pred = 
+  pgExecute (PostgreSQL.Query (showDeleteFrom table pred)) PostgreSQL.Row0
+
+showDeleteFrom
+  ∷  ∀ r s r'
+  . TableToColsWithoutAlias r r'
+  ⇒ Table r
+  → ({ | r' } → Col s Boolean)
+  → String
+showDeleteFrom table@(Table { name }) pred = 
+  "DELETE FROM " <> name <> " WHERE " <> pred_str
+    where
+      recordWithCols = tableToColsWithoutAlias table
+      pred_str = showCol $ pred recordWithCols
 
 update
   ∷  ∀ r s r'
@@ -180,13 +195,23 @@ update
   → ({ | r' } → Col s Boolean)
   → ({ | r' } → { | r' })
   → MonadSelda Unit
-update table@(Table { name }) pred up = do
-  let
-    recordWithCols = tableToColsWithoutAlias table
-    pred_str = showCol $ pred recordWithCols
-    vals =
-      getCols (up recordWithCols)
-        # map (\(Tuple n e) → n <> " = " <> runExists showExpr e)
-        # joinWith ", "
-    q_str = "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
-  pgExecute (PostgreSQL.Query q_str) PostgreSQL.Row0
+update table pred up =
+  pgExecute (PostgreSQL.Query (showUpdate table pred up)) PostgreSQL.Row0
+
+showUpdate
+  ∷  ∀ r s r'
+  . TableToColsWithoutAlias r r'
+  ⇒ GetCols r'
+  ⇒ Table r
+  → ({ | r' } → Col s Boolean)
+  → ({ | r' } → { | r' })
+  → String
+showUpdate table@(Table { name }) pred up =
+  "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
+    where
+      recordWithCols = tableToColsWithoutAlias table
+      pred_str = showCol $ pred recordWithCols
+      vals =
+        getCols (up recordWithCols)
+          # map (\(Tuple n e) → n <> " = " <> runExists showExpr e)
+          # joinWith ", "
