@@ -1,8 +1,6 @@
 module Selda.PG
-  ( MonadSelda
-  , runSelda
-  , hoistSelda
-  , hoistSeldaWith
+  ( class MonadSelda
+  , _pgError
   , insert_
   , insert
   , showInsert1
@@ -17,25 +15,20 @@ module Selda.PG
 
 import Prelude
 
-import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Except (ExceptT)
-import Control.Monad.Except.Trans (runExceptT)
-import Control.Monad.Reader (class MonadReader, ask, runReaderT)
-import Control.Monad.Reader.Class (asks)
-import Control.Monad.Reader.Trans (ReaderT)
+import Control.Monad.Error.Class (class MonadError)
+import Control.Monad.Reader (class MonadReader, ask)
 import Data.Array (concat)
 import Data.Array as Array
-import Data.Either (Either(..))
 import Data.Exists (runExists)
 import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, PGError)
+import Data.Variant (SProxy(..), Variant, inj)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
-import Effect.Aff (Aff)
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Aff.Class (class MonadAff)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
@@ -50,47 +43,43 @@ import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 
-type MonadSelda a = ExceptT PGError (ReaderT PostgreSQL.Connection Aff) a
+_pgError = SProxy ∷ SProxy "pgError"
 
-runSelda
-  ∷ ∀ a
-  . PostgreSQL.Connection → MonadSelda a → Aff (Either PGError a)
-runSelda conn m = runReaderT (runExceptT m) conn
+class 
+  ( MonadAff m
+  , MonadError (Variant ( pgError ∷ PostgreSQL.PGError | e ) ) m
+  , MonadReader { conn ∷ PostgreSQL.Connection | r } m
+  ) <= MonadSelda m e r
 
-hoistSelda
-  ∷ ∀ m
-  . MonadAff m
-  ⇒ MonadError PGError m
-  ⇒ MonadReader PostgreSQL.Connection m
-  ⇒ MonadSelda ~> m
-hoistSelda = hoistSeldaWith identity identity
+instance monadSeldaInstance
+  ∷ ( MonadAff m
+    , MonadError (Variant ( pgError ∷ PostgreSQL.PGError | e ) ) m
+    , MonadReader { conn ∷ PostgreSQL.Connection | r } m
+    )
+  ⇒ MonadSelda m e r
 
-hoistSeldaWith
-  ∷ ∀ e m r
-  . MonadAff m
-  ⇒ MonadError e m
-  ⇒ MonadReader r m
-  ⇒ (PGError → e) → (r → PostgreSQL.Connection) → MonadSelda ~> m
-hoistSeldaWith fe fr m = do
-  conn ← asks fr
-  r ← liftAff $ runReaderT (runExceptT m) conn
-  case r of
-    Right a → pure a
-    Left pgError → throwError (fe pgError)
-
-pgQuery ∷ ∀ i o. ToSQLRow i ⇒ FromSQLRow o ⇒ PostgreSQL.Query i o → i → MonadSelda (Array o)
+pgQuery 
+  ∷ ∀ i o m e r
+  . ToSQLRow i
+  ⇒ FromSQLRow o
+  ⇒ MonadSelda m e r 
+  ⇒ PostgreSQL.Query i o → i → m (Array o)
 pgQuery q xTup = do
-  conn ← ask
-  PostgreSQL.PG.hoist $ PostgreSQL.PG.query conn q xTup
+  { conn } ← ask
+  PostgreSQL.PG.hoistWith (inj _pgError) $ PostgreSQL.PG.query conn q xTup
 
-pgExecute ∷ ∀ i o. ToSQLRow i ⇒ PostgreSQL.Query i o → i → MonadSelda Unit
+pgExecute
+  ∷ ∀ i o m e r
+  . ToSQLRow i
+  ⇒ MonadSelda m e r 
+  ⇒ PostgreSQL.Query i o → i → m Unit
 pgExecute q xTup = do
-  conn ← ask
-  PostgreSQL.PG.hoist $ PostgreSQL.PG.execute conn q xTup
+  { conn } ← ask
+  PostgreSQL.PG.hoistWith (inj _pgError) $ PostgreSQL.PG.execute conn q xTup
 
 -- | Executes an insert query for each input record.
 insert_
-  ∷ ∀ r rl tup
+  ∷ ∀ r rl tup m e rc
   . RL.RowToList r rl
   ⇒ TableColumnNames rl
   ⇒ RowListLength rl
@@ -98,12 +87,13 @@ insert_
   ⇒ ToSQLRow tup
   ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ Table r → Array { | r } → MonadSelda Unit
+  ⇒ MonadSelda m e rc
+  ⇒ Table r → Array { | r } → m Unit
 insert_ t r = void $ insert t r
 
 -- | Executes an insert query for each input record.
 insert
-  ∷ ∀ r rl tup
+  ∷ ∀ r rl tup m e rc
   . RL.RowToList r rl
   ⇒ TableColumnNames rl
   ⇒ RowListLength rl
@@ -111,10 +101,11 @@ insert
   ⇒ ToSQLRow tup
   ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ Table r → Array { | r } → MonadSelda (Array { | r })
+  ⇒ MonadSelda m e rc
+  ⇒ Table r → Array { | r } → m (Array { | r })
 insert table xs = concat <$> traverse insert1 xs
   where
-  insert1 ∷ { | r } → MonadSelda (Array { | r })
+  insert1 ∷ { | r } → m (Array { | r })
   insert1 r = do
     let rTup = hfoldl RecordToTuple unit r
     rows ← pgQuery (PostgreSQL.Query (showInsert1 table)) rTup
@@ -138,12 +129,12 @@ showInsert1 (Table { name }) =
     <> "RETURNING " <> cols
 
 query
-  ∷ ∀ o i tup s
+  ∷ ∀ o i tup s m e rc
   . ColsToPGHandler s i tup o
   ⇒ GetCols i
   ⇒ FromSQLRow tup
-  ⇒ FullQuery s (Record i)
-  → MonadSelda (Array (Record o))
+  ⇒ MonadSelda m e rc
+  ⇒ FullQuery s (Record i) → m (Array (Record o))
 query q = do
   let (Tuple res _) = runQuery $ unwrap q
   rows ← pgQuery (PostgreSQL.Query (showQuery q)) PostgreSQL.Row0
@@ -156,31 +147,27 @@ showQuery q = showState st
     st = st' { cols = getCols res }
 
 selectFrom
-  ∷ ∀ cols o i r s tup
+  ∷ ∀ cols o i r s tup m e rc
   . ColsToPGHandler s i tup o
   ⇒ FromSQLRow tup
   ⇒ FromTable s r cols
   ⇒ GetCols i
-  ⇒ Table r
-  → ({ | cols } → Query s { | i })
-  → MonadSelda (Array (Record o))
+  ⇒ MonadSelda m e rc
+  ⇒ Table r → ({ | cols } → Query s { | i }) → m (Array (Record o))
 selectFrom table q = query (Query.selectFrom table q)
 
 deleteFrom
-  ∷  ∀ r s r'
+  ∷  ∀ r s r' m e rc
   . TableToColsWithoutAlias r r'
-  ⇒ Table r
-  → ({ | r' } → Col s Boolean)
-  → MonadSelda Unit
+  ⇒ MonadSelda m e rc
+  ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
 deleteFrom table pred = 
   pgExecute (PostgreSQL.Query (showDeleteFrom table pred)) PostgreSQL.Row0
 
 showDeleteFrom
   ∷  ∀ r s r'
   . TableToColsWithoutAlias r r'
-  ⇒ Table r
-  → ({ | r' } → Col s Boolean)
-  → String
+  ⇒ Table r → ({ | r' } → Col s Boolean) → String
 showDeleteFrom table@(Table { name }) pred = 
   "DELETE FROM " <> name <> " WHERE " <> pred_str
     where
@@ -188,13 +175,11 @@ showDeleteFrom table@(Table { name }) pred =
       pred_str = showCol $ pred recordWithCols
 
 update
-  ∷  ∀ r s r'
+  ∷  ∀ r s r' m e rc
   . TableToColsWithoutAlias r r'
   ⇒ GetCols r'
-  ⇒ Table r
-  → ({ | r' } → Col s Boolean)
-  → ({ | r' } → { | r' })
-  → MonadSelda Unit
+  ⇒ MonadSelda m e rc
+  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → m Unit
 update table pred up =
   pgExecute (PostgreSQL.Query (showUpdate table pred up)) PostgreSQL.Row0
 
@@ -202,10 +187,7 @@ showUpdate
   ∷  ∀ r s r'
   . TableToColsWithoutAlias r r'
   ⇒ GetCols r'
-  ⇒ Table r
-  → ({ | r' } → Col s Boolean)
-  → ({ | r' } → { | r' })
-  → String
+  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → String
 showUpdate table@(Table { name }) pred up =
   "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
     where
