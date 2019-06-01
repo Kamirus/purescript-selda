@@ -16,6 +16,7 @@ import Prim.RowList as RL
 import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
+import Selda.Query (notNull)
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
@@ -217,27 +218,29 @@ main = do
                   pure { pid, m: max_ balance, c: count personId }
 
             testWith assertSeqEq conn "aggr: order by max people id desc"
-              [ { pid: 3, m: Just 300, c: "1" }
-              , { pid: 1, m: Just 150, c: "2" }
+              [ { pid: 3, m: 300, c: "1" }
+              , { pid: 1, m: 150, c: "2" }
               ]
               $ selectFrom_ do
                   aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                       pid ← groupBy personId
                       pure { pid, m: max_ balance, c: count personId }
-                  $ \r@{ m } → do
+                  $ \r@{ pid, c } → do
+                      m ← notNull r.m
                       orderBy desc m
-                      pure r
+                      pure { pid, m, c }
 
             test' conn "aggr: max people id having count > 1"
-              [ { pid: 1, m: Just 150, c: "2" }
+              [ { pid: 1, m: 150, c: "2" }
               ]
               $ selectFrom_ do
                   aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                       pid ← groupBy personId
                       pure { pid, m: max_ balance, c: count personId }
-                  $ \r@{ c } → do
+                  $ \r@{ pid, c } → do
+                      m ← notNull r.m
                       restrict $ c .> lit "1"
-                      pure r
+                      pure { pid, m, c }
 
             test' conn "limit negative returns 0"
               [ ]
@@ -256,6 +259,21 @@ main = do
             test' conn "max(id) on empty table returns 1 result: null"
               [ { maxId: Nothing } ]
               $ aggregate $ selectFrom emptyTable \r → pure { maxId: max_ r.id }
+
+            test' conn "max(id) on empty table returns 0 results with notNull"
+              [ ]
+              $ selectFrom_ do 
+                  aggregate $ selectFrom emptyTable \r →
+                      pure { maxId: max_ r.id }
+                  $ \r → do
+                      id ← notNull r.maxId
+                      pure { id }
+
+            test' conn "return only not null values"
+              [ { id: 1, text: "text1" } ]
+              $ selectFrom descriptions \ { id, text: maybeText } → do
+                  text ← notNull maybeText
+                  pure { id, text }
 
 test'
   ∷ ∀ s o i tup ol

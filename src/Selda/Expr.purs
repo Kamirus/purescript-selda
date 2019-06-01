@@ -26,13 +26,19 @@ data BinOp i o
   | Gt (Boolean ~ o)
   | Eq (Boolean ~ o)
 
+data UnOp i o
+  = IsNull (Boolean ~ o)
+
 data Expr o
   = EColumn (Column o)
   | ELit (Literal o)
   | EBinOp (Exists (BinExp o))
+  | EUnOp (Exists (UnExp o))
   | EFn (Exists (Fn o))
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
+
+data UnExp o i = UnExp (UnOp i o) (Expr i)
 
 data Fn o i
   = FnMax (Expr i) (Maybe i ~ o)
@@ -67,10 +73,16 @@ showExpr = case _ of
   EColumn col → showColumn col
   ELit lit → showLiteral lit
   EBinOp e → runExists showBinExp e
+  EUnOp e → runExists showUnExp e
   EFn fn → runExists showFn fn
 
 showBinExp ∷ ∀ o i. BinExp o i → String
 showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2 <> ")"
+
+showUnExp ∷ ∀ o i. UnExp o i → String
+showUnExp (UnExp op e) = (\s → "(" <> s <> ")") $
+  case op of 
+    IsNull _ → showExpr e <> " IS NOT NULL"
 
 showFn ∷ ∀ o i. Fn o i → String
 showFn = case _ of

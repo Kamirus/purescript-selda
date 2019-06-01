@@ -14,7 +14,7 @@ import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
-import Selda.Expr (Expr(..))
+import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
 import Selda.Query.Type (FullQuery(..), Order, Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
@@ -40,6 +40,14 @@ selectFrom_ iq k = FullQuery $ crossJoin_ iq >>= k
 
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = Query $ modify_ \st → st { restricts = e : st.restricts }
+
+notNull ∷ ∀ s a. Col s (Maybe a) → Query s (Col s a)
+notNull col@(Col e) = do 
+  let
+    notNullCol = Col $ EUnOp $ mkExists $ UnExp (IsNull identity) e
+    fromMaybeCol = (unsafeCoerce ∷ Col s (Maybe a) → Col s a)
+  restrict notNullCol
+  pure $ fromMaybeCol col
 
 crossJoin ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
 crossJoin table = do
