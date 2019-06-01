@@ -29,6 +29,9 @@ bankAccounts = Table { name: "bank_accounts" }
 descriptions ∷ Table ( id ∷ Int, text ∷ Maybe String )
 descriptions = Table { name: "descriptions" }
 
+emptyTable ∷ Table ( id ∷ Int )
+emptyTable = Table { name: "emptyTable" }
+
 main ∷ Effect Unit
 main = do
   pool ← PG.newPool dbconfig
@@ -55,6 +58,11 @@ main = do
           CREATE TABLE descriptions (
             id INTEGER PRIMARY KEY,
             text TEXT
+          );
+
+          DROP TABLE IF EXISTS emptyTable;
+          CREATE TABLE emptyTable (
+            id INTEGER PRIMARY KEY
           );
         """) PG.Row0
 
@@ -196,21 +204,21 @@ main = do
                     pure { id, balance }
 
             test' conn "aggr: max people id"
-              [ { maxId: 3 } ]
+              [ { maxId: Just 3 } ]
               $ aggregate $ selectFrom people \{ id, name, age } → do
                   pure { maxId: max_ id }
 
             test' conn "aggr: max people id"
-              [ { pid: 1, m: 150, c: "2" }
-              , { pid: 3, m: 300, c: "1" }
+              [ { pid: 1, m: Just 150, c: "2" }
+              , { pid: 3, m: Just 300, c: "1" }
               ]
               $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                   pid ← groupBy personId
                   pure { pid, m: max_ balance, c: count personId }
 
             testWith assertSeqEq conn "aggr: order by max people id desc"
-              [ { pid: 3, m: 300, c: "1" }
-              , { pid: 1, m: 150, c: "2" }
+              [ { pid: 3, m: Just 300, c: "1" }
+              , { pid: 1, m: Just 150, c: "2" }
               ]
               $ selectFrom_ do
                   aggregate $ selectFrom bankAccounts \{ personId, balance } → do
@@ -221,7 +229,7 @@ main = do
                       pure r
 
             test' conn "aggr: max people id having count > 1"
-              [ { pid: 1, m: 150, c: "2" }
+              [ { pid: 1, m: Just 150, c: "2" }
               ]
               $ selectFrom_ do
                   aggregate $ selectFrom bankAccounts \{ personId, balance } → do
@@ -238,12 +246,16 @@ main = do
                   pure r
 
             test' conn "limit + order by: return first"
-              [ { pid: 3, maxBalance: 300 } ]
+              [ { pid: 3, maxBalance: Just 300 } ]
               $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                   pid ← groupBy personId
                   limit 1
                   orderBy desc personId
                   pure { pid, maxBalance: max_ balance }
+
+            test' conn "max(id) on empty table returns 1 result: null"
+              [ { maxId: Nothing } ]
+              $ aggregate $ selectFrom emptyTable \r → pure { maxId: max_ r.id }
 
 test'
   ∷ ∀ s o i tup ol

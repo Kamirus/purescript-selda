@@ -30,13 +30,13 @@ data Expr o
   = EColumn (Column o)
   | ELit (Literal o)
   | EBinOp (Exists (BinExp o))
-  | EFn (Fn o)
+  | EFn (Exists (Fn o))
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
-data Fn o
-  = FnMax (Expr o)
-  | FnCount (Exists Expr) (String ~ o)
+data Fn o i
+  = FnMax (Expr i) (Maybe i ~ o)
+  | FnCount (Expr i) (String ~ o)
 
 primPGEscape ∷ String → String
 primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
@@ -67,12 +67,12 @@ showExpr = case _ of
   EColumn col → showColumn col
   ELit lit → showLiteral lit
   EBinOp e → runExists showBinExp e
-  EFn fn → showFn fn
+  EFn fn → runExists showFn fn
 
 showBinExp ∷ ∀ o i. BinExp o i → String
 showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2 <> ")"
 
-showFn ∷ ∀ o. Fn o → String
+showFn ∷ ∀ o i. Fn o i → String
 showFn = case _ of
-  FnMax e → "max(" <> showExpr e <> ")"
-  FnCount ee _ → "count(" <> runExists showExpr ee <> ")"
+  FnMax e _ → "max(" <> showExpr e <> ")"
+  FnCount e _ → "count(" <> showExpr e <> ")"

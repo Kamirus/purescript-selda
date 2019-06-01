@@ -19,6 +19,7 @@ module Selda
 import Prelude
 
 import Data.Exists (mkExists)
+import Data.Maybe (Maybe)
 import Selda.Aggr (Aggr(..))
 import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
@@ -42,10 +43,10 @@ binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
 
 count ∷ ∀ s a. Col s a → Aggr s String
-count (Col e) = Aggr $ Col $ EFn $ FnCount (mkExists e) identity
+count (Col e) = Aggr $ Col $ EFn $ mkExists $ FnCount e identity
 
-max_ ∷ ∀ s a. Col s a → Aggr s a
-max_ (Col e) = Aggr $ Col $ EFn $ FnMax e
+max_ ∷ ∀ s a. Col s a → Aggr s (Maybe a)
+max_ (Col e) = Aggr $ Col $ EFn $ mkExists $ FnMax e identity
 
 asc ∷ Order
 asc = Asc
