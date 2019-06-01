@@ -54,14 +54,14 @@ instance tupToRec
   foldingWithIndex TupleToRecordFunc sym f _ =
     \(Tuple a tup) → Record.insert (SProxy ∷ SProxy sym) a $ f tup
 
-class TupleToRecord tup r | r → tup where
-  tupleToRecord ∷ { | r } → (tup → { | r })
+class MkTupleToRecord tup r | r → tup where
+  mkTupleToRecord ∷ { | r } → (tup → { | r })
 
 instance tupTR
     ∷ HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | r })
-    ⇒ TupleToRecord tup r
+    ⇒ MkTupleToRecord tup r
   where
-  tupleToRecord r = hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) r
+  mkTupleToRecord r = hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) r
 
 data RecordToTuple = RecordToTuple
 instance rToTuple ∷ Folding RecordToTuple tail a (Tuple a tail) where
@@ -80,6 +80,13 @@ else instance tuplerevc
 data RecordLength = RecordLength
 instance rlen ∷ Folding RecordLength Int a Int where
   folding _ acc _ = acc + 1
+
+class RowListLength rl where
+  rowListLength ∷ RLProxy rl → Int
+instance rowListLengthNil ∷ RowListLength RL.Nil where
+  rowListLength _ = 0
+else instance rowListLengthCons ∷ RowListLength t ⇒ RowListLength (RL.Cons s a t) where
+  rowListLength _ = rowListLength (RLProxy ∷ RLProxy t) + 1
 
 -- | ```purescript
 -- | Table ( a1 ∷ A1 , a2 ∷ A2 ... )

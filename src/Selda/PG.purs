@@ -32,13 +32,13 @@ import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Heterogeneous.Folding (class HFoldl, class HFoldlWithIndex, hfoldl)
+import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
-import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
+import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordLength(..), RecordToTuple(..), colsToPGHandler, mkTupleToRecord, rowListLength, tableToColsWithoutAlias)
 import Selda.Query (class FromTable)
 import Selda.Query (selectFrom) as Query
 import Selda.Query.Type (FullQuery, Query, runQuery)
@@ -84,43 +84,54 @@ pgExecute q xTup = do
   conn ← ask
   PostgreSQL.PG.hoist $ PostgreSQL.PG.execute conn q xTup
 
+-- | Executes an insert query for each input record.
 insert_
   ∷ ∀ r rl tup
-  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | r })
+  . RL.RowToList r rl
+  ⇒ TableColumnNames rl
+  ⇒ RowListLength rl
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
-  ⇒ RL.RowToList r rl
-  ⇒ TableColumnNames rl
+  ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ HFoldl RecordLength Int { | r } Int
   ⇒ Table r → Array { | r } → MonadSelda Unit
 insert_ t r = void $ insert t r
 
+-- | Executes an insert query for each input record.
 insert
   ∷ ∀ r rl tup
-  . TupleToRecord tup r
+  . RL.RowToList r rl
+  ⇒ TableColumnNames rl
+  ⇒ RowListLength rl
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
-  ⇒ RL.RowToList r rl
-  ⇒ TableColumnNames rl
+  ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ HFoldl RecordLength Int { | r } Int
   ⇒ Table r → Array { | r } → MonadSelda (Array { | r })
-insert (Table { name }) xs = concat <$> traverse insert1 xs
+insert table xs = concat <$> traverse insert1 xs
   where
-  insert1 x = do
-    let
-      cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
-      xTup = hfoldl RecordToTuple unit x
-      xLen = hfoldl RecordLength 0 x
-      placeholders =
-        Array.range 1 xLen # map (\i → "$" <> show i) # joinWith ", "
-      qStr =
-        "INSERT INTO " <> name <> " (" <> cols <> ") " 
-          <> "VALUES " <> "(" <> placeholders <> ") "
-          <> "RETURNING " <> cols
-    rows ← pgQuery (PostgreSQL.Query qStr) xTup
-    pure $ map (tupleToRecord x) rows
+  insert1 ∷ { | r } → MonadSelda (Array { | r })
+  insert1 r = do
+    let rTup = hfoldl RecordToTuple unit r
+    rows ← pgQuery (PostgreSQL.Query (showInsert1 table)) rTup
+    pure $ map (mkTupleToRecord r) rows
+
+showInsert1
+  ∷ ∀ r rl
+  . RL.RowToList r rl
+  ⇒ TableColumnNames rl
+  ⇒ RowListLength rl
+  ⇒ Table r → String
+showInsert1 (Table { name }) =
+  let
+    cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
+    len = rowListLength (RLProxy ∷ RLProxy rl)
+    placeholders =
+      Array.range 1 len # map (\i → "$" <> show i) # joinWith ", "
+  in
+  "INSERT INTO " <> name <> " (" <> cols <> ") " 
+    <> "VALUES " <> "(" <> placeholders <> ") "
+    <> "RETURNING " <> cols
 
 query
   ∷ ∀ o i tup s
