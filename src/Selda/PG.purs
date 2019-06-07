@@ -1,5 +1,7 @@
 module Selda.PG
   ( class MonadSelda
+  , runSelda
+  , hoistSeldaWith
   , insert_
   , insert
   , showInsert1
@@ -14,19 +16,22 @@ module Selda.PG
 
 import Prelude
 
-import Control.Monad.Error.Class (class MonadError)
-import Control.Monad.Reader (class MonadReader, ask)
+import Control.Monad.Error.Class (class MonadError, throwError)
+import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Reader (class MonadReader, ReaderT, ask, asks, runReaderT)
 import Data.Array (concat)
 import Data.Array as Array
+import Data.Either (Either(..))
 import Data.Exists (runExists)
 import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, PGError)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
-import Effect.Aff.Class (class MonadAff)
+import Effect.Aff (Aff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
@@ -43,16 +48,36 @@ import Type.Row (RLProxy(..))
 
 class 
   ( MonadAff m
-  , MonadError PostgreSQL.PGError m
+  , MonadError PGError m
   , MonadReader PostgreSQL.Connection m
   ) <= MonadSelda m
 
 instance monadSeldaInstance
   ∷ ( MonadAff m
-    , MonadError PostgreSQL.PGError m
+    , MonadError PGError m
     , MonadReader PostgreSQL.Connection m
     )
   ⇒ MonadSelda m
+
+type MonadSelda_ = ExceptT PGError (ReaderT PostgreSQL.Connection Aff)
+
+runSelda
+  ∷ ∀ a
+  . PostgreSQL.Connection → MonadSelda_ a → Aff (Either PGError a)
+runSelda conn m = runReaderT (runExceptT m) conn
+
+hoistSeldaWith
+  ∷ ∀ e m r
+  . MonadAff m
+  ⇒ MonadError e m
+  ⇒ MonadReader r m
+  ⇒ (PGError → e) → (r → PostgreSQL.Connection) → MonadSelda_ ~> m
+hoistSeldaWith fe fr m = do
+  conn ← asks fr
+  r ← liftAff $ runReaderT (runExceptT m) conn
+  case r of
+    Right a → pure a
+    Left pgError → throwError (fe pgError)
 
 pgQuery 
   ∷ ∀ i o m
