@@ -9,7 +9,6 @@ import Data.Array (fromFoldable)
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable, find, foldl, for_)
 import Data.Maybe (Maybe(..))
-import Data.Variant (Variant)
 import Database.PostgreSQL (Connection, Query(..), Row0(..), execute)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff, catchError, throwError)
@@ -39,12 +38,10 @@ withRollback conn action = do
 runSeldaAff
   ∷ ∀ a
   . Connection
-  → ExceptT 
-      (Variant ( pgError ∷ PostgreSQL.PGError ) )
-      (ReaderT { conn ∷ PostgreSQL.Connection } Aff) a
+  → ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff) a
   → Aff a
 runSeldaAff conn m = do
-  r ← runReaderT (runExceptT m) { conn }
+  r ← runReaderT (runExceptT m) conn
   case r of
     Left pgError →
       throwError $ error ("PGError occured during test execution: " <> unsafeStringify (pgError))

@@ -1,6 +1,5 @@
 module Selda.PG
   ( class MonadSelda
-  , _pgError
   , insert_
   , insert
   , showInsert1
@@ -24,7 +23,6 @@ import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.Variant (SProxy(..), Variant, inj)
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
@@ -43,18 +41,16 @@ import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
 
-_pgError = SProxy ∷ SProxy "pgError"
-
 class 
   ( MonadAff m
-  , MonadError (Variant ( pgError ∷ PostgreSQL.PGError | e ) ) m
-  , MonadReader { conn ∷ PostgreSQL.Connection | r } m
+  , MonadError PostgreSQL.PGError m
+  , MonadReader PostgreSQL.Connection m
   ) <= MonadSelda m e r
 
 instance monadSeldaInstance
   ∷ ( MonadAff m
-    , MonadError (Variant ( pgError ∷ PostgreSQL.PGError | e ) ) m
-    , MonadReader { conn ∷ PostgreSQL.Connection | r } m
+    , MonadError PostgreSQL.PGError m
+    , MonadReader PostgreSQL.Connection m
     )
   ⇒ MonadSelda m e r
 
@@ -65,8 +61,8 @@ pgQuery
   ⇒ MonadSelda m e r 
   ⇒ PostgreSQL.Query i o → i → m (Array o)
 pgQuery q xTup = do
-  { conn } ← ask
-  PostgreSQL.PG.hoistWith (inj _pgError) $ PostgreSQL.PG.query conn q xTup
+  conn ← ask
+  PostgreSQL.PG.hoistWith identity $ PostgreSQL.PG.query conn q xTup
 
 pgExecute
   ∷ ∀ i o m e r
@@ -74,8 +70,8 @@ pgExecute
   ⇒ MonadSelda m e r 
   ⇒ PostgreSQL.Query i o → i → m Unit
 pgExecute q xTup = do
-  { conn } ← ask
-  PostgreSQL.PG.hoistWith (inj _pgError) $ PostgreSQL.PG.execute conn q xTup
+  conn ← ask
+  PostgreSQL.PG.hoistWith identity $ PostgreSQL.PG.execute conn q xTup
 
 -- | Executes an insert query for each input record.
 insert_
