@@ -13,6 +13,7 @@ import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
 import Type.Row (RLProxy(..))
+import Prim.TypeError (class Fail, Text, Beside)
 
 -- | For record
 -- |   `{ n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }`
@@ -36,6 +37,9 @@ instance rLUnColNil ∷ ValidateSInCols s RL.Nil
 else instance rLUnColCons
   ∷ ValidateSInCols s tail
   ⇒ ValidateSInCols s (RL.Cons sym (Col s t) tail)
+else instance failValidateSInCols 
+  ∷ Fail (Beside (Text sym) (Text " is not Col or the scope 's' is wrong"))
+  ⇒ ValidateSInCols s (RL.Cons sym col tail)
 
 class ChangeType i o | i → o
 instance mapTypeCol ∷ ChangeType (Col s a) a
