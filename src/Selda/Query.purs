@@ -19,7 +19,7 @@ import Selda.Inner (Inner, OuterCols(..))
 import Selda.Query.Type (FullQuery(..), Order, Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
-import Type.Row (RLProxy(..))
+import Type.Data.RowList (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 selectFrom

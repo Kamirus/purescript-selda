@@ -1,5 +1,6 @@
 module Selda.PG
   ( class MonadSelda
+  , MonadSelda_
   , runSelda
   , hoistSeldaWith
   , insert_
@@ -44,7 +45,7 @@ import Selda.Query (selectFrom) as Query
 import Selda.Query.Type (FullQuery, Query, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Type.Proxy (Proxy(..))
-import Type.Row (RLProxy(..))
+import Type.Data.RowList (RLProxy(..))
 
 class 
   ( MonadAff m
