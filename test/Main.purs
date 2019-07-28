@@ -13,12 +13,11 @@ import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Prim.RowList as RL
-import Selda (Col(..), FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
 import Selda.Col (class GetCols)
-import Selda.Expr (Expr(..), Literal(..))
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
-import Test.Types (AccountType(..), printAccountType)
+import Test.Types (AccountType(..), litAccountType)
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
@@ -142,7 +141,7 @@ main = do
               , { id: 3, personId: 3, balance: 300, accountType: Personal }
               ]
               $ selectFrom bankAccounts \r@{ accountType } → do
-                  restrict $ accountType .== Col (ELit (Any (printAccountType Personal)))
+                  restrict $ accountType .== litAccountType Personal
                   pure r
 
             test' conn "cross product with restrict"
