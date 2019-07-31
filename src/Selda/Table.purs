@@ -14,7 +14,7 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
-import Type.Row (RLProxy(..))
+import Type.Data.RowList (RLProxy(..))
 
 newtype Table ( r ∷ # Type ) = Table { name ∷ String }
 

@@ -12,7 +12,7 @@ import Record as Record
 import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table(..), tableColumns)
 import Type.Proxy (Proxy(..))
-import Type.Row (RLProxy(..))
+import Type.Data.RowList (RLProxy(..))
 import Prim.TypeError (class Fail, Text, Beside)
 
 -- | For record

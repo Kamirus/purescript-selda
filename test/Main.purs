@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Eq (class EqRecord)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Show (class ShowRecordFields)
 import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
@@ -17,6 +17,7 @@ import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, des
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
+import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
@@ -24,7 +25,7 @@ import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
 people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
 people = Table { name: "people" }
 
-bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int )
+bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int, accountType ∷ AccountType )
 bankAccounts = Table { name: "bank_accounts" }
 
 descriptions ∷ Table ( id ∷ Int, text ∷ Maybe String )
@@ -40,7 +41,7 @@ main = do
     PG.withConnection pool case _ of
       Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
       Right conn → do
-        void $ PG.execute conn (PG.Query """
+        createdb ← PG.execute conn (PG.Query """
           DROP TABLE IF EXISTS people;
           CREATE TABLE people (
             id INTEGER PRIMARY KEY,
@@ -48,11 +49,22 @@ main = do
             age INTEGER
           );
 
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'account_type') THEN
+              CREATE TYPE ACCOUNT_TYPE as ENUM (
+                'business',
+                'personal'
+              );
+            END IF;
+          END$$;
+
           DROP TABLE IF EXISTS bank_accounts;
           CREATE TABLE bank_accounts (
             id INTEGER PRIMARY KEY,
             personId INTEGER NOT NULL,
-            balance INTEGER NOT NULL
+            balance INTEGER NOT NULL,
+            accountType ACCOUNT_TYPE NOT NULL
           );
 
           DROP TABLE IF EXISTS descriptions;
@@ -66,6 +78,8 @@ main = do
             id INTEGER PRIMARY KEY
           );
         """) PG.Row0
+        when (isJust createdb) $
+          failure ("PostgreSQL createdb error: " <> unsafeStringify createdb)
 
         runSeldaAff conn do
           insert_ people
@@ -74,9 +88,9 @@ main = do
             , { id: 3, name: "name3", age: Just 33 }
             ]
           insert_ bankAccounts
-            [ { id: 1, personId: 1, balance: 100 }
-            , { id: 2, personId: 1, balance: 150 }
-            , { id: 3, personId: 3, balance: 300 }
+            [ { id: 1, personId: 1, balance: 100, accountType: Business }
+            , { id: 2, personId: 1, balance: 150, accountType: Personal }
+            , { id: 3, personId: 3, balance: 300, accountType: Personal }
             ]
           insert_ descriptions
             [ { id: 1, text: Just "text1" }
@@ -122,6 +136,14 @@ main = do
                   restrict $ age .> lit (Just 20)
                   pure r
 
+            test' conn "simple select restrict on custom type"
+              [ { id: 2, personId: 1, balance: 150, accountType: Personal }
+              , { id: 3, personId: 3, balance: 300, accountType: Personal }
+              ]
+              $ selectFrom bankAccounts \r@{ accountType } → do
+                  restrict $ accountType .== lit Personal
+                  pure r
+
             test' conn "cross product with restrict"
               [ { id1: 2, age1: Just 22, age2: Just 11 }
               , { id1: 3, age1: Just 33, age2: Just 11 }
@@ -159,15 +181,15 @@ main = do
                   pure { id: r.id, text }
 
             test' conn "cross product as natural join"
-              [ { id: 1, balance: 100 }
-              , { id: 1, balance: 150 }
+              [ { id: 1, balance: 100, accountType: Business }
+              , { id: 1, balance: 150, accountType: Personal }
               -- , { id: 2, balance: Nothing }
-              , { id: 3, balance: 300 }
+              , { id: 3, balance: 300, accountType: Personal }
               ]
               $ selectFrom people \{ id, name, age } → do
-                  { balance, personId } ← crossJoin bankAccounts
+                  { accountType, balance, personId } ← crossJoin bankAccounts
                   restrict $ id .== personId
-                  pure { id, balance }
+                  pure { accountType, id, balance }
 
             test' conn "left join"
               [ { id: 1, balance: Just 100 }
@@ -262,7 +284,7 @@ main = do
 
             test' conn "max(id) on empty table returns 0 results with notNull"
               [ ]
-              $ selectFrom_ do 
+              $ selectFrom_ do
                   aggregate $ selectFrom emptyTable \r →
                       pure { maxId: max_ r.id }
                   $ \r → do
