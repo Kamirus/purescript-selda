@@ -44,8 +44,9 @@ import Selda.Query (class FromTable)
 import Selda.Query (selectFrom) as Query
 import Selda.Query.Type (FullQuery, Query, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
-import Type.Proxy (Proxy(..))
+import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
+import Type.Proxy (Proxy(..))
 
 class 
   ( MonadAff m
@@ -101,48 +102,53 @@ pgExecute q xTup = do
 
 -- | Executes an insert query for each input record.
 insert_
-  ∷ ∀ r rl tup m
-  . RL.RowToList r rl
-  ⇒ TableColumnNames rl
-  ⇒ RowListLength rl
+  ∷ ∀ r t rlcols tup m
+  . RL.RowToList r rlcols
+  ⇒ CanInsertColumnsIntoTable rlcols t
+  ⇒ TableColumnNames rlcols
+  ⇒ RowListLength rlcols
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
   ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
   ⇒ MonadSelda m
-  ⇒ Table r → Array { | r } → m Unit
+  ⇒ Table t → Array { | r } → m Unit
 insert_ t r = void $ insert t r
 
 -- | Executes an insert query for each input record.
+-- | Records to be inserted needs to have columns without constraints,
+-- | Default ale optional, Auto must be missing
 insert
-  ∷ ∀ r rl tup m
-  . RL.RowToList r rl
-  ⇒ TableColumnNames rl
-  ⇒ RowListLength rl
+  ∷ ∀ r t rlcols tup m
+  . RL.RowToList r rlcols
+  ⇒ CanInsertColumnsIntoTable rlcols t
+  ⇒ TableColumnNames rlcols
+  ⇒ RowListLength rlcols
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
   ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
   ⇒ MonadSelda m
-  ⇒ Table r → Array { | r } → m (Array { | r })
+  ⇒ Table t → Array { | r } → m (Array { | r })
 insert table xs = concat <$> traverse insert1 xs
   where
   insert1 ∷ { | r } → m (Array { | r })
   insert1 r = do
     let rTup = hfoldl RecordToTuple unit r
-    rows ← pgQuery (PostgreSQL.Query (showInsert1 table)) rTup
+    let rlCols = (RLProxy ∷ RLProxy rlcols)
+    rows ← pgQuery (PostgreSQL.Query (showInsert1 table rlCols)) rTup
     pure $ map (mkTupleToRecord r) rows
 
 showInsert1
-  ∷ ∀ r rl
-  . RL.RowToList r rl
-  ⇒ TableColumnNames rl
-  ⇒ RowListLength rl
-  ⇒ Table r → String
-showInsert1 (Table { name }) =
+  ∷ ∀ t rlcols
+  . CanInsertColumnsIntoTable rlcols t
+  ⇒ TableColumnNames rlcols
+  ⇒ RowListLength rlcols
+  ⇒ Table t → RLProxy rlcols → String
+showInsert1 (Table { name }) colsToinsert =
   let
-    cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
-    len = rowListLength (RLProxy ∷ RLProxy rl)
+    cols = joinWith ", " $ tableColumnNames colsToinsert
+    len = rowListLength colsToinsert
     placeholders =
       Array.range 1 len # map (\i → "$" <> show i) # joinWith ", "
   in

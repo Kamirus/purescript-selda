@@ -14,6 +14,7 @@ import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
+import Selda.Table.Constraint (class EraseConstraint)
 import Type.Data.RowList (RLProxy(..))
 
 newtype Table ( r ∷ # Type ) = Table { name ∷ String }
@@ -40,7 +41,8 @@ instance tableColumnsNil ∷ TableColumns RL.Nil () where
 instance tableColumnsCons
     ∷ ( IsSymbol sym
       , R.Lacks sym r'
-      , R.Cons sym (Column t) r' r
+      , EraseConstraint t t'
+      , R.Cons sym (Column t') r' r
       , TableColumns tail r'
       )
     ⇒ TableColumns (RL.Cons sym t tail) r

@@ -17,6 +17,7 @@ import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, des
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
+import Selda.Table.Constraint (Auto, Default)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
@@ -33,6 +34,9 @@ descriptions = Table { name: "descriptions" }
 
 emptyTable ∷ Table ( id ∷ Int )
 emptyTable = Table { name: "emptyTable" }
+
+employees ∷ Table ( id ∷ Auto Int, name ∷ String, salary ∷ Default Int )
+employees = Table { name: "employees" }
 
 main ∷ Effect Unit
 main = do
@@ -77,6 +81,13 @@ main = do
           CREATE TABLE emptyTable (
             id INTEGER PRIMARY KEY
           );
+
+          DROP TABLE IF EXISTS employees;
+          CREATE TABLE employees (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            salary INTEGER DEFAULT 500
+          );
         """) PG.Row0
         when (isJust createdb) $
           failure ("PostgreSQL createdb error: " <> unsafeStringify createdb)
@@ -96,6 +107,10 @@ main = do
             [ { id: 1, text: Just "text1" }
             , { id: 3, text: Nothing }
             ]
+          -- id is Auto, so it cannot be inserted
+          -- insert_ employees [{ id: 1, name: "E1", salary: 123 }]
+          insert_ employees [{ name: "E1", salary: 123 }]
+          insert_ employees [{ name: "E2" }]
 
         -- simple test delete
         runSeldaAff conn do
@@ -296,6 +311,12 @@ main = do
               $ selectFrom descriptions \ { id, text: maybeText } → do
                   text ← notNull maybeText
                   pure { id, text }
+
+            test' conn "employees inserted with default and without salary"
+              [ { id: 1, name: "E1", salary: 123 }
+              , { id: 2, name: "E2", salary: 500 }
+              ]
+              $ selectFrom employees pure 
 
 test'
   ∷ ∀ s o i tup ol
