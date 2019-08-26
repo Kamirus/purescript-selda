@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Eq (class EqRecord)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Show (class ShowRecordFields)
 import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
@@ -13,9 +13,12 @@ import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
+import Selda.Query (notNull)
+import Selda.Table.Constraint (Auto, Default)
+import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
 import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
@@ -23,11 +26,17 @@ import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
 people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
 people = Table { name: "people" }
 
-bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int )
+bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int, accountType ∷ AccountType )
 bankAccounts = Table { name: "bank_accounts" }
 
 descriptions ∷ Table ( id ∷ Int, text ∷ Maybe String )
 descriptions = Table { name: "descriptions" }
+
+emptyTable ∷ Table ( id ∷ Int )
+emptyTable = Table { name: "emptyTable" }
+
+employees ∷ Table ( id ∷ Auto Int, name ∷ String, salary ∷ Default Int )
+employees = Table { name: "employees" }
 
 main ∷ Effect Unit
 main = do
@@ -36,7 +45,7 @@ main = do
     PG.withConnection pool case _ of
       Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
       Right conn → do
-        void $ PG.execute conn (PG.Query """
+        createdb ← PG.execute conn (PG.Query """
           DROP TABLE IF EXISTS people;
           CREATE TABLE people (
             id INTEGER PRIMARY KEY,
@@ -44,11 +53,22 @@ main = do
             age INTEGER
           );
 
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'account_type') THEN
+              CREATE TYPE ACCOUNT_TYPE as ENUM (
+                'business',
+                'personal'
+              );
+            END IF;
+          END$$;
+
           DROP TABLE IF EXISTS bank_accounts;
           CREATE TABLE bank_accounts (
             id INTEGER PRIMARY KEY,
             personId INTEGER NOT NULL,
-            balance INTEGER NOT NULL
+            balance INTEGER NOT NULL,
+            accountType ACCOUNT_TYPE NOT NULL
           );
 
           DROP TABLE IF EXISTS descriptions;
@@ -56,7 +76,21 @@ main = do
             id INTEGER PRIMARY KEY,
             text TEXT
           );
+
+          DROP TABLE IF EXISTS emptyTable;
+          CREATE TABLE emptyTable (
+            id INTEGER PRIMARY KEY
+          );
+
+          DROP TABLE IF EXISTS employees;
+          CREATE TABLE employees (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            salary INTEGER DEFAULT 500
+          );
         """) PG.Row0
+        when (isJust createdb) $
+          failure ("PostgreSQL createdb error: " <> unsafeStringify createdb)
 
         runSeldaAff conn do
           insert_ people
@@ -65,14 +99,18 @@ main = do
             , { id: 3, name: "name3", age: Just 33 }
             ]
           insert_ bankAccounts
-            [ { id: 1, personId: 1, balance: 100 }
-            , { id: 2, personId: 1, balance: 150 }
-            , { id: 3, personId: 3, balance: 300 }
+            [ { id: 1, personId: 1, balance: 100, accountType: Business }
+            , { id: 2, personId: 1, balance: 150, accountType: Personal }
+            , { id: 3, personId: 3, balance: 300, accountType: Personal }
             ]
           insert_ descriptions
             [ { id: 1, text: Just "text1" }
             , { id: 3, text: Nothing }
             ]
+          -- id is Auto, so it cannot be inserted
+          -- insert_ employees [{ id: 1, name: "E1", salary: 123 }]
+          insert_ employees [{ name: "E1", salary: 123 }]
+          insert_ employees [{ name: "E2" }]
 
         -- simple test delete
         runSeldaAff conn do
@@ -113,6 +151,14 @@ main = do
                   restrict $ age .> lit (Just 20)
                   pure r
 
+            test' conn "simple select restrict on custom type"
+              [ { id: 2, personId: 1, balance: 150, accountType: Personal }
+              , { id: 3, personId: 3, balance: 300, accountType: Personal }
+              ]
+              $ selectFrom bankAccounts \r@{ accountType } → do
+                  restrict $ accountType .== lit Personal
+                  pure r
+
             test' conn "cross product with restrict"
               [ { id1: 2, age1: Just 22, age2: Just 11 }
               , { id1: 3, age1: Just 33, age2: Just 11 }
@@ -150,15 +196,15 @@ main = do
                   pure { id: r.id, text }
 
             test' conn "cross product as natural join"
-              [ { id: 1, balance: 100 }
-              , { id: 1, balance: 150 }
+              [ { id: 1, balance: 100, accountType: Business }
+              , { id: 1, balance: 150, accountType: Personal }
               -- , { id: 2, balance: Nothing }
-              , { id: 3, balance: 300 }
+              , { id: 3, balance: 300, accountType: Personal }
               ]
               $ selectFrom people \{ id, name, age } → do
-                  { balance, personId } ← crossJoin bankAccounts
+                  { accountType, balance, personId } ← crossJoin bankAccounts
                   restrict $ id .== personId
-                  pure { id, balance }
+                  pure { accountType, id, balance }
 
             test' conn "left join"
               [ { id: 1, balance: Just 100 }
@@ -196,13 +242,13 @@ main = do
                     pure { id, balance }
 
             test' conn "aggr: max people id"
-              [ { maxId: 3 } ]
+              [ { maxId: Just 3 } ]
               $ aggregate $ selectFrom people \{ id, name, age } → do
                   pure { maxId: max_ id }
 
             test' conn "aggr: max people id"
-              [ { pid: 1, m: 150, c: "2" }
-              , { pid: 3, m: 300, c: "1" }
+              [ { pid: 1, m: Just 150, c: "2" }
+              , { pid: 3, m: Just 300, c: "1" }
               ]
               $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                   pid ← groupBy personId
@@ -216,9 +262,10 @@ main = do
                   aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                       pid ← groupBy personId
                       pure { pid, m: max_ balance, c: count personId }
-                  $ \r@{ m } → do
+                  $ \r@{ pid, c } → do
+                      m ← notNull r.m
                       orderBy desc m
-                      pure r
+                      pure { pid, m, c }
 
             test' conn "aggr: max people id having count > 1"
               [ { pid: 1, m: 150, c: "2" }
@@ -227,9 +274,10 @@ main = do
                   aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                       pid ← groupBy personId
                       pure { pid, m: max_ balance, c: count personId }
-                  $ \r@{ c } → do
+                  $ \r@{ pid, c } → do
+                      m ← notNull r.m
                       restrict $ c .> lit "1"
-                      pure r
+                      pure { pid, m, c }
 
             test' conn "limit negative returns 0"
               [ ]
@@ -238,12 +286,51 @@ main = do
                   pure r
 
             test' conn "limit + order by: return first"
-              [ { pid: 3, maxBalance: 300 } ]
+              [ { pid: 3, maxBalance: Just 300 } ]
               $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
                   pid ← groupBy personId
                   limit 1
                   orderBy desc personId
                   pure { pid, maxBalance: max_ balance }
+
+            test' conn "max(id) on empty table returns 1 result: null"
+              [ { maxId: Nothing } ]
+              $ aggregate $ selectFrom emptyTable \r → pure { maxId: max_ r.id }
+
+            test' conn "max(id) on empty table returns 0 results with notNull"
+              [ ]
+              $ selectFrom_ do
+                  aggregate $ selectFrom emptyTable \r →
+                      pure { maxId: max_ r.id }
+                  $ \r → do
+                      id ← notNull r.maxId
+                      pure { id }
+
+            test' conn "return only not null values"
+              [ { id: 1, text: "text1" } ]
+              $ selectFrom descriptions \ { id, text: maybeText } → do
+                  text ← notNull maybeText
+                  pure { id, text }
+
+            test' conn "employees inserted with default and without salary"
+              [ { id: 1, name: "E1", salary: 123 }
+              , { id: 2, name: "E2", salary: 500 }
+              ]
+              $ selectFrom employees pure
+
+            test' conn "inArray"
+              [ { id: 1, name: "name1", age: Just 11 }
+              , { id: 3, name: "name3", age: Just 33 }
+              ]
+              $ selectFrom people \r → do
+                  restrict $ r.id `inArray` [ lit 1, lit 3 ]
+                  pure r
+
+            test' conn "not inArray"
+              [ { id: 2, name: "name2", age: Just 22 } ]
+              $ selectFrom people \r → do
+                  restrict $ not_ $ r.id `inArray` [ lit 1, lit 3 ]
+                  pure r
 
 test'
   ∷ ∀ s o i tup ol

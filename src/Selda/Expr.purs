@@ -5,6 +5,8 @@ import Prelude
 import Data.Exists (Exists, runExists)
 import Data.Leibniz (type (~))
 import Data.Maybe (Maybe)
+import Data.String (joinWith)
+import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Prim.RowList (kind RowList)
 import Selda.Table (Column, showColumn)
 
@@ -14,6 +16,7 @@ data Literal a
   | LInt Int (Int ~ a)
   | LNull (Exists (None a))
   | LJust (Exists (Some a))
+  | Any String
 
 data Some a b = Some (Literal b) (Maybe b ~ a)
 
@@ -24,25 +27,45 @@ data BinOp i o
   | Gt (Boolean ~ o)
   | Eq (Boolean ~ o)
 
+data UnOp i o
+  = IsNull (Boolean ~ o)
+  | Not (Boolean ~ i) (Boolean ~ o)
+
 data Expr o
   = EColumn (Column o)
   | ELit (Literal o)
   | EBinOp (Exists (BinExp o))
-  | EFn (Fn o)
+  | EUnOp (Exists (UnExp o))
+  | EFn (Exists (Fn o))
+  | EInArray (Exists (InArray o)) 
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
-data Fn o
-  = FnMax (Expr o)
-  | FnCount (Exists Expr) (String ~ o)
+data UnExp o i = UnExp (UnOp i o) (Expr i)
+
+data Fn o i
+  = FnMax (Expr i) (Maybe i ~ o)
+  | FnCount (Expr i) (String ~ o)
+
+data InArray o i = InArray (Expr i) (Array (Expr i)) (Boolean ~ o)
+
+primPGEscape ∷ String → String
+primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
+  where
+  escape ∷ Char → Array Char
+  escape c = case c of
+    '\'' → [c, c]
+    '\\' → [c, c]
+    _ → pure c
 
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
   LBoolean b _ → show b
-  LString s _ → "'" <> s <> "'"
+  LString s _ → "E'" <> primPGEscape s <> "'"
   LInt i _ → show i
   LNull _ → "null"
   LJust x → runExists (\(Some l _) → showLiteral l) x
+  Any s → "E'" <> primPGEscape s <> "'"
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
@@ -55,12 +78,25 @@ showExpr = case _ of
   EColumn col → showColumn col
   ELit lit → showLiteral lit
   EBinOp e → runExists showBinExp e
-  EFn fn → showFn fn
+  EUnOp e → runExists showUnExp e
+  EFn fn → runExists showFn fn
+  EInArray e → runExists showInArray e
 
 showBinExp ∷ ∀ o i. BinExp o i → String
 showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2 <> ")"
 
-showFn ∷ ∀ o. Fn o → String
+showUnExp ∷ ∀ o i. UnExp o i → String
+showUnExp (UnExp op e) = (\s → "(" <> s <> ")") $
+  case op of 
+    IsNull _ → showExpr e <> " IS NOT NULL"
+    Not _ _ → "NOT " <> showExpr e
+
+showFn ∷ ∀ o i. Fn o i → String
 showFn = case _ of
-  FnMax e → "max(" <> showExpr e <> ")"
-  FnCount ee _ → "count(" <> runExists showExpr ee <> ")"
+  FnMax e _ → "max(" <> showExpr e <> ")"
+  FnCount e _ → "count(" <> showExpr e <> ")"
+
+showInArray ∷ ∀ o i. InArray o i → String
+showInArray (InArray x xs _) = "(" <> showExpr x <> " IN " <> "(" <> l <> "))"
+  where
+    l = joinWith ", " $ map showExpr xs

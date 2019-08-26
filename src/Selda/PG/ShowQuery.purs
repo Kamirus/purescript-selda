@@ -31,16 +31,11 @@ showSources sources = case Array.uncons $ reverse sources of
   Nothing → ""
   Just { head, tail } → " FROM "
     <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource head) tail
-  -- Just { head: h@(Product t), tail } →
-  --   " FROM " <> foldl (\acc x → acc <> sepFor x <> showSource x) (showSource h) tail
-  -- Just { head: LeftJoin t _, tail } →
-  --   -- join on the first place, drop it and interpret as Product
-  --   showSources $ Product t : tail
 
 showRestricts ∷ Array (Expr Boolean) → String
 showRestricts = case _ of
   [] → ""
-  xs → " WHERE " <> (joinWith " AND " $ map (\e → "(" <> showExpr e <> ")") xs)
+  xs → " WHERE " <> (joinWith " AND " $ map showExpr xs)
 
 showGrouping ∷ Array (Exists Expr) → String
 showGrouping = case _ of

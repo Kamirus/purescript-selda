@@ -1,24 +1,25 @@
 module Selda.PG
-  ( MonadSelda
-  , hoistSelda
+  ( class MonadSelda
+  , MonadSelda_
+  , runSelda
   , hoistSeldaWith
   , insert_
   , insert
-  , deleteFrom
+  , showInsert1
   , query
-  , runSelda
+  , showQuery
   , selectFrom
+  , deleteFrom
+  , showDeleteFrom
   , update
+  , showUpdate
   ) where
 
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Except (ExceptT)
-import Control.Monad.Except.Trans (runExceptT)
-import Control.Monad.Reader (class MonadReader, ask, runReaderT)
-import Control.Monad.Reader.Class (asks)
-import Control.Monad.Reader.Trans (ReaderT)
+import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Reader (class MonadReader, ReaderT, ask, asks, runReaderT)
 import Data.Array (concat)
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -32,41 +33,47 @@ import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Heterogeneous.Folding (class HFoldl, class HFoldlWithIndex, hfoldl)
+import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
-import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, class TupleToRecord, RecordLength(..), RecordToTuple(..), TupleToRecordFunc, colsToPGHandler, tableToColsWithoutAlias, tupleToRecord)
+import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, mkTupleToRecord, rowListLength, tableToColsWithoutAlias)
 import Selda.Query (class FromTable)
 import Selda.Query (selectFrom) as Query
 import Selda.Query.Type (FullQuery, Query, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
+import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
+import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
-import Type.Row (RLProxy(..))
 
-type MonadSelda a = ExceptT PGError (ReaderT PostgreSQL.Connection Aff) a
+class 
+  ( MonadAff m
+  , MonadError PGError m
+  , MonadReader PostgreSQL.Connection m
+  ) <= MonadSelda m
+
+instance monadSeldaInstance
+  ∷ ( MonadAff m
+    , MonadError PGError m
+    , MonadReader PostgreSQL.Connection m
+    )
+  ⇒ MonadSelda m
+
+type MonadSelda_ = ExceptT PGError (ReaderT PostgreSQL.Connection Aff)
 
 runSelda
   ∷ ∀ a
-  . PostgreSQL.Connection → MonadSelda a → Aff (Either PGError a)
+  . PostgreSQL.Connection → MonadSelda_ a → Aff (Either PGError a)
 runSelda conn m = runReaderT (runExceptT m) conn
-
-hoistSelda
-  ∷ ∀ m
-  . MonadAff m
-  ⇒ MonadError PGError m
-  ⇒ MonadReader PostgreSQL.Connection m
-  ⇒ MonadSelda ~> m
-hoistSelda = hoistSeldaWith identity identity
 
 hoistSeldaWith
   ∷ ∀ e m r
   . MonadAff m
   ⇒ MonadError e m
   ⇒ MonadReader r m
-  ⇒ (PGError → e) → (r → PostgreSQL.Connection) → MonadSelda ~> m
+  ⇒ (PGError → e) → (r → PostgreSQL.Connection) → MonadSelda_ ~> m
 hoistSeldaWith fe fr m = do
   conn ← asks fr
   r ← liftAff $ runReaderT (runExceptT m) conn
@@ -74,108 +81,147 @@ hoistSeldaWith fe fr m = do
     Right a → pure a
     Left pgError → throwError (fe pgError)
 
-pgQuery ∷ ∀ i o. ToSQLRow i ⇒ FromSQLRow o ⇒ PostgreSQL.Query i o → i → MonadSelda (Array o)
+pgQuery 
+  ∷ ∀ i o m
+  . ToSQLRow i
+  ⇒ FromSQLRow o
+  ⇒ MonadSelda m 
+  ⇒ PostgreSQL.Query i o → i → m (Array o)
 pgQuery q xTup = do
   conn ← ask
-  PostgreSQL.PG.hoist $ PostgreSQL.PG.query conn q xTup
+  PostgreSQL.PG.hoistWith identity $ PostgreSQL.PG.query conn q xTup
 
-pgExecute ∷ ∀ i o. ToSQLRow i ⇒ PostgreSQL.Query i o → i → MonadSelda Unit
+pgExecute
+  ∷ ∀ i o m
+  . ToSQLRow i
+  ⇒ MonadSelda m 
+  ⇒ PostgreSQL.Query i o → i → m Unit
 pgExecute q xTup = do
   conn ← ask
-  PostgreSQL.PG.hoist $ PostgreSQL.PG.execute conn q xTup
+  PostgreSQL.PG.hoistWith identity $ PostgreSQL.PG.execute conn q xTup
 
+-- | Executes an insert query for each input record.
 insert_
-  ∷ ∀ r rl tup
-  . HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | r })
+  ∷ ∀ r t rlcols tup m
+  . RL.RowToList r rlcols
+  ⇒ CanInsertColumnsIntoTable rlcols t
+  ⇒ TableColumnNames rlcols
+  ⇒ RowListLength rlcols
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
-  ⇒ RL.RowToList r rl
-  ⇒ TableColumnNames rl
+  ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ HFoldl RecordLength Int { | r } Int
-  ⇒ Table r → Array { | r } → MonadSelda Unit
+  ⇒ MonadSelda m
+  ⇒ Table t → Array { | r } → m Unit
 insert_ t r = void $ insert t r
 
+-- | Executes an insert query for each input record.
+-- | Records to be inserted needs to have columns without constraints,
+-- | Default ale optional, Auto must be missing
 insert
-  ∷ ∀ r rl tup
-  . TupleToRecord tup r
+  ∷ ∀ r t rlcols tup m
+  . RL.RowToList r rlcols
+  ⇒ CanInsertColumnsIntoTable rlcols t
+  ⇒ TableColumnNames rlcols
+  ⇒ RowListLength rlcols
   ⇒ FromSQLRow tup
   ⇒ ToSQLRow tup
-  ⇒ RL.RowToList r rl
-  ⇒ TableColumnNames rl
+  ⇒ MkTupleToRecord tup r
   ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ HFoldl RecordLength Int { | r } Int
-  ⇒ Table r → Array { | r } → MonadSelda (Array { | r })
-insert (Table { name }) xs = concat <$> traverse insert1 xs
+  ⇒ MonadSelda m
+  ⇒ Table t → Array { | r } → m (Array { | r })
+insert table xs = concat <$> traverse insert1 xs
   where
-  insert1 x = do
-    let
-      cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
-      xTup = hfoldl RecordToTuple unit x
-      xLen = hfoldl RecordLength 0 x
-      placeholders =
-        Array.range 1 xLen # map (\i → "$" <> show i) # joinWith ", "
-      qStr =
-        "INSERT INTO " <> name <> " (" <> cols <> ") " 
-          <> "VALUES " <> "(" <> placeholders <> ") "
-          <> "RETURNING " <> cols
-    rows ← pgQuery (PostgreSQL.Query qStr) xTup
-    pure $ map (tupleToRecord x) rows
+  insert1 ∷ { | r } → m (Array { | r })
+  insert1 r = do
+    let rTup = hfoldl RecordToTuple unit r
+    let rlCols = (RLProxy ∷ RLProxy rlcols)
+    rows ← pgQuery (PostgreSQL.Query (showInsert1 table rlCols)) rTup
+    pure $ map (mkTupleToRecord r) rows
+
+showInsert1
+  ∷ ∀ t rlcols
+  . CanInsertColumnsIntoTable rlcols t
+  ⇒ TableColumnNames rlcols
+  ⇒ RowListLength rlcols
+  ⇒ Table t → RLProxy rlcols → String
+showInsert1 (Table { name }) colsToinsert =
+  let
+    cols = joinWith ", " $ tableColumnNames colsToinsert
+    len = rowListLength colsToinsert
+    placeholders =
+      Array.range 1 len # map (\i → "$" <> show i) # joinWith ", "
+  in
+  "INSERT INTO " <> name <> " (" <> cols <> ") " 
+    <> "VALUES " <> "(" <> placeholders <> ") "
+    <> "RETURNING " <> cols
 
 query
-  ∷ ∀ o i tup s
+  ∷ ∀ o i tup s m
   . ColsToPGHandler s i tup o
   ⇒ GetCols i
   ⇒ FromSQLRow tup
-  ⇒ FullQuery s (Record i)
-  → MonadSelda (Array (Record o))
+  ⇒ MonadSelda m
+  ⇒ FullQuery s (Record i) → m (Array (Record o))
 query q = do
-  let
-    (Tuple res st') = runQuery $ unwrap q
-    st = st' { cols = getCols res }
-    q_str = showState st
-  rows ← pgQuery (PostgreSQL.Query q_str) PostgreSQL.Row0
+  let (Tuple res _) = runQuery $ unwrap q
+  rows ← pgQuery (PostgreSQL.Query (showQuery q)) PostgreSQL.Row0
   pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 
+showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → String
+showQuery q = showState st
+  where
+    (Tuple res st') = runQuery $ unwrap q
+    st = st' { cols = getCols res }
+
 selectFrom
-  ∷ ∀ cols o i r s tup
+  ∷ ∀ cols o i r s tup m
   . ColsToPGHandler s i tup o
   ⇒ FromSQLRow tup
   ⇒ FromTable s r cols
   ⇒ GetCols i
-  ⇒ Table r
-  → ({ | cols } → Query s { | i })
-  → MonadSelda (Array (Record o))
+  ⇒ MonadSelda m
+  ⇒ Table r → ({ | cols } → Query s { | i }) → m (Array (Record o))
 selectFrom table q = query (Query.selectFrom table q)
 
 deleteFrom
+  ∷  ∀ r s r' m
+  . TableToColsWithoutAlias r r'
+  ⇒ MonadSelda m
+  ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
+deleteFrom table pred = 
+  pgExecute (PostgreSQL.Query (showDeleteFrom table pred)) PostgreSQL.Row0
+
+showDeleteFrom
   ∷  ∀ r s r'
   . TableToColsWithoutAlias r r'
-  ⇒ Table r
-  → ({ | r' } → Col s Boolean)
-  → MonadSelda Unit
-deleteFrom table@(Table { name }) pred = do
-  let
-    recordWithCols = tableToColsWithoutAlias table
-    pred_str = showCol $ pred recordWithCols
-    q_str = "DELETE FROM " <> name <> " WHERE " <> pred_str
-  pgExecute (PostgreSQL.Query q_str) PostgreSQL.Row0
+  ⇒ Table r → ({ | r' } → Col s Boolean) → String
+showDeleteFrom table@(Table { name }) pred = 
+  "DELETE FROM " <> name <> " WHERE " <> pred_str
+    where
+      recordWithCols = tableToColsWithoutAlias table
+      pred_str = showCol $ pred recordWithCols
 
 update
+  ∷  ∀ r s r' m
+  . TableToColsWithoutAlias r r'
+  ⇒ GetCols r'
+  ⇒ MonadSelda m
+  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → m Unit
+update table pred up =
+  pgExecute (PostgreSQL.Query (showUpdate table pred up)) PostgreSQL.Row0
+
+showUpdate
   ∷  ∀ r s r'
   . TableToColsWithoutAlias r r'
   ⇒ GetCols r'
-  ⇒ Table r
-  → ({ | r' } → Col s Boolean)
-  → ({ | r' } → { | r' })
-  → MonadSelda Unit
-update table@(Table { name }) pred up = do
-  let
-    recordWithCols = tableToColsWithoutAlias table
-    pred_str = showCol $ pred recordWithCols
-    vals =
-      getCols (up recordWithCols)
-        # map (\(Tuple n e) → n <> " = " <> runExists showExpr e)
-        # joinWith ", "
-    q_str = "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
-  pgExecute (PostgreSQL.Query q_str) PostgreSQL.Row0
+  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → String
+showUpdate table@(Table { name }) pred up =
+  "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
+    where
+      recordWithCols = tableToColsWithoutAlias table
+      pred_str = showCol $ pred recordWithCols
+      vals =
+        getCols (up recordWithCols)
+          # map (\(Tuple n e) → n <> " = " <> runExists showExpr e)
+          # joinWith ", "

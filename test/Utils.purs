@@ -2,16 +2,18 @@ module Test.Utils where
 
 import Prelude
 
+import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Free (Free)
+import Control.Monad.Reader (ReaderT, runReaderT)
 import Data.Array (fromFoldable)
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable, find, foldl, for_)
 import Data.Maybe (Maybe(..))
 import Database.PostgreSQL (Connection, Query(..), Row0(..), execute)
+import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Exception (error)
 import Global.Unsafe (unsafeStringify)
-import Selda.PG (MonadSelda, runSelda)
 import Test.Unit (TestF)
 import Test.Unit as Unit
 import Test.Unit.Assert (assert)
@@ -36,10 +38,10 @@ withRollback conn action = do
 runSeldaAff
   ∷ ∀ a
   . Connection
-  → MonadSelda a
+  → ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff) a
   → Aff a
 runSeldaAff conn m = do
-  r ← runSelda conn m
+  r ← runReaderT (runExceptT m) conn
   case r of
     Left pgError →
       throwError $ error ("PGError occured during test execution: " <> unsafeStringify (pgError))
