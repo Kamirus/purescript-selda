@@ -13,7 +13,7 @@ import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, insert_, leftJoin, leftJoin_, limit, lit, max_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
@@ -316,7 +316,21 @@ main = do
               [ { id: 1, name: "E1", salary: 123 }
               , { id: 2, name: "E2", salary: 500 }
               ]
-              $ selectFrom employees pure 
+              $ selectFrom employees pure
+
+            test' conn "inArray"
+              [ { id: 1, name: "name1", age: Just 11 }
+              , { id: 3, name: "name3", age: Just 33 }
+              ]
+              $ selectFrom people \r → do
+                  restrict $ r.id `inArray` [ lit 1, lit 3 ]
+                  pure r
+
+            test' conn "not inArray"
+              [ { id: 2, name: "name2", age: Just 22 } ]
+              $ selectFrom people \r → do
+                  restrict $ not_ $ r.id `inArray` [ lit 1, lit 3 ]
+                  pure r
 
 test'
   ∷ ∀ s o i tup ol

@@ -5,6 +5,7 @@ import Prelude
 import Data.Exists (Exists, runExists)
 import Data.Leibniz (type (~))
 import Data.Maybe (Maybe)
+import Data.String (joinWith)
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Prim.RowList (kind RowList)
 import Selda.Table (Column, showColumn)
@@ -28,6 +29,7 @@ data BinOp i o
 
 data UnOp i o
   = IsNull (Boolean ~ o)
+  | Not (Boolean ~ i) (Boolean ~ o)
 
 data Expr o
   = EColumn (Column o)
@@ -35,6 +37,7 @@ data Expr o
   | EBinOp (Exists (BinExp o))
   | EUnOp (Exists (UnExp o))
   | EFn (Exists (Fn o))
+  | EInArray (Exists (InArray o)) 
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
@@ -43,6 +46,8 @@ data UnExp o i = UnExp (UnOp i o) (Expr i)
 data Fn o i
   = FnMax (Expr i) (Maybe i ~ o)
   | FnCount (Expr i) (String ~ o)
+
+data InArray o i = InArray (Expr i) (Array (Expr i)) (Boolean ~ o)
 
 primPGEscape ∷ String → String
 primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
@@ -75,6 +80,7 @@ showExpr = case _ of
   EBinOp e → runExists showBinExp e
   EUnOp e → runExists showUnExp e
   EFn fn → runExists showFn fn
+  EInArray e → runExists showInArray e
 
 showBinExp ∷ ∀ o i. BinExp o i → String
 showBinExp (BinExp op e1 e2) = "(" <> showExpr e1 <> showBinOp op <> showExpr e2 <> ")"
@@ -83,8 +89,14 @@ showUnExp ∷ ∀ o i. UnExp o i → String
 showUnExp (UnExp op e) = (\s → "(" <> s <> ")") $
   case op of 
     IsNull _ → showExpr e <> " IS NOT NULL"
+    Not _ _ → "NOT " <> showExpr e
 
 showFn ∷ ∀ o i. Fn o i → String
 showFn = case _ of
   FnMax e _ → "max(" <> showExpr e <> ")"
   FnCount e _ → "count(" <> showExpr e <> ")"
+
+showInArray ∷ ∀ o i. InArray o i → String
+showInArray (InArray x xs _) = "(" <> showExpr x <> " IN " <> "(" <> l <> "))"
+  where
+    l = joinWith ", " $ map showExpr xs
