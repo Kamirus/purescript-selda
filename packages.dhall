@@ -112,37 +112,37 @@ let mkPackage =
       https://raw.githubusercontent.com/purescript/package-sets/psc-0.13.2-20190725/src/mkPackage.dhall sha256:0b197efa1d397ace6eb46b243ff2d73a3da5638d8d0ac8473e8e4a8fc528cf57
 
 let upstream =
-      https://raw.githubusercontent.com/purescript/package-sets/psc-0.13.2-20190725/src/packages.dhall sha256:60cc03d2c3a99a0e5eeebb16a22aac219fa76fe6a1686e8c2bd7a11872527ea3
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.3-20190920/packages.dhall sha256:53873cf2fc4a343a41f335ee47c1706ecf755ac7c5a336e8eb03ad23165dfd28
 
 let overrides = {=}
 
-let additions = {
-  postgresql-client =
-      mkPackage
-      [ "aff"
-      , "arrays"
-      , "bifunctors"
-      , "bytestrings"
-      , "datetime"
-      , "decimals"
-      , "effect"
-      , "either"
-      , "exceptions"
-      , "foldable-traversable"
-      , "foreign"
-      , "foreign-generic"
-      , "foreign-object"
-      , "js-date"
-      , "lists"
-      , "maybe"
-      , "newtype"
-      , "nullable"
-      , "prelude"
-      , "transformers"
-      , "tuples"
-      ]
-     "https://github.com/rightfold/purescript-postgresql-client.git"
-     "master"
-}
+let additions =
+      { postgresql-client =
+          mkPackage
+          [ "aff"
+          , "arrays"
+          , "bifunctors"
+          , "bytestrings"
+          , "datetime"
+          , "decimals"
+          , "effect"
+          , "either"
+          , "exceptions"
+          , "foldable-traversable"
+          , "foreign"
+          , "foreign-generic"
+          , "foreign-object"
+          , "js-date"
+          , "lists"
+          , "maybe"
+          , "newtype"
+          , "nullable"
+          , "prelude"
+          , "transformers"
+          , "tuples"
+          ]
+          "https://github.com/rightfold/purescript-postgresql-client.git"
+          "master"
+      }
 
 in  upstream // overrides // additions

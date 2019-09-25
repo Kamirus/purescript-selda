@@ -63,7 +63,7 @@ pgQuery
   ⇒ PostgreSQL.Query i o → i → m (Array o)
 pgQuery q xTup = do
   conn ← ask
-  PostgreSQL.PG.hoistWith identity $ PostgreSQL.PG.query conn q xTup
+  PostgreSQL.PG.query conn q xTup
 
 pgExecute
   ∷ ∀ i o m
@@ -72,7 +72,7 @@ pgExecute
   ⇒ PostgreSQL.Query i o → i → m Unit
 pgExecute q xTup = do
   conn ← ask
-  PostgreSQL.PG.hoistWith identity $ PostgreSQL.PG.execute conn q xTup
+  PostgreSQL.PG.execute conn q xTup
 
 -- | Executes an insert query for each input record.
 insert_
