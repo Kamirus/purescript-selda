@@ -196,6 +196,12 @@ Above error message will appear even without the type annotation.
 
 ## Execution
 
+Now we will show how to execute queries and perform insert operations using `purescript-selda`.
+We perform these actions in a monad that satisfies three constraints: `MonadAff m, MonadError PGError m, MonadReader PostgreSQL.Connection m`.
+There is a provided shortcut for these classes called `MonadSelda m`.
+
+If your context in a `Reader` or the error type in `Except` are different then it is necessary to write a *hoist* function that transforms `MonadSelda` to your monad stack.
+
 ```purescript
 app ∷ ∀ m. MonadSelda m ⇒ m Unit
 app = do
@@ -209,16 +215,27 @@ app = do
     , { id: 2, personId: 1, balance: 150 }
     , { id: 3, personId: 3, balance: 300 }
     ]
+```
+Let's start with some insert operations, so we have something in the database to work with.
+```purescript
 
   log $ showQuery qNamesWithBalance
   query qNamesWithBalance >>= logShow
-
+```
+We execute a query by calling `query` and as a result we get an array of records.
+We can also get SQL string literal from a query using `showQuery` function.
+```purescript
   log $ showQuery qBankAccountOwnersWithBalance
   query qBankAccountOwnersWithBalance >>= logShow
 
   log $ showQuery qCountBankAccountOwners
   query qCountBankAccountOwners >>= logShow
+```
 
+Now we will finally write the `main` that will interpret our `app`.
+We start with getting the database connection ready.
+
+```purescript
 main ∷ Effect Unit
 main = do
   pool ← PostgreSQL.newPool dbconfig
@@ -226,6 +243,10 @@ main = do
     PostgreSQL.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)
       Right conn → do
+```
+When we've got the connection we can create the database tables and then run our monad stack.
+We are going to wrap everything in a transaction and do a rollback at the end.
+```purescript
         execute "BEGIN TRANSACTION" conn
 
         createPeople conn
