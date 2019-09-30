@@ -9,6 +9,7 @@ import Data.String (joinWith)
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Prim.RowList (kind RowList)
 import Selda.Table (Column, showColumn)
+import Unsafe.Coerce (unsafeCoerce)
 
 data Literal a
   = LBoolean Boolean (Boolean ~ a)
@@ -37,7 +38,10 @@ data Expr o
   | EBinOp (Exists (BinExp o))
   | EUnOp (Exists (UnExp o))
   | EFn (Exists (Fn o))
-  | EInArray (Exists (InArray o)) 
+  | EInArray (Exists (InArray o))
+-- derive instance exprFunctor ∷ Functor Expr
+instance exprFunctor ∷ Functor Expr where
+  map _ = unsafeCoerce
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 

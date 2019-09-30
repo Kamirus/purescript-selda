@@ -24,6 +24,7 @@ type Alias = String
 type AliasedTable = { name ∷ String, alias ∷ Alias }
 
 newtype Column a = Column { namespace ∷ Alias, name ∷ String }
+derive instance columnFunctor ∷ Functor Column
 
 showColumn ∷ ∀ a. Column a → String
 showColumn (Column { namespace, name }) =

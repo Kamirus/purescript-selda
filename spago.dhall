@@ -13,6 +13,7 @@ You can edit this file as you like.
     , "strings"
     , "transformers"
     , "test-unit"
+    , "variant"
     ]
 , packages =
     ./packages.dhall
