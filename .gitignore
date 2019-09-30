@@ -9,3 +9,6 @@
 /.psa*
 
 package-lock.json
+
+# generated literate files
+guide/src/*

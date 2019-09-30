@@ -1,7 +1,7 @@
 # Simple End-to-End Example
 
-```purescipt
-module Main where
+```purescript
+module Guide.SimpleE2E where
 
 import Prelude
 
@@ -32,11 +32,11 @@ dbconfig = (PostgreSQL.defaultPoolConfiguration "purspg")
 
 Now we should create some tables in our database.
 We will use the `postgresql-client` to get the job done.
-To do so we define a auxiliary function `createTable` that takes the SQL string literal with table definition, executes it and simply throws an error if something went wrong.
+To do so we define a auxiliary function `execute` that takes the SQL string literal, executes it and simply throws an error if something went wrong.
 
 ```purescript
-createTable ∷ String → PostgreSQL.Connection → Aff Unit
-createTable sql conn = do
+execute ∷ String → PostgreSQL.Connection → Aff Unit
+execute sql conn = do
   PostgreSQL.execute conn (PostgreSQL.Query sql) PostgreSQL.Row0
     >>= maybe (pure unit) (throwError <<< error <<< show)
 ```
@@ -45,7 +45,7 @@ The function that creates our first table - `people` - is defined below.
 
 ```purescript
 createPeople ∷ PostgreSQL.Connection → Aff Unit
-createPeople = createTable """
+createPeople = execute """
   DROP TABLE IF EXISTS people;
   CREATE TABLE people (
     id INTEGER PRIMARY KEY,
@@ -71,7 +71,7 @@ Similarly we create second table - `bankAccounts`.
 
 ```purescript
 createBankAccounts ∷ PostgreSQL.Connection → Aff Unit
-createBankAccounts = createTable """
+createBankAccounts = execute """
   DROP TABLE IF EXISTS bank_accounts;
   CREATE TABLE bank_accounts (
     id INTEGER PRIMARY KEY,
@@ -100,12 +100,12 @@ qNamesWithBalance =
 
 Before we explain every operation used let's look how the generated SQL for this query looks like
 
-```sql
+  ```sql
   SELECT people_0.name AS name, bank_accounts_1.balance AS balance
   FROM people people_0
   LEFT JOIN bank_accounts bank_accounts_1 ON ((people_0.id = bank_accounts_1.personId))
   WHERE (people_0.id > 1)
-```
+  ```
 
 We define a query using the `selectFrom` function.
 It takes two arguments: a table definition and a function that takes a record of table's columns and returns a query description.
@@ -169,8 +169,12 @@ main = do
     PostgreSQL.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)
       Right conn → do
+        execute "BEGIN TRANSACTION" conn
+
         createPeople conn
         createBankAccounts conn
 
         runReaderT (runExceptT app) conn >>= either logShow pure
+
+        execute "ROLLBACK TRANSACTION" conn
 ```

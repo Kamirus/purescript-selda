@@ -12,6 +12,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
+import Guide.SimpleE2E as Guide.SimpleE2E
 import Prim.RowList as RL
 import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
 import Selda.Col (class GetCols)
@@ -40,6 +41,10 @@ employees = Table { name: "employees" }
 
 main ∷ Effect Unit
 main = do
+  -- run literate guides
+  Guide.SimpleE2E.main
+
+  -- integration test suite
   pool ← PG.newPool dbconfig
   void $ launchAff do
     PG.withConnection pool case _ of
