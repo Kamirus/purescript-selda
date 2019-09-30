@@ -32,7 +32,7 @@ dbconfig = (PostgreSQL.defaultPoolConfiguration "purspg")
 
 Now we should create some tables in our database.
 We will use the `postgresql-client` to get the job done.
-To do so we define a auxiliary function `execute` that takes the SQL string literal, executes it and simply throws an error if something went wrong.
+To do so we define an auxiliary function `execute` that takes the SQL string literal, executes it and if something went wrong throws an error.
 
 ```purescript
 execute ∷ String → PostgreSQL.Connection → Aff Unit
@@ -54,7 +54,7 @@ createPeople = execute """
   );"""
 ```
 
-To represent this table definition in PureScript, we use a `Table` type which is parameterized by a *row of types* that describes the columns and their types from the database.
+To represent this table definition in PureScript, we use a `Table` type which is parameterized by a *row of types* that describes the columns and their types in the database.
 
 Please note that `purescript-selda` does not handle schema modification, such as table creation, we are doing it manually using `postgresql-client`.
 So it is important to correctly define the tables and types for its columns.
@@ -63,11 +63,15 @@ Notice that `name` column has `NOT NULL` constraint, unlike the `age` column.
 We use `Maybe` for type of nullable columns.
 
 ```purescript
-people ∷ Table (id ∷ Int, name ∷ String, age ∷ Maybe Int)
+people ∷ Table 
+  ( id ∷ Int
+  , name ∷ String
+  , age ∷ Maybe Int
+  )
 people = Table { name: "people" }
 ```
 
-Similarly we create second table - `bankAccounts`.
+Similarly we create a second table - `bankAccounts`.
 
 ```purescript
 createBankAccounts ∷ PostgreSQL.Connection → Aff Unit
@@ -79,16 +83,20 @@ createBankAccounts = execute """
     balance INTEGER NOT NULL
   );"""
 
-bankAccounts ∷ Table ( personId ∷ Int, id ∷ Int, balance ∷ Int)
+bankAccounts ∷ Table
+  ( id ∷ Int
+  , personId ∷ Int
+  , balance ∷ Int
+  )
 bankAccounts = Table { name: "bank_accounts" }
 ```
+
+## First Query
 
 Since we have defined table definitions, we can write some queries.
 Let's start with a simple `LEFT JOIN` query with some arbitrary condition in the `WHERE` clause.
 
 ```purescript
--- Why is it worth to create queries of FullQuery type? to reuse in other queries
--- simple query with left join, some arbitrary where with restrict
 qNamesWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s (Maybe Int) }
 qNamesWithBalance = 
@@ -98,7 +106,7 @@ qNamesWithBalance =
     pure { name, balance }
 ```
 
-Before we explain every operation used let's look how the generated SQL for this query looks like
+And below is the generated SQL for the query `qNamesWithBalance`.
 
   ```sql
   SELECT people_0.name AS name, bank_accounts_1.balance AS balance
@@ -107,19 +115,23 @@ Before we explain every operation used let's look how the generated SQL for this
   WHERE (people_0.id > 1)
   ```
 
-We define a query using the `selectFrom` function.
-It takes two arguments: a table definition and a function that takes a record of table's columns and returns a query description.
-Operations such as `restrict` and `leftJoin` modify the state of the query.
-For example: the `leftJoin` call in the query above adds the `LEFT JOIN` clause.
-At the end we pick which columns should be included in the result.
+We define a query using the `selectFrom` function by providing a table definition and a function that takes a record of columns from the table and returns a *query description*.
+Operations such as `restrict` and `leftJoin` modify the state of the query, or as we called it earlier - *query description*.
 
-Notice that `leftJoin` also changes the types in a column's record. The `balance` column is nullable in that context, so it has type `Maybe Int`.
+<!-- For example: the `leftJoin` call in the query above adds the `LEFT JOIN` clause.
+At the end we pick which columns should be included in the result. -->
+
+<!-- First let's look at the line with the `restrict` call.
+We want to query only these people that have `id` greater then `1`.
+To express this we use the operator `.>` defined by `selda` and we precede `1` by calling `lit`, because we are dealing with abstract values (of type `Col s a`) that represent database values like columns, literals, expressions, etc. -->
+
+Notice that `leftJoin` also changes the types in a column's record. The `balance` column is nullable in that context, so it represents a value of type `Maybe Int`.
+
+## Nested Query
 
 We can use the previously defined `qNamesWithBalance` as a subquery to filter out the null values in the `balance` column.
 
 ```purescript
--- we can reuse other queries to use them as subqueries
--- notNull changes the balance type, filtering only results with Just values
 qBankAccountOwnersWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s Int }
 qBankAccountOwnersWithBalance = 
@@ -128,7 +140,22 @@ qBankAccountOwnersWithBalance =
     pure { name, balance }
 ```
 
+We used the `selectFrom_` function which is similar to the `selectFrom` that we saw earlier, but instead of *table definition* we provide a nested query as its first argument. 
 
+In the *query description* we filter out the null values in balance.
+It adds to the `WHERE` clause that `balance IS NOT NULL` and it returns a column representation `Col s Int` instead of `Col s (Maybe Int)`.
+
+## Aggregation
+
+We would like to know how many people have a bank account.
+To do this we first write a query that returns `personId` from `bankAccounts` without duplicates.
+We accomplish that using aggregation: we are groupping by `personId` column and simply return the only aggregated column.
+
+Queries that use aggregation can be problematic.
+Only aggregated columns and results of aggregate functions can appear in the result.
+To prevent some such runtime errors, we added separate representation for aggregate values (`Aggr s a`) which is only returned by `groupBy` and aggregate functions like `count` and `max_`.
+Mixing `Col` and `Aggr` is not allowed and it will result in a type error.
+To validate and use the query (nest it or execute it) we have to call `aggregate` function that changes the `Aggr` into `Col`.
 
 ```purescript
 qCountBankAccountOwners
@@ -139,7 +166,37 @@ qCountBankAccountOwners =
       pid ← groupBy personId
       pure { pid })
     \{ pid } → pure { numberOfOwners: count pid }
+```
 
+## Type Errors
+
+Sometimes we do something wrong and it (hopefully) results in a type error (and not a runtime error).
+We would like to get useful error messages that lead us to the source of the problem, but when a library heavily uses generic programming on type classes it is not always possible...
+
+In the example query `qCountBankAccountOwners` above, when we forget the `aggregate` call, use `personId` instead of `pid` in the result or include `id` in the result we will get following error message:
+
+  ```
+  No type class instance was found for Heterogeneous.Mapping.Mapping OuterCols t4 t5
+  The instance head contains unknown type variables. Consider adding a type annotation
+  ```
+
+Without knowing some implementation details this message is not really helpful.
+We can mitigate the problem with these error messages, by providing a type annotation for the nested query or define it as top-level value.
+
+```purescript
+qBankAccountOwnerIds ∷ ∀ s. FullQuery s { pid ∷ Col s Int }
+qBankAccountOwnerIds = 
+  aggregate $ selectFrom bankAccounts \{ id, personId } → do
+    pid ← groupBy personId
+    pure { pid }
+```
+
+Now if we use `id` or `personId` in the result we will get custom error message in the line with `aggregate` call: `field 'pid' is not aggregated. Its type should be 'Aggr _ _'`.
+Above error message will appear even without the type annotation.
+
+## Execution
+
+```purescript
 app ∷ ∀ m. MonadSelda m ⇒ m Unit
 app = do
   insert_ people
