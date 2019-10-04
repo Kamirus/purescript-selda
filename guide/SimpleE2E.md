@@ -11,15 +11,18 @@ module Guide.SimpleE2E where
 
 import Prelude
 
-import Control.Monad.Except (runExceptT, throwError)
-import Control.Monad.Reader (runReaderT)
+import Control.Monad.Except (class MonadError, ExceptT, runExceptT, throwError)
+import Control.Monad.Reader (class MonadReader, ReaderT, asks, runReaderT)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Variant (SProxy(..), Variant, inj)
+import Database.PostgreSQL (PGError)
 import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
-import Selda (class MonadSelda, Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
+import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
 ```
 ## Setup
@@ -239,39 +242,80 @@ Now we will show how to execute queries and perform insert operations using `pur
 We perform these actions in a monad that satisfies three constraints: `MonadAff m, MonadError PGError m, MonadReader PostgreSQL.Connection m`.
 There is a provided shortcut for these classes called `MonadSelda m`.
 
-If your context in a `Reader` or the error type in `Except` are different then it is necessary to write a *hoist* function that transforms `MonadSelda` to your monad stack.
+In the example below, we'll use an incompatible monad stack to show what to do in this situation.
+Our Reader's context will be a record and for en error type we will use polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
 
 ```purescript
-app ∷ ∀ m. MonadSelda m ⇒ m Unit
+type Context = 
+  { conn ∷ PostgreSQL.Connection
+  , other ∷ String
+  }
+type AppError = Variant
+  ( pgError ∷ PGError
+  , error ∷ String
+  )
+_pgError = SProxy ∷ SProxy "pgError"
+type App = ReaderT Context (ExceptT AppError Aff)
+
+runApp ∷ ∀ a. Context → App a → Aff (Either AppError a)
+runApp ctx m = runExceptT $ runReaderT m ctx
+```
+
+We define a hoist function that will transform a basic `MonadSelda` stack instance into a more general one that will be suitable for our `App` monad.
+
+```purescript
+hoistSeldaWith
+  ∷ ∀ e m r
+  . MonadAff m
+  ⇒ MonadError e m
+  ⇒ MonadReader r m
+  ⇒ (PGError → e)
+  → (r → PostgreSQL.Connection)
+  → ExceptT PGError (ReaderT PostgreSQL.Connection Aff) ~> m
+hoistSeldaWith fe fr m = do
+  conn ← asks fr
+  runReaderT (runExceptT m) conn # liftAff
+    >>= either (throwError <<< fe) pure
+
+hoistSelda
+  ∷ ∀ e r m
+  . MonadReader { conn ∷ PostgreSQL.Connection | r } m
+  ⇒ MonadError (Variant ( pgError ∷ PGError | e )) m
+  ⇒ MonadAff m
+  ⇒ ExceptT PGError (ReaderT PostgreSQL.Connection Aff) ~> m
+hoistSelda = hoistSeldaWith (inj _pgError) (_.conn)
+
+app ∷ App Unit
 app = do
-  insert_ people
+  hoistSelda $ insert_ people
     [ { id: 1, name: "name1", age: Just 11 }
     , { id: 2, name: "name2", age: Just 22 }
     , { id: 3, name: "name3", age: Just 33 }
     ]
-  insert_ bankAccounts
+  hoistSelda $ insert_ bankAccounts
     [ { id: 1, personId: 1, balance: 100 }
     , { id: 2, personId: 1, balance: 150 }
     , { id: 3, personId: 3, balance: 300 }
     ]
 ```
 Let's start with some insert operations, so we have something in the database to work with.
+`hoistSelda` is needed to lift these operations to the `App` monad.
 ```purescript
-
-  log $ showQuery qNamesWithBalance
-  query qNamesWithBalance >>= logShow
+  hoistSelda do
+    log $ showQuery qNamesWithBalance
+    query qNamesWithBalance >>= logShow
 ```
 We execute a query by calling `query` and as a result we get an array of records.
 We can also get SQL string literal from a query using `showQuery` function.
 ```purescript
-  log $ showQuery qBankAccountOwnersWithBalance
-  query qBankAccountOwnersWithBalance >>= logShow
+    log $ showQuery qBankAccountOwnersWithBalance
+    query qBankAccountOwnersWithBalance >>= logShow
 
-  log $ showQuery qCountBankAccountOwners
-  query qCountBankAccountOwners >>= logShow
+    log $ showQuery qCountBankAccountOwners
+    query qCountBankAccountOwners >>= logShow
 
-  -- query qPersonsMaxBalance >>= logShow
-  -- TYPE ERROR
+    -- query qPersonsMaxBalance >>= logShow
+    -- TYPE ERROR
 ```
 
 Now we will finally write the `main` that will interpret our `app`.
@@ -294,7 +338,7 @@ We are going to wrap everything in a transaction and do a rollback at the end.
         createPeople conn
         createBankAccounts conn
 
-        runReaderT (runExceptT app) conn >>= either logShow pure
+        runApp { conn, other: "other" } app >>= either logShow pure
 
         execute "ROLLBACK TRANSACTION" conn
 ```
