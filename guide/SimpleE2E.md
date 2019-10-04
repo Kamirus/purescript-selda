@@ -153,9 +153,9 @@ We can use the previously defined `qNamesWithBalance` as a subquery to filter ou
 qBankAccountOwnersWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s Int }
 qBankAccountOwnersWithBalance = 
-  selectFrom_ qNamesWithBalance \{ name, balance: nullableBalance } → do
-    balance ← notNull nullableBalance
-    pure { name, balance }
+  selectFrom_ qNamesWithBalance \r → do
+    balance ← notNull r.balance
+    pure $ r { balance = balance }
 ```
 
 We used the `selectFrom_` function which is similar to the `selectFrom` that we saw earlier, but instead of *table definition* we provide a nested query as its first argument. 
