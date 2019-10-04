@@ -127,6 +127,12 @@ To express this we use the operator `.>` defined by `selda` and we precede `1` b
 
 Notice that `leftJoin` also changes the types in a column's record. The `balance` column is nullable in that context, so it represents a value of type `Maybe Int`.
 
+The return type of the operations like `restrict` and `leftJoin` is `Query s _`, contrary to the return type of the `selectFrom` which is `FullQuery s _`.
+The difference between them is very subtle. 
+The idea is that `FullQuery` means a *fully described query*, so it can be used as a nested query or executed.
+Without the distinction one could write just a `restrict` (or `leftJoin`) operation and execute this 'query'.
+Everything would typecheck, but in the runtime we would get a query without any table name in the `FROM` clause (like: `SELECT ... FROM ??? WHERE ...`).
+
 ## Nested Query
 
 We can use the previously defined `qNamesWithBalance` as a subquery to filter out the null values in the `balance` column.
