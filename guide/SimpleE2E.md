@@ -13,7 +13,8 @@ import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
 import Effect.Class.Console (log, logShow)
-import Selda (class MonadSelda, Col, FullQuery, Table(..), aggregate, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
+import Selda (class MonadSelda, Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
+import Selda.Aggr (Aggr)
 ```
 
 First we have to setup the database.
@@ -71,7 +72,8 @@ people ∷ Table
 people = Table { name: "people" }
 ```
 
-Similarly we create a second table - `bankAccounts`.
+Similarly we create a second table and provide its table definition - `bankAccounts`.
+The name of the table in the database - here it's `bank_accounts` - is passed as string in the record for the `Table` constructor.
 
 ```purescript
 createBankAccounts ∷ PostgreSQL.Connection → Aff Unit
@@ -127,7 +129,7 @@ To express this we use the operator `.>` defined by `selda` and we precede `1` b
 
 Notice that `leftJoin` also changes the types in a column's record. The `balance` column is nullable in that context, so it represents a value of type `Maybe Int`.
 
-The return type of the operations like `restrict` and `leftJoin` is `Query s _`, contrary to the return type of the `selectFrom` which is `FullQuery s _`.
+The return type of operations like `restrict` and `leftJoin` is `Query s _`, contrary to the return type of the `selectFrom` which is `FullQuery s _`.
 The difference between them is very subtle. 
 The idea is that `FullQuery` means a *fully described query*, so it can be used as a nested query or executed.
 Without the distinction one could write just a `restrict` (or `leftJoin`) operation and execute this 'query'.
@@ -200,6 +202,30 @@ qBankAccountOwnerIds =
 Now if we use `id` or `personId` in the result we will get custom error message in the line with `aggregate` call: `field 'pid' is not aggregated. Its type should be 'Aggr _ _'`.
 Above error message will appear even without the type annotation.
 
+Let us consider another query that will find maximum balance for each person.
+We will do this intentionally wrong to show what will happen if we try to execute it (which we cover in the next chapter).
+
+```purescript
+qPersonsMaxBalance
+  ∷ ∀ s. FullQuery s { pid ∷ Col s Int, maxBalance ∷ Aggr s (Maybe Int) }
+qPersonsMaxBalance =
+  selectFrom people \{ id: pid } → do
+    b ← leftJoin bankAccounts \b → b.personId .== pid
+    balance ← notNull b.balance
+    pure { pid, maxBalance: max_ balance }
+```
+
+In the query above we did not use the `groupBy` operation on the `personId` column, but we used the aggregate function `max_`.
+Every value in the resulting record has to be groupped by or come from aggregate function.
+When we try to execute `qPersonsMaxBalance`, we get the following error message: 
+  ```
+  A custom type error occurred while solving type class constraints:
+    balance is not Col or the scope 's' is wrong
+  ```
+
+An inquisitive reader might spot that `maxBalance` is nullable despite that we called `notNull` on `balance` column.
+The aggregate function `max_` returns nullable values, because SQL's function `MAX` returns a null when the data set is empty and there is nothing to aggregate.
+
 ## Execution
 
 Now we will show how to execute queries and perform insert operations using `purescript-selda`.
@@ -236,6 +262,9 @@ We can also get SQL string literal from a query using `showQuery` function.
 
   log $ showQuery qCountBankAccountOwners
   query qCountBankAccountOwners >>= logShow
+
+  -- query qPersonsMaxBalance >>= logShow
+  -- TYPE ERROR
 ```
 
 Now we will finally write the `main` that will interpret our `app`.
