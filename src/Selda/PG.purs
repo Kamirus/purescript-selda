@@ -2,14 +2,13 @@ module Selda.PG
   ( class MonadSelda
   , insert_
   , insert
-  , showInsert1
+  -- , showInsert1
   , query
-  , showQuery
-  , selectFrom
+  -- , showQuery
   , deleteFrom
-  , showDeleteFrom
+  -- , showDeleteFrom
   , update
-  , showUpdate
+  -- , showUpdate
   ) where
 
 import Prelude
@@ -19,6 +18,7 @@ import Control.Monad.Reader (class MonadReader, ask)
 import Data.Array (concat)
 import Data.Array as Array
 import Data.Exists (runExists)
+import Data.Functor.Variant (VariantF, match)
 import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
@@ -30,8 +30,8 @@ import Effect.Aff.Class (class MonadAff)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
-import Selda.Col (class GetCols, Col, getCols, showCol)
-import Selda.Expr (showExpr)
+import Selda.Col (class GetCols, Col(..), ExistsExpr, getCols)
+import Selda.Expr (Expr, showExpr)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, mkTupleToRecord, rowListLength, tableToColsWithoutAlias)
 import Selda.Query (class FromTable)
@@ -39,39 +39,48 @@ import Selda.Query (selectFrom) as Query
 import Selda.Query.Type (FullQuery, Query, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
+import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 
 class 
   ( MonadAff m
   , MonadError PGError m
-  , MonadReader PostgreSQL.Connection m
-  ) <= MonadSelda m
+  , MonadReader
+      { conn ∷ PostgreSQL.Connection
+      , showV ∷ ExistsExpr v → String
+      }
+      m
+  ) <= MonadSelda m v
 
 instance monadSeldaInstance
   ∷ ( MonadAff m
     , MonadError PGError m
-    , MonadReader PostgreSQL.Connection m
+    , MonadReader
+        { conn ∷ PostgreSQL.Connection
+        , showV ∷ ExistsExpr v → String
+        }
+        m
     )
-  ⇒ MonadSelda m
+  ⇒ MonadSelda m v
 
 pgQuery 
-  ∷ ∀ i o m
+  ∷ ∀ i o m v
   . ToSQLRow i
   ⇒ FromSQLRow o
-  ⇒ MonadSelda m 
+  ⇒ MonadSelda m v
   ⇒ PostgreSQL.Query i o → i → m (Array o)
 pgQuery q xTup = do
-  conn ← ask
+  { conn } ← ask
   PostgreSQL.PG.query conn q xTup
 
 pgExecute
   ∷ ∀ i o m
   . ToSQLRow i
-  ⇒ MonadSelda m 
+  ⇒ MonadSelda m
   ⇒ PostgreSQL.Query i o → i → m Unit
 pgExecute q xTup = do
-  conn ← ask
+  { conn } ← ask
   PostgreSQL.PG.execute conn q xTup
 
 -- | Executes an insert query for each input record.
@@ -131,71 +140,65 @@ showInsert1 (Table { name }) colsToinsert =
     <> "RETURNING " <> cols
 
 query
-  ∷ ∀ o i tup s m
+  ∷ ∀ o i tup s m v
   . ColsToPGHandler s i tup o
-  ⇒ GetCols i
+  ⇒ GetCols i v
   ⇒ FromSQLRow tup
-  ⇒ MonadSelda m
-  ⇒ FullQuery s (Record i) → m (Array (Record o))
+  ⇒ MonadSelda m v
+  ⇒ FullQuery s v (Record i) → m (Array (Record o))
 query q = do
+  { showV } ← ask
   let (Tuple res _) = runQuery $ unwrap q
   rows ← pgQuery (PostgreSQL.Query (showQuery q)) PostgreSQL.Row0
   pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
-
-showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → String
-showQuery q = showState st
-  where
-    (Tuple res st') = runQuery $ unwrap q
-    st = st' { cols = getCols res }
-
-selectFrom
-  ∷ ∀ cols o i r s tup m
-  . ColsToPGHandler s i tup o
-  ⇒ FromSQLRow tup
-  ⇒ FromTable s r cols
-  ⇒ GetCols i
-  ⇒ MonadSelda m
-  ⇒ Table r → ({ | cols } → Query s { | i }) → m (Array (Record o))
-selectFrom table q = query (Query.selectFrom table q)
+    where
+    -- showQuery ∷ ∀ i s v. GetCols i v ⇒ FullQuery s v (Record i) → String
+    showQuery q = showState showV st
+      where
+        (Tuple res st') = runQuery $ unwrap q
+        st = st' { cols = getCols res (RProxy ∷ RProxy v) }
 
 deleteFrom
-  ∷  ∀ r s r' m
+  ∷  ∀ r s r' m v
   . TableToColsWithoutAlias r r'
   ⇒ MonadSelda m
-  ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
-deleteFrom table pred = 
+  ⇒ (∀ a. VariantF v a → String)
+  → Table r → ({ | r' } → Col s v Boolean) → m Unit
+deleteFrom showV table pred =
   pgExecute (PostgreSQL.Query (showDeleteFrom table pred)) PostgreSQL.Row0
-
-showDeleteFrom
-  ∷  ∀ r s r'
-  . TableToColsWithoutAlias r r'
-  ⇒ Table r → ({ | r' } → Col s Boolean) → String
-showDeleteFrom table@(Table { name }) pred = 
-  "DELETE FROM " <> name <> " WHERE " <> pred_str
     where
-      recordWithCols = tableToColsWithoutAlias table
-      pred_str = showCol $ pred recordWithCols
+  -- showDeleteFrom
+  --   ∷  ∀ r s r'
+  --   . TableToColsWithoutAlias r r'
+  --   ⇒ Table r → ({ | r' } → Col s Boolean) → String
+    showDeleteFrom table@(Table { name }) pred = 
+      "DELETE FROM " <> name <> " WHERE " <> pred_str
+        where
+          recordWithCols = tableToColsWithoutAlias table
+          pred_str = showV $ unwrap $ pred recordWithCols
 
 update
-  ∷  ∀ r s r' m
+  ∷  ∀ r s r' m v
   . TableToColsWithoutAlias r r'
-  ⇒ GetCols r'
+  ⇒ GetCols r' v
   ⇒ MonadSelda m
-  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → m Unit
-update table pred up =
-  pgExecute (PostgreSQL.Query (showUpdate table pred up)) PostgreSQL.Row0
+  ⇒ (∀ a. VariantF v a → String)
+  → Table r → ({ | r' } → Col s v Boolean) → ({ | r' } → { | r' }) → m Unit
+update showV table@(Table { name }) pred up = do
+  pgExecute (PostgreSQL.Query (showUpdate showV table pred up)) PostgreSQL.Row0
 
 showUpdate
-  ∷  ∀ r s r'
+  ∷  ∀ r s r' v
   . TableToColsWithoutAlias r r'
-  ⇒ GetCols r'
-  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → String
-showUpdate table@(Table { name }) pred up =
+  ⇒ GetCols r' v
+  ⇒ (∀ a. VariantF v a → String)
+  → Table r → ({ | r' } → Col s v Boolean) → ({ | r' } → { | r' }) → String
+showUpdate showV table@(Table { name }) pred up =
   "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
     where
       recordWithCols = tableToColsWithoutAlias table
-      pred_str = showCol $ pred recordWithCols
+      pred_str = showV $ unwrap $ pred recordWithCols
       vals =
-        getCols (up recordWithCols)
-          # map (\(Tuple n e) → n <> " = " <> runExists showExpr e)
+        getCols (up recordWithCols) (RProxy ∷ RProxy v)
+          # map (\(Tuple n e) → n <> " = " <> runExists showV e)
           # joinWith ", "
