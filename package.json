@@ -16,5 +16,8 @@
   "dependencies": {
     "decimal.js": "^10.0.1",
     "pg": "^7.6.0"
+  },
+  "devDependencies": {
+    "paluh-litps": "^0.1.4"
   }
 }

@@ -1,5 +1,11 @@
 # Simple End-to-End Example
 
+## Preface
+
+This guide is a literate PureScript file, which is designed to be a standalone runnable example (executed before the actual test suite).
+So it is quite verbose and in the [Setup](#setup) chapter we do some schema modifications that would normally by in a separate script.
+Just have it in mind while reading :wink:
+
 ```purescript
 module Guide.SimpleE2E where
 
@@ -16,6 +22,7 @@ import Effect.Class.Console (log, logShow)
 import Selda (class MonadSelda, Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
 ```
+## Setup
 
 First we have to setup the database.
 We create a db called *purspg* and a user.
