@@ -24,6 +24,7 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
 import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
+import Selda.Table.Constraint (Auto, Default)
 ```
 ## Setup
 
@@ -82,26 +83,35 @@ people ∷ Table
 people = Table { name: "people" }
 ```
 
-Similarly we create a second table and provide its table definition - `bankAccounts`.
-The name of the table in the database - here it's `bank_accounts` - is passed as string in the record for the `Table` constructor.
+Sometimes we want the database to create values for some columns automatically.
+So we could not be able to insert these manually, but still have an opportunity to query whole rows from a table.
+Similarly other columns may be optional - with default value.
+
+We will present what to do in such situations by defining a table `bankAccounts` with an auto-increment value and a column with a default value.
 
 ```purescript
 createBankAccounts ∷ PostgreSQL.Connection → Aff Unit
 createBankAccounts = execute """
   DROP TABLE IF EXISTS bank_accounts;
   CREATE TABLE bank_accounts (
-    id INTEGER PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     personId INTEGER NOT NULL,
-    balance INTEGER NOT NULL
+    balance INTEGER NOT NULL DEFAULT 100
   );"""
 
 bankAccounts ∷ Table
-  ( id ∷ Int
+  ( id ∷ Auto Int
   , personId ∷ Int
-  , balance ∷ Int
+  , balance ∷ Default Int
   )
 bankAccounts = Table { name: "bank_accounts" }
 ```
+
+We express that a column value is assigned automatically by wrapping its type in a `Auto` constructor, likewise `Default` for columns that can we optionally specify for the `insert` operation.
+
+Using a *constraint constructor* (`Auto`, `Default`) only affects `insert` operation.
+A column with `Auto` constraint cannot be inserted, while `Default` columns can be either omitted or provided.
+Other operations ignore these constraints and automatically unwrap it so queries return `Int` and not `Auto Int`.
 
 ## First Query
 
@@ -136,8 +146,11 @@ At the end we pick which columns should be included in the result. -->
 <!-- First let's look at the line with the `restrict` call.
 We want to query only these people that have `id` greater then `1`.
 To express this we use the operator `.>` defined by `selda` and we precede `1` by calling `lit`, because we are dealing with abstract values (of type `Col s a`) that represent database values like columns, literals, expressions, etc. -->
-
+We write a join condition as a function that takes a record of columns from a table we are joining and return a boolean expression.
 Notice that `leftJoin` also changes the types in a column's record. The `balance` column is nullable in that context, so it represents a value of type `Maybe Int`.
+
+
+#### Query vs. FullQuery
 
 The return type of operations like `restrict` and `leftJoin` is `Query s _`, contrary to the return type of the `selectFrom` which is `FullQuery s _`.
 The difference between them is very subtle. 
@@ -240,10 +253,10 @@ The aggregate function `max_` returns nullable values, because SQL's function `M
 
 Now we will show how to execute queries and perform insert operations using `purescript-selda`.
 We perform these actions in a monad that satisfies three constraints: `MonadAff m, MonadError PGError m, MonadReader PostgreSQL.Connection m`.
-There is a provided shortcut for these classes called `MonadSelda m`.
+There is a provided 'shortcut' for these classes called `MonadSelda m`.
 
-In the example below, we'll use an incompatible monad stack to show what to do in this situation.
-Our Reader's context will be a record and for en error type we will use polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
+In the example below, we'll use an incompatible monad stack with the `MonadSelda` constraint to show what to do in this situation.
+Our Reader's context will be a record and for an error type we will use a polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
 
 ```purescript
 type Context = 
@@ -261,7 +274,7 @@ runApp ∷ ∀ a. Context → App a → Aff (Either AppError a)
 runApp ctx m = runExceptT $ runReaderT m ctx
 ```
 
-We define a hoist function that will transform a basic `MonadSelda` stack instance into a more general one that will be suitable for our `App` monad.
+We define a hoist function that transforms a basic `MonadSelda` stack instance into a more general one that will be suitable for our `App` monad.
 
 ```purescript
 hoistSeldaWith
@@ -292,14 +305,23 @@ app = do
     , { id: 2, name: "name2", age: Just 22 }
     , { id: 3, name: "name3", age: Just 33 }
     ]
-  hoistSelda $ insert_ bankAccounts
-    [ { id: 1, personId: 1, balance: 100 }
-    , { id: 2, personId: 1, balance: 150 }
-    , { id: 3, personId: 3, balance: 300 }
-    ]
 ```
 Let's start with some insert operations, so we have something in the database to work with.
-`hoistSelda` is needed to lift these operations to the `App` monad.
+`hoistSelda` is needed to lift these operations into the `App` monad.
+
+```purescript
+  hoistSelda do
+    insert_ bankAccounts
+      [ { personId: 1 } ]
+    insert_ bankAccounts
+      [ { personId: 1, balance: 150 }
+      , { personId: 3, balance: 300 }
+      ]
+```
+We leverage the capabilities of the `Auto` and `Default` table constraints.
+It is forbidden to provide `id` column since its value should be assigned by the database.
+We can either specify a value for `balance` column or leave it empty and let database handle it.
+
 ```purescript
   hoistSelda do
     log $ showQuery qNamesWithBalance
@@ -319,7 +341,7 @@ We can also get SQL string literal from a query using `showQuery` function.
 ```
 
 Now we will finally write the `main` that will interpret our `app`.
-We start with getting the database connection ready.
+We start by preparing a connection to the database.
 
 ```purescript
 main ∷ Effect Unit
