@@ -5,7 +5,6 @@ module Selda.PG
   , showInsert1
   , query
   , showQuery
-  , selectFrom
   , deleteFrom
   , showDeleteFrom
   , update
@@ -34,9 +33,7 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (showExpr)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, mkTupleToRecord, rowListLength, tableToColsWithoutAlias)
-import Selda.Query (class FromTable)
-import Selda.Query (selectFrom) as Query
-import Selda.Query.Type (FullQuery, Query, runQuery)
+import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
@@ -148,18 +145,8 @@ showQuery q = showState st
     (Tuple res st') = runQuery $ unwrap q
     st = st' { cols = getCols res }
 
-selectFrom
-  ∷ ∀ cols o i r s tup m
-  . ColsToPGHandler s i tup o
-  ⇒ FromSQLRow tup
-  ⇒ FromTable s r cols
-  ⇒ GetCols i
-  ⇒ MonadSelda m
-  ⇒ Table r → ({ | cols } → Query s { | i }) → m (Array (Record o))
-selectFrom table q = query (Query.selectFrom table q)
-
 deleteFrom
-  ∷  ∀ r s r' m
+  ∷ ∀ r s r' m
   . TableToColsWithoutAlias r r'
   ⇒ MonadSelda m
   ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
@@ -167,7 +154,7 @@ deleteFrom table pred =
   pgExecute (PostgreSQL.Query (showDeleteFrom table pred)) PostgreSQL.Row0
 
 showDeleteFrom
-  ∷  ∀ r s r'
+  ∷ ∀ r s r'
   . TableToColsWithoutAlias r r'
   ⇒ Table r → ({ | r' } → Col s Boolean) → String
 showDeleteFrom table@(Table { name }) pred = 
@@ -177,7 +164,7 @@ showDeleteFrom table@(Table { name }) pred =
       pred_str = showCol $ pred recordWithCols
 
 update
-  ∷  ∀ r s r' m
+  ∷ ∀ r s r' m
   . TableToColsWithoutAlias r r'
   ⇒ GetCols r'
   ⇒ MonadSelda m
@@ -186,7 +173,7 @@ update table pred up =
   pgExecute (PostgreSQL.Query (showUpdate table pred up)) PostgreSQL.Row0
 
 showUpdate
-  ∷  ∀ r s r'
+  ∷ ∀ r s r'
   . TableToColsWithoutAlias r r'
   ⇒ GetCols r'
   ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → String

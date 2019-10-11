@@ -14,7 +14,7 @@ import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide.SimpleE2E
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, update, (.==), (.>))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
@@ -311,6 +311,16 @@ main = do
                       id ← notNull r.maxId
                       pure { id }
 
+            test' conn "sum(balance); OR operator"
+              [ { pid: 1, sum: Just "250" }
+              , { pid: 2, sum: Nothing }
+              ]
+              $ aggregate $ selectFrom people \p → do
+                  b ← leftJoin bankAccounts \{ personId } → p.id .== personId
+                  pid ← groupBy p.id
+                  restrict $ p.id .== lit 1 .|| p.id .== lit 2
+                  pure { pid, sum: sum_ b.balance}
+
             test' conn "return only not null values"
               [ { id: 1, text: "text1" } ]
               $ selectFrom descriptions \ { id, text: maybeText } → do
@@ -336,7 +346,6 @@ main = do
               $ selectFrom people \r → do
                   restrict $ not_ $ r.id `inArray` [ lit 1, lit 3 ]
                   pure r
-
 test'
   ∷ ∀ s o i tup ol
   . ColsToPGHandler s i tup o

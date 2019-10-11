@@ -46,6 +46,7 @@ data UnExp o i = UnExp (UnOp i o) (Expr i)
 data Fn o i
   = FnMax (Expr i) (Maybe i ~ o)
   | FnCount (Expr i) (String ~ o)
+  | FnSum (Expr i) (Maybe String ~ o)
 
 data InArray o i = InArray (Expr i) (Array (Expr i)) (Boolean ~ o)
 
@@ -69,7 +70,7 @@ showLiteral = case _ of
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
-  Or _ _ → " || "
+  Or _ _ → " or "
   Gt _ → " > "
   Eq _ → " = "
 
@@ -95,6 +96,7 @@ showFn ∷ ∀ o i. Fn o i → String
 showFn = case _ of
   FnMax e _ → "max(" <> showExpr e <> ")"
   FnCount e _ → "count(" <> showExpr e <> ")"
+  FnSum e _ → "sum(" <> showExpr e <> ")"
 
 showInArray ∷ ∀ o i. InArray o i → String
 showInArray (InArray x xs _) = "(" <> showExpr x <> " IN " <> "(" <> l <> "))"
