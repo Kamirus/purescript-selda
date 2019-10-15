@@ -21,7 +21,7 @@ instance wrapWithAggrInstance
 infixl 4 type Beside as <:>
 
 data UnAggr = UnAggr
-instance unAggrInstancedsa
+instance failUnAggr
     ∷ Fail (Text "field '"
         <:> Text sym
         <:> Text "' is not aggregated. Its type should be 'Aggr _ _'")

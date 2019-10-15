@@ -8,12 +8,13 @@ import Heterogeneous.Folding (class Folding, class FoldingWithIndex, class HFold
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
+import Prim.TypeError (class Fail, Text, Beside)
 import Record as Record
+import Selda.Aggr (Aggr)
 import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table(..), tableColumns)
-import Type.Proxy (Proxy(..))
 import Type.Data.RowList (RLProxy(..))
-import Prim.TypeError (class Fail, Text, Beside)
+import Type.Proxy (Proxy(..))
 
 -- | For record
 -- |   `{ n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }`
@@ -32,13 +33,22 @@ instance colsToPGHandlerI
   colsToPGHandler _ i = hfoldlWithIndex TupleToRecordFunc f i
     where f = (const {} ∷ Unit → {})
 
+class ContainsOnlyColTypes (rl ∷ RowList)
+instance colOnlyNil ∷ ContainsOnlyColTypes RL.Nil
+else instance failColOnly
+  ∷ Fail (Text "column `" <:> Text sym <:> Text "` has type `Aggr`, expected `Col`")
+  ⇒ ContainsOnlyColTypes (RL.Cons sym (Aggr s a) tail)
+else instance colOnlyCons
+  ∷ ContainsOnlyColTypes tail
+  ⇒ ContainsOnlyColTypes (RL.Cons sym (Col s a) tail)
+
 class ValidateSInCols s (il ∷ RowList)
 instance rLUnColNil ∷ ValidateSInCols s RL.Nil
 else instance rLUnColCons
   ∷ ValidateSInCols s tail
   ⇒ ValidateSInCols s (RL.Cons sym (Col s t) tail)
 else instance failValidateSInCols 
-  ∷ Fail (Beside (Text sym) (Text " is not Col or the scope 's' is wrong"))
+  ∷ Fail (Text sym <:> Text " is not Col or the scope 's' is wrong")
   ⇒ ValidateSInCols s (RL.Cons sym col tail)
 
 class ChangeType i o | i → o
@@ -112,3 +122,5 @@ instance tableToColsI
     aliased = { name, alias: "" }
     recordWithColumns = tableColumns aliased (RLProxy ∷ RLProxy rl)
     recordWithCols = toCols (Proxy ∷ Proxy s) recordWithColumns
+
+infixl 4 type Beside as <:>

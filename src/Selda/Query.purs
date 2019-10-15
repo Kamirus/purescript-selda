@@ -16,10 +16,11 @@ import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
+import Selda.PG.Utils (class ContainsOnlyColTypes)
 import Selda.Query.Type (FullQuery(..), Order, Query(..), SQL(..), Source(..), freshId, runQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
-import Type.Proxy (Proxy(..))
 import Type.Data.RowList (RLProxy(..))
+import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 selectFrom
@@ -168,7 +169,9 @@ class FromSubQuery s inner res | s inner → res where
     → Query s { res ∷ { | res } , sql ∷ SQL , alias ∷ Alias }
 
 instance fromSubQueryI 
-    ∷ ( HMap OuterCols { | inner } { | res0 }
+    ∷ ( ContainsOnlyColTypes inner_rl
+      , RL.RowToList inner inner_rl
+      , HMapWithIndex OuterCols { | inner } { | res0 }
       , GetCols res0
       , HMapWithIndex SubQueryResult { | res0 } { | res }
       )
@@ -176,7 +179,7 @@ instance fromSubQueryI
   where
   fromSubQuery q = do
     let (Tuple innerRes st) = runQuery q
-    let res0 = hmap OuterCols innerRes
+    let res0 = hmapWithIndex OuterCols innerRes
     alias ← subQueryAlias
     let res = createSubQueryResult alias res0
     pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }
