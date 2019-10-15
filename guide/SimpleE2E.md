@@ -28,8 +28,10 @@ import Selda.Table.Constraint (Auto, Default)
 ```
 ## Setup
 
-First we have to setup the database.
-We create a db called *purspg* and a user.
+First we have to setup the database. Make sure that:
+- a database named `purspg` exists
+- a user called `init` with password `qwerty` has been created
+
 We include this information in a record below.
 We will need it later to execute our queries.
 
@@ -42,8 +44,23 @@ dbconfig = (PostgreSQL.defaultPoolConfiguration "purspg")
   }
 ```
 
-Now we should create some tables in our database.
-We will use the `postgresql-client` to get the job done.
+### Table definition
+
+If we have a database table already created, we have to declare it here to reference it.
+We use a `Table` data type to create a *table definition*.
+Its type is parameterized by a *row of types* that describes the columns and their types in the database.
+
+```purescript
+exampleTable ∷ Table
+  ( nullableText ∷ Maybe String     -- column with possible null values
+  , numberColumn ∷ Int              -- integer column with `NOT NULL` constraint
+  , autoNumber ∷ Auto Int           -- value is supplied automatically, cannot be inserted
+  , valueWithDefault ∷ Default Int  -- optional column for `insert` operation
+  )
+exampleTable = Table { name: "example_table" }
+```
+
+We will use the `postgresql-client` to create some tables in our database.
 To do so we define an auxiliary function `execute` that takes the SQL string literal, executes it and if something went wrong throws an error.
 
 ```purescript
@@ -66,8 +83,6 @@ createPeople = execute """
   );"""
 ```
 
-To represent this table definition in PureScript, we use a `Table` type which is parameterized by a *row of types* that describes the columns and their types in the database.
-
 Please note that `purescript-selda` does not handle schema modification, such as table creation, we are doing it manually using `postgresql-client`.
 So it is important to correctly define the tables and types for its columns.
 
@@ -82,6 +97,8 @@ people ∷ Table
   )
 people = Table { name: "people" }
 ```
+
+#### Constraints - wrappers: `Auto` and `Default`
 
 Sometimes we want the database to create values for some columns automatically.
 So we could not be able to insert these manually, but still have an opportunity to query whole rows from a table.
@@ -110,22 +127,41 @@ bankAccounts = Table { name: "bank_accounts" }
 We express that a column value is assigned automatically by wrapping its type in a `Auto` constructor, likewise `Default` for columns that can we optionally specify for the `insert` operation.
 
 Using a *constraint constructor* (`Auto`, `Default`) only affects `insert` operation.
-A column with `Auto` constraint cannot be inserted, while `Default` columns can be either omitted or provided.
-Other operations ignore these constraints and automatically unwrap it so queries return `Int` and not `Auto Int`.
+
+| Column's type Wrapper        | on **insert**      |
+| ---------------------------- | ------------------ |
+| *None*    (e.g. `Int`)       | value is required  |
+| Default (e.g. `Default Int`) | value is optional  |
+| Auto    (e.g. `Auto Int`)    | value is forbidden |
+
+<!-- A column with `Auto` constraint cannot be inserted, while `Default` columns can be either omitted or provided.
+Other operations ignore these constraints and automatically unwrap it so queries return `Int` and not `Auto Int`. -->
 
 ## First Query
 
 Since we have defined table definitions, we can write some queries.
-Let's start with a simple `LEFT JOIN` query with some arbitrary condition in the `WHERE` clause.
+Let's say we want to get people's names along with their balance, but we only want people with *id* higher than 1.
+
+We can solve it with a following SQL query.
+
+  ```sql
+  SELECT people.name, bank_accounts.balance
+  FROM people
+  LEFT JOIN bank_accounts ON people.id = bank_accounts.personId
+  WHERE people.id > 1
+  ```
+
+We can write the same query using `purescript-selda`.
 
 ```purescript
 qNamesWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s (Maybe Int) }
 qNamesWithBalance = 
-  selectFrom people \{ id, name, age } → do
-    { balance } ← leftJoin bankAccounts \acc → id .== acc.personId
-    restrict $ id .> lit 1
-    pure { name, balance }
+  selectFrom people \{ id, name, age } → do      -- FROM people
+    { balance } ← leftJoin bankAccounts          -- LEFT JOIN bank_accounts
+                    \acc → id .== acc.personId   -- ON people.id = bank_accounts.personId
+    restrict $ id .> lit 1                       -- WHERE people.id > 1 
+    pure { name, balance }                       -- SELECT people.name, bank_accounts.balance
 ```
 
 And below is the generated SQL for the query `qNamesWithBalance`.
@@ -137,7 +173,7 @@ And below is the generated SQL for the query `qNamesWithBalance`.
   WHERE (people_0.id > 1)
   ```
 
-We define a query using the `selectFrom` function by providing a table definition and a function that takes a record of columns from the table and returns a *query description*.
+We define a query using the `selectFrom` function by providing a **table definition** and a function that takes a record of columns from the table and returns a *query description*.
 Operations such as `restrict` and `leftJoin` modify the state of the query, or as we called it earlier - *query description*.
 
 <!-- For example: the `leftJoin` call in the query above adds the `LEFT JOIN` clause.
@@ -204,26 +240,37 @@ qCountBankAccountOwners =
 Sometimes we do something wrong and it (hopefully) results in a type error (and not a runtime error).
 We would like to get useful error messages that lead us to the source of the problem, but when a library heavily uses generic programming on type classes it is not always possible...
 
-In the example query `qCountBankAccountOwners` above, when we forget the `aggregate` call, use `personId` instead of `pid` in the result or include `id` in the result we will get following error message:
+  ```purescript
+  aggregate $ selectFrom_
+    (aggregate $ selectFrom bankAccounts \{ id, personId } → do
+      pid ← groupBy personId
+      pure { pid: personId })  -- (personId ∷ Col _ _) used instead of (pid ∷ Aggr _ _)
+    \{ pid } → pure { numberOfOwners: count pid }
+  ```
+
+In the query above, when we use `personId` instead of `pid` in the result or include `id` in the result we will get following error message:
 
   ```
-  No type class instance was found for Heterogeneous.Mapping.Mapping OuterCols t4 t5
-  The instance head contains unknown type variables. Consider adding a type annotation
+  No type class instance was found for
+  Selda.PG.Utils.ContainsOnlyColTypes (Cons "pid" t4 Nil)
+  The instance head contains unknown type variables. Consider adding a type annotation.
   ```
 
 Without knowing some implementation details this message is not really helpful.
 We can mitigate the problem with these error messages, by providing a type annotation for the nested query or define it as top-level value.
 
-```purescript
-qBankAccountOwnerIds ∷ ∀ s. FullQuery s { pid ∷ Col s Int }
-qBankAccountOwnerIds = 
-  aggregate $ selectFrom bankAccounts \{ id, personId } → do
-    pid ← groupBy personId
-    pure { pid }
-```
+  ```purescript
+  -- top-level definition, type annotation omitted
+  qBankAccountOwnerIds = 
+    aggregate $ selectFrom bankAccounts \{ id, personId } → do
+      pid ← groupBy personId
+      pure { pid: personId }  -- (personId ∷ Col _ _) used instead of (pid ∷ Aggr _ _)
+  ```
 
-Now if we use `id` or `personId` in the result we will get custom error message in the line with `aggregate` call: `field 'pid' is not aggregated. Its type should be 'Aggr _ _'`.
-Above error message will appear even without the type annotation.
+Now we encounter a custom type error that says:
+  ```
+  field 'pid' is not aggregated. Its type should be 'Aggr _ _'
+  ```
 
 Let us consider another query that will find maximum balance for each person.
 We will do this intentionally wrong to show what will happen if we try to execute it (which we cover in the next chapter).

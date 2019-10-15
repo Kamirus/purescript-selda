@@ -10,6 +10,7 @@ We used standard monadic abstraction which supports writing queries in a linear,
 ## Getting Started
 
 Install [postgresql-client's dependencies](https://github.com/rightfold/purescript-postgresql-client#install)
+> npm install pg decimal.js
 
 ## Guides
 
