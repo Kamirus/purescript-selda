@@ -1,4 +1,10 @@
-module Selda.PG.Aff where
+module Selda.PG.Aff
+  ( insert_
+  , insert
+  , query
+  , deleteFrom
+  , update
+  ) where
 
 import Prelude
 
@@ -11,8 +17,8 @@ import Heterogeneous.Folding (class HFoldl)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda (Col, FullQuery, Table)
-import Selda as S
 import Selda.Col (class GetCols)
+import Selda.PG.Class as S
 import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple)
 import Selda.Table (class TableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
