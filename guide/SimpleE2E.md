@@ -222,7 +222,7 @@ Queries that use aggregation can be problematic.
 Only aggregated columns and results of aggregate functions can appear in the result.
 To prevent some such runtime errors, we added separate representation for aggregate values (`Aggr s a`) which is only returned by `groupBy` and aggregate functions like `count` and `max_`.
 Mixing `Col` and `Aggr` is not allowed and it will result in a type error.
-To validate and use the query (nest it or execute it) we have to call `aggregate` function that changes the `Aggr` into `Col`.
+To validate and use the query (nest it or execute it) we have to call `aggregate` function that changes `Aggr` into `Col`.
 
 ```purescript
 qCountBankAccountOwners
@@ -248,7 +248,7 @@ We would like to get useful error messages that lead us to the source of the pro
     \{ pid } → pure { numberOfOwners: count pid }
   ```
 
-In the query above, when we use `personId` instead of `pid` in the result or include `id` in the result we will get following error message:
+In the query above, when we use `personId` instead of `pid` in the result or include `id` in the result we get following error message:
 
   ```
   No type class instance was found for
@@ -256,8 +256,8 @@ In the query above, when we use `personId` instead of `pid` in the result or inc
   The instance head contains unknown type variables. Consider adding a type annotation.
   ```
 
-Without knowing some implementation details this message is not really helpful.
-We can mitigate the problem with these error messages, by providing a type annotation for the nested query or define it as top-level value.
+Without knowing the implementation details this message is not really helpful.
+We can mitigate the problem with these error messages by providing a type annotation for the nested query or define it as top-level value.
 
   ```purescript
   -- top-level definition, type annotation omitted
@@ -273,7 +273,7 @@ Now we encounter a custom type error that says:
   ```
 
 Let us consider another query that will find maximum balance for each person.
-We will do this intentionally wrong to show what will happen if we try to execute it (which we cover in the next chapter).
+We are going to do this intentionally wrong to show what happens if we try to execute it (We cover query execution in the next chapter).
 
 ```purescript
 qPersonsMaxBalance
@@ -303,7 +303,7 @@ We perform these actions in a monad that satisfies three constraints: `MonadAff 
 There is a provided 'shortcut' for these classes called `MonadSelda m`.
 
 In the example below, we'll use an incompatible monad stack with the `MonadSelda` constraint to show what to do in this situation.
-Our Reader's context will be a record and for an error type we will use a polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
+Our Reader's context is a record and for an error type we use the polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
 
 ```purescript
 type Context = 
@@ -359,11 +359,11 @@ Let's start with some insert operations, so we have something in the database to
 ```purescript
   hoistSelda do
     insert_ bankAccounts
-      [ { personId: 1 } ]
-    insert_ bankAccounts
-      [ { personId: 1, balance: 150 }
+      [ { personId: 1, balance: 150 }  -- we can't provide a value for `id`
       , { personId: 3, balance: 300 }
       ]
+    insert_ bankAccounts
+      [ { personId: 1 } ]  -- `balance` omitted, the database will use its default value
 ```
 We leverage the capabilities of the `Auto` and `Default` table constraints.
 It is forbidden to provide `id` column since its value should be assigned by the database.
@@ -400,7 +400,7 @@ main = do
       Right conn → do
 ```
 When we've got the connection we can create the database tables and then run our monad stack.
-We are going to wrap everything in a transaction and do a rollback at the end.
+We are going to wrap everything in a transaction and do a rollback at the end because it is only for testing purposes.
 ```purescript
         execute "BEGIN TRANSACTION" conn
 
