@@ -1,25 +1,26 @@
 {
-  "name": "selda",
-  "ignore": [
-    "**/.*",
-    "node_modules",
-    "bower_components",
-    "output"
-  ],
-  "dependencies": {
-    "purescript-prelude": "^4.1.0",
-    "purescript-console": "^4.1.0",
-    "purescript-transformers": "^4.1.0",
-    "purescript-heterogeneous": "^0.4.1",
-    "purescript-postgresql-client": "rightfold/purescript-postgresql-client#4d8dfd4c00f7971691a81f2ccfa2d4ab8c1f9bed",
-    "purescript-strings": "^4.0.0",
-    "purescript-exists": "^4.0.0"
-  },
-  "devDependencies": {
-    "purescript-psci-support": "^4.0.0",
-    "purescript-test-unit": "^14.0.0"
-  },
-  "resolutions": {
-    "purescript-record": "^2.0.0"
-  }
+    "name": "purescript-selda",
+    "license": [
+        "MIT"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Kamirus/purescript-selda.git"
+    },
+    "ignore": [
+        "**/.*",
+        "node_modules",
+        "bower_components",
+        "output"
+    ],
+    "dependencies": {
+        "purescript-console": "^v4.2.0",
+        "purescript-exists": "^v4.0.0",
+        "purescript-heterogeneous": "^v0.4.1",
+        "purescript-postgresql-client": "^v3.0.0",
+        "purescript-prelude": "^v4.1.1",
+        "purescript-strings": "^v4.0.1",
+        "purescript-test-unit": "^v15.0.0",
+        "purescript-transformers": "^v4.2.0"
+    }
 }
