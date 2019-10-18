@@ -142,7 +142,7 @@ let additions =
           , "tuples"
           ]
           "https://github.com/rightfold/purescript-postgresql-client.git"
-          "master"
+          "v3.0.0"
       }
 
 in  upstream // overrides // additions
