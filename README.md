@@ -7,6 +7,8 @@ Generated SQL is guaranteed to be correct by the type system.
 It supports arbitrarily nested queries with capabilities of filtering, joins and aggregation.
 We used standard monadic abstraction which supports writing queries in a linear, natural style.
 
+[Pursuit docs](https://pursuit.purescript.org/packages/purescript-selda/)
+
 ## Getting Started
 
 Install [postgresql-client's dependencies](https://github.com/rightfold/purescript-postgresql-client#install)
