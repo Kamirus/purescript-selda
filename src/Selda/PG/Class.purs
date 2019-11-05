@@ -1,7 +1,11 @@
 module Selda.PG.Class
   ( class MonadSelda
+  , class InsertRecordIntoTableReturning
+  , insertRecordIntoTableReturning
   , insert_
   , insert
+  , insert1
+  , insert1_
   , query
   , deleteFrom
   , update
@@ -13,6 +17,7 @@ import Control.Monad.Error.Class (class MonadError, throwError)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Reader (class MonadReader, ReaderT, ask, asks, runReaderT)
 import Data.Array (concat)
+import Data.Array.Partial (head)
 import Data.Either (either)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -23,11 +28,12 @@ import Database.PostgreSQL.PG as PostgreSQL.PG
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
+import Partial.Unsafe (unsafePartial)
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
-import Selda.PG (showQuery, showInsert1, showDeleteFrom, showUpdate)
 import Selda.Col (class GetCols, Col)
-import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, mkTupleToRecord)
+import Selda.PG (showQuery, showInsert1, showDeleteFrom, showUpdate)
+import Selda.PG.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
@@ -81,42 +87,68 @@ pgExecute q xTup = do
 
 -- | Executes an insert query for each input record.
 insert_
-  ∷ ∀ r t rlcols tup m
-  . RL.RowToList r rlcols
-  ⇒ CanInsertColumnsIntoTable rlcols t
-  ⇒ TableColumnNames rlcols
-  ⇒ RowListLength rlcols
-  ⇒ FromSQLRow tup
-  ⇒ ToSQLRow tup
-  ⇒ MkTupleToRecord tup r
-  ⇒ HFoldl RecordToTuple Unit { | r } tup
+  ∷ ∀ m r t ret
+  . InsertRecordIntoTableReturning r t ret
   ⇒ MonadSelda m
   ⇒ Table t → Array { | r } → m Unit
 insert_ t r = void $ insert t r
 
 -- | Executes an insert query for each input record.
--- | Records to be inserted needs to have columns without constraints,
--- | Default ale optional, Auto must be missing
+-- | Column constraints: `Default`s are optional, `Auto`s are forbidden
 insert
-  ∷ ∀ r t rlcols tup m
-  . RL.RowToList r rlcols
-  ⇒ CanInsertColumnsIntoTable rlcols t
-  ⇒ TableColumnNames rlcols
-  ⇒ RowListLength rlcols
-  ⇒ FromSQLRow tup
-  ⇒ ToSQLRow tup
-  ⇒ MkTupleToRecord tup r
-  ⇒ HFoldl RecordToTuple Unit { | r } tup
+  ∷ ∀ m r t ret
+  . InsertRecordIntoTableReturning r t ret
   ⇒ MonadSelda m
-  ⇒ Table t → Array { | r } → m (Array { | r })
-insert table xs = concat <$> traverse insert1 xs
+  ⇒ Table t → Array { | r } → m (Array { | ret })
+insert table xs = concat <$> traverse ins1 xs
+  where ins1 r = insertRecordIntoTableReturning r table
+
+insert1
+  ∷ ∀ m r t ret
+  . InsertRecordIntoTableReturning r t ret
+  ⇒ MonadSelda m
+  ⇒ Table t → { | r } → m { | ret }
+insert1 table r =
+  unsafePartial $ head <$> insertRecordIntoTableReturning r table
+
+insert1_
+  ∷ ∀ m r t ret
+  . InsertRecordIntoTableReturning r t ret
+  ⇒ MonadSelda m
+  ⇒ Table t → { | r } → m Unit
+insert1_ table r = void $ insert1 table r
+
+-- | Inserts `{ | r }` into `Table t`. Checks constraints (Auto, Default).
+-- | Returns inserted record with every column from `Table t`.
+class InsertRecordIntoTableReturning r t ret | r t → ret where
+  insertRecordIntoTableReturning
+    ∷ ∀ m. MonadSelda m ⇒ { | r } → Table t → m (Array { | ret })
+
+instance insertRecordIntoTableReturningInstance
+    ∷ ( RL.RowToList r rlcols
+      , CanInsertColumnsIntoTable rlcols t
+      , TableColumnNames rlcols
+      , RowListLength rlcols
+      , ToSQLRow rTuple
+      , FromSQLRow trTuple
+      , HFoldl RecordToTuple Unit { | r } rTuple
+      , TableToColsWithoutAlias s t tr
+      , RL.RowToList tr trl
+      , TableColumnNames trl
+      , ColsToPGHandler s tr trTuple ret
+      )
+    ⇒ InsertRecordIntoTableReturning r t ret
   where
-  insert1 ∷ { | r } → m (Array { | r })
-  insert1 r = do
-    let rTup = hfoldl RecordToTuple unit r
-    let rlCols = (RLProxy ∷ RLProxy rlcols)
-    rows ← pgQuery (PostgreSQL.Query (showInsert1 table rlCols)) rTup
-    pure $ map (mkTupleToRecord r) rows
+  insertRecordIntoTableReturning r table = do
+    let
+      s = (Proxy ∷ Proxy s)
+      colsToinsert = (RLProxy ∷ RLProxy rlcols)
+      rTuple = hfoldl RecordToTuple unit r
+      tr = tableToColsWithoutAlias s table
+      colsToRet = (RLProxy ∷ RLProxy trl)
+      q = showInsert1 table colsToinsert colsToRet
+    rows ← pgQuery (PostgreSQL.Query q) rTuple
+    pure $ map (colsToPGHandler s tr) rows
 
 query
   ∷ ∀ o i tup s m
@@ -132,7 +164,7 @@ query q = do
 
 deleteFrom
   ∷ ∀ r s r' m
-  . TableToColsWithoutAlias r r'
+  . TableToColsWithoutAlias s r r'
   ⇒ MonadSelda m
   ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
 deleteFrom table pred = 
@@ -140,7 +172,7 @@ deleteFrom table pred =
 
 update
   ∷ ∀ r s r' m
-  . TableToColsWithoutAlias r r'
+  . TableToColsWithoutAlias s r r'
   ⇒ GetCols r'
   ⇒ MonadSelda m
   ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → m Unit

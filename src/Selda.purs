@@ -30,7 +30,7 @@ import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
 import Selda.PG (showInsert1, showQuery, showDeleteFrom, showUpdate) as PG
-import Selda.PG.Class (class MonadSelda, insert_, insert, query, deleteFrom, update) as PG.Class
+import Selda.PG.Class (class MonadSelda, insert_, insert, insert1, insert1_, query, deleteFrom, update) as PG.Class
 import Selda.Query (crossJoin, crossJoin_, restrict, notNull, leftJoin, leftJoin_, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
 import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type

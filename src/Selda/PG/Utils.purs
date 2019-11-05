@@ -107,17 +107,17 @@ else instance rowListLengthCons ∷ RowListLength t ⇒ RowListLength (RL.Cons s
 -- | →
 -- | { a1 ∷ Col s A1, a2 ∷ Col s A2 ... }
 -- | ```
-class TableToColsWithoutAlias r o | r → o where
-  tableToColsWithoutAlias ∷ Table r → { | o }
+class TableToColsWithoutAlias s r o | r → o where
+  tableToColsWithoutAlias ∷ Proxy s → Table r → { | o }
 
 instance tableToColsI
     ∷ ( RL.RowToList r rl
       , TableColumns rl i
       , ToCols s i o
       )
-    ⇒ TableToColsWithoutAlias r o
+    ⇒ TableToColsWithoutAlias s r o
   where
-  tableToColsWithoutAlias (Table { name }) = recordWithCols
+  tableToColsWithoutAlias _ (Table { name }) = recordWithCols
     where
     aliased = { name, alias: "" }
     recordWithColumns = tableColumns aliased (RLProxy ∷ RLProxy rl)

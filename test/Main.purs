@@ -14,7 +14,7 @@ import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide.SimpleE2E
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
+import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert1_, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
 import Selda.Col (class GetCols)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
@@ -115,16 +115,16 @@ main = do
           -- id is Auto, so it cannot be inserted
           -- insert_ employees [{ id: 1, name: "E1", salary: 123 }]
           insert_ employees [{ name: "E1", salary: 123 }]
-          insert_ employees [{ name: "E2" }]
+          insert1_ employees { name: "E2" }
 
         -- simple test delete
         runSeldaAff conn do
-          insert_ people [{ id: 4, name: "delete", age: Just 999 }]
+          insert1_ people { id: 4, name: "delete", age: Just 999 }
           deleteFrom people \r → r.id .== lit 4
 
         -- simple test update
         runSeldaAff conn do
-          insert_ people [{ id: 5, name: "update", age: Just 999 }]
+          insert1_ people { id: 5, name: "update", age: Just 999 }
           update people
             (\r → r.name .== lit "update")
             (\r → r { age = lit $ Just 1000 })

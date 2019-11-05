@@ -1,6 +1,8 @@
 module Selda.PG.Aff
   ( insert_
   , insert
+  , insert1
+  , insert1_
   , query
   , deleteFrom
   , update
@@ -11,17 +13,14 @@ import Prelude
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Data.Either (Either)
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, Connection, PGError)
+import Database.PostgreSQL (class FromSQLRow, Connection, PGError)
 import Effect.Aff (Aff)
-import Heterogeneous.Folding (class HFoldl)
 import Prim.RowList (kind RowList)
-import Prim.RowList as RL
 import Selda (Col, FullQuery, Table)
 import Selda.Col (class GetCols)
+import Selda.PG.Class (class InsertRecordIntoTableReturning)
 import Selda.PG.Class as S
-import Selda.PG.Utils (class ColsToPGHandler, class MkTupleToRecord, class RowListLength, class TableToColsWithoutAlias, RecordToTuple)
-import Selda.Table (class TableColumnNames)
-import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
+import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias)
 
 runSelda
   ∷ ∀ a
@@ -31,30 +30,28 @@ runSelda
 runSelda conn m = runReaderT (runExceptT m) conn
 
 insert_
-  ∷ ∀ r t rlcols tup
-  . RL.RowToList r rlcols
-  ⇒ CanInsertColumnsIntoTable rlcols t
-  ⇒ TableColumnNames rlcols
-  ⇒ RowListLength rlcols
-  ⇒ FromSQLRow tup
-  ⇒ ToSQLRow tup
-  ⇒ MkTupleToRecord tup r
-  ⇒ HFoldl RecordToTuple Unit { | r } tup
+  ∷ ∀ r t tr
+  . InsertRecordIntoTableReturning r t tr
   ⇒ Connection → Table t → Array { | r } → Aff (Either PGError Unit)
 insert_ conn t r = runSelda conn $ S.insert_ t r
 
 insert
-  ∷ ∀ r t rlcols tup
-  . RL.RowToList r rlcols
-  ⇒ CanInsertColumnsIntoTable rlcols t
-  ⇒ TableColumnNames rlcols
-  ⇒ RowListLength rlcols
-  ⇒ FromSQLRow tup
-  ⇒ ToSQLRow tup
-  ⇒ MkTupleToRecord tup r
-  ⇒ HFoldl RecordToTuple Unit { | r } tup
-  ⇒ Connection → Table t → Array { | r } → Aff (Either PGError (Array { | r }))
+  ∷ ∀ r t tr
+  . InsertRecordIntoTableReturning r t tr
+  ⇒ Connection → Table t → Array { | r } → Aff (Either PGError (Array { | tr }))
 insert conn t r = runSelda conn $ S.insert t r
+
+insert1
+  ∷ ∀ r t tr
+  . InsertRecordIntoTableReturning r t tr
+  ⇒ Connection → Table t → { | r } → Aff (Either PGError { | tr })
+insert1 conn t r = runSelda conn $ S.insert1 t r
+
+insert1_
+  ∷ ∀ r t tr
+  . InsertRecordIntoTableReturning r t tr
+  ⇒ Connection → Table t → { | r } → Aff (Either PGError Unit)
+insert1_ conn t r = runSelda conn $ S.insert1_ t r
 
 query
   ∷ ∀ o i tup s
@@ -66,7 +63,7 @@ query conn q = runSelda conn $ S.query q
 
 deleteFrom
   ∷ ∀ r s r'
-  . TableToColsWithoutAlias r r'
+  . TableToColsWithoutAlias s r r'
   ⇒ Connection 
   → Table r 
   → ({ | r' } → Col s Boolean) 
@@ -75,7 +72,7 @@ deleteFrom conn table pred = runSelda conn $ S.deleteFrom table pred
 
 update
   ∷ ∀ r s r'
-  . TableToColsWithoutAlias r r'
+  . TableToColsWithoutAlias s r r'
   ⇒ GetCols r'
   ⇒ Connection 
   → Table r 
