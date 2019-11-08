@@ -273,7 +273,7 @@ Now we encounter a custom type error that says:
   ```
 
 Let us consider another query that will find maximum balance for each person.
-We are going to do this intentionally wrong to show what happens if we try to execute it (We cover query execution in the next chapter).
+We are going to do this intentionally wrong to show what happens if we try to execute it (We cover query execution in the [next chapter](#execution)).
 
 ```purescript
 qPersonsMaxBalance
@@ -301,6 +301,9 @@ The aggregate function `max_` returns nullable values, because SQL's function `M
 Now we will show how to execute queries and perform insert operations using `purescript-selda`.
 We perform these actions in a monad that satisfies three constraints: `MonadAff m, MonadError PGError m, MonadReader PostgreSQL.Connection m`.
 There is a provided 'shortcut' for these classes called `MonadSelda m`.
+
+> **MonadSelda vs Aff:** <br>
+> To avoid monad stack one can use alternative functions in the `PG.Aff` module that work with plain monad `Aff`.
 
 In the example below, we'll use an incompatible monad stack with the `MonadSelda` constraint to show what to do in this situation.
 Our Reader's context is a record and for an error type we use the polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
