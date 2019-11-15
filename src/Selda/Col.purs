@@ -10,14 +10,14 @@ import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
-import Selda.Expr (Expr(..), Literal(..), None(..), Some(..), showExpr)
+import Selda.Expr (Expr(..), Literal(..), None(..), Some(..), ShowM, showExpr)
 import Selda.Table (Alias, Column)
 import Type.Proxy (Proxy)
 
 newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
 
-showCol ∷ ∀ s a. Col s a → String
+showCol ∷ ∀ s a. Col s a → ShowM
 showCol = unwrap >>> showExpr
 
 lit ∷ ∀ s a. Lit a ⇒ a → Col s a

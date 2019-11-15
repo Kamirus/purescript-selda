@@ -2,9 +2,11 @@ module Test.Main where
 
 import Prelude
 
+import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
+import Data.Enum (toEnum)
 import Data.Eq (class EqRecord)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Show (class ShowRecordFields)
 import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
@@ -13,9 +15,11 @@ import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide.SimpleE2E
+import Partial.Unsafe (unsafePartial)
 import Prim.RowList as RL
 import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert1_, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
 import Selda.Col (class GetCols)
+import Selda.PG (litF)
 import Selda.PG.Utils (class ColsToPGHandler)
 import Selda.Query (notNull)
 import Selda.Table.Constraint (Auto, Default)
@@ -36,8 +40,17 @@ descriptions = Table { name: "descriptions" }
 emptyTable ∷ Table ( id ∷ Int )
 emptyTable = Table { name: "emptyTable" }
 
-employees ∷ Table ( id ∷ Auto Int, name ∷ String, salary ∷ Default Int )
+employees ∷ Table
+  ( id ∷ Auto Int
+  , name ∷ String
+  , salary ∷ Default Int
+  , date ∷ Default Date
+  )
 employees = Table { name: "employees" }
+
+date ∷ Int → Int → Int → Date
+date y m d = unsafePartial $ fromJust $
+  canonicalDate <$> toEnum y <*> toEnum m <*> toEnum d
 
 main ∷ Effect Unit
 main = do
@@ -91,7 +104,8 @@ main = do
           CREATE TABLE employees (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
-            salary INTEGER DEFAULT 500
+            salary INTEGER DEFAULT 500,
+            date DATE NOT NULL DEFAULT '2000-10-20'
           );
         """) PG.Row0
         when (isJust createdb) $
@@ -115,7 +129,8 @@ main = do
           -- id is Auto, so it cannot be inserted
           -- insert_ employees [{ id: 1, name: "E1", salary: 123 }]
           insert_ employees [{ name: "E1", salary: 123 }]
-          insert1_ employees { name: "E2" }
+          insert1_ employees { name: "E2", date: date 2000 11 21 }
+          insert1_ employees { name: "E3" }
 
         -- simple test delete
         runSeldaAff conn do
@@ -129,6 +144,10 @@ main = do
             (\r → r.name .== lit "update")
             (\r → r { age = lit $ Just 1000 })
           deleteFrom people \r → r.age .> lit (Just 999)
+
+          update employees
+            (\r → r.name .== lit "E3")
+            (\r → r { date = litF $ date 2000 12 22 })
 
         liftEffect $ runTest $ do
           suite "Selda" $ do
@@ -328,10 +347,13 @@ main = do
                   pure { id, text }
 
             test' conn "employees inserted with default and without salary"
-              [ { id: 1, name: "E1", salary: 123 }
-              , { id: 2, name: "E2", salary: 500 }
+              [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
+              , { id: 2, name: "E2", salary: 500, date: date 2000 11 21 }
+              -- , { id: 3, name: "E3", salary: 500, date: date 2000 12 22 }
               ]
-              $ selectFrom employees pure
+              $ selectFrom employees \r → do
+                  restrict $ not_ $ r.date .> (litF $ date 2000 11 21)
+                  pure r
 
             test' conn "inArray"
               [ { id: 1, name: "name1", age: Just 11 }

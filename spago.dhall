@@ -4,17 +4,21 @@ You can edit this file as you like.
 -}
 { name =
     "selda"
-, license = "MIT"
-, repository = "https://github.com/Kamirus/purescript-selda.git"
+, license =
+    "MIT"
+, repository =
+    "https://github.com/Kamirus/purescript-selda.git"
 , dependencies =
     [ "console"
     , "exists"
     , "heterogeneous"
+    , "lists"
     , "postgresql-client"
     , "prelude"
     , "strings"
-    , "transformers"
     , "test-unit"
+    , "transformers"
+    , "variant"
     ]
 , packages =
     ./packages.dhall

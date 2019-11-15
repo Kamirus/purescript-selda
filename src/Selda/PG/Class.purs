@@ -31,6 +31,7 @@ import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Partial.Unsafe (unsafePartial)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
+import Selda.Expr (ShowM, showM)
 import Selda.PG (showQuery, showInsert1, showDeleteFrom, showUpdate)
 import Selda.PG.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Query.Type (FullQuery, runQuery)
@@ -76,13 +77,13 @@ pgQuery q xTup = do
   PostgreSQL.PG.query conn q xTup
 
 pgExecute
-  ∷ ∀ i o m
-  . ToSQLRow i
-  ⇒ MonadSelda m 
-  ⇒ PostgreSQL.Query i o → i → m Unit
-pgExecute q xTup = do
+  ∷ ∀ m
+  . MonadSelda m 
+  ⇒ ShowM → m Unit
+pgExecute m = do
   conn ← ask
-  PostgreSQL.PG.execute conn q xTup
+  let { strQuery, params } = showM 1 m
+  PostgreSQL.PG.execute conn (PostgreSQL.Query strQuery) params
 
 -- | Executes an insert query for each input record.
 insert_
@@ -157,8 +158,10 @@ query
   ⇒ MonadSelda m
   ⇒ FullQuery s (Record i) → m (Array (Record o))
 query q = do
-  let (Tuple res _) = runQuery $ unwrap q
-  rows ← pgQuery (PostgreSQL.Query (showQuery q)) PostgreSQL.Row0
+  let
+    (Tuple res _) = runQuery $ unwrap q
+    { strQuery, params } = showM 1 $ showQuery q
+  rows ← pgQuery (PostgreSQL.Query strQuery) params
   pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 
 deleteFrom
@@ -166,8 +169,7 @@ deleteFrom
   . TableToColsWithoutAlias s r r'
   ⇒ MonadSelda m
   ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
-deleteFrom table pred = 
-  pgExecute (PostgreSQL.Query (showDeleteFrom table pred)) PostgreSQL.Row0
+deleteFrom table pred = pgExecute $ showDeleteFrom table pred
 
 update
   ∷ ∀ r s r' m
@@ -175,5 +177,4 @@ update
   ⇒ GetCols r'
   ⇒ MonadSelda m
   ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → m Unit
-update table pred up =
-  pgExecute (PostgreSQL.Query (showUpdate table pred up)) PostgreSQL.Row0
+update table pred up = pgExecute $ showUpdate table pred up
