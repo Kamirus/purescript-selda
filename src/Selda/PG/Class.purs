@@ -29,7 +29,6 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Partial.Unsafe (unsafePartial)
-import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
 import Selda.PG (showQuery, showInsert1, showDeleteFrom, showUpdate)

@@ -7,7 +7,6 @@ import Data.Exists (Exists)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple)
-import Prim.RowList (kind RowList)
 import Selda.Expr (Expr)
 import Selda.Table (AliasedTable, Alias)
 

@@ -9,9 +9,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Database.PostgreSQL (class FromSQLValue, class ToSQLValue)
 import Foreign (readString, unsafeToForeign)
-import Selda (class Lit, Col(..))
-import Selda.Col (literal)
-import Selda.Expr (Expr(..), Literal(..))
+import Selda (class Lit)
+import Selda.Expr (Literal(..))
 
 data AccountType
   = Business
@@ -38,5 +37,3 @@ instance toSQLValueProductType ∷ ToSQLValue AccountType where
 
 instance litAccountType ∷ Lit AccountType where
   literal x = Any (printAccountType x)
-  lit x = Col $ ELit $ literal x
-

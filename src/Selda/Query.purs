@@ -10,7 +10,6 @@ import Data.Newtype (unwrap)
 import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
-import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)

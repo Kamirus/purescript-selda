@@ -1,7 +1,6 @@
 module Selda.Table.Constraint where
 
 import Prim.Row as R
-import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Type.RowList (class ListToRow, class RowListAppend)
 
