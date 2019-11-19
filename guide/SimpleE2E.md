@@ -24,7 +24,7 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
 import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
-import Selda.Expr (showM)
+import Selda.PG (showPG)
 import Selda.Table.Constraint (Auto, Default)
 ```
 ## Setup
@@ -376,7 +376,7 @@ We can either specify a value for `balance` column or leave it empty and let dat
 ```purescript
   hoistSelda do
     -- transform Query into (Query String, Parameters) and return only SQL as a string
-    let str m = (showM 1 m).strQuery
+    let str m = (showPG m).strQuery
 
     log $ str $ showQuery qNamesWithBalance
     query qNamesWithBalance >>= logShow

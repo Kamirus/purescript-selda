@@ -31,8 +31,8 @@ import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Partial.Unsafe (unsafePartial)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
-import Selda.Expr (ShowM, showM)
-import Selda.PG (showQuery, showInsert1, showDeleteFrom, showUpdate)
+import Selda.Expr (ShowM)
+import Selda.PG (showDeleteFrom, showInsert1, showPG, showQuery, showUpdate)
 import Selda.PG.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Table (class TableColumnNames, Table)
@@ -82,7 +82,7 @@ pgExecute
   ⇒ ShowM → m Unit
 pgExecute m = do
   conn ← ask
-  let { strQuery, params } = showM 1 m
+  let { strQuery, params } = showPG m
   PostgreSQL.PG.execute conn (PostgreSQL.Query strQuery) params
 
 -- | Executes an insert query for each input record.
@@ -160,7 +160,7 @@ query
 query q = do
   let
     (Tuple res _) = runQuery $ unwrap q
-    { strQuery, params } = showM 1 $ showQuery q
+    { strQuery, params } = showPG $ showQuery q
   rows ← pgQuery (PostgreSQL.Query strQuery) params
   pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 

@@ -2,6 +2,7 @@ module Selda.Expr where
 
 import Prelude
 
+import Control.Monad.Reader (ReaderT(..), ask, runReaderT)
 import Control.Monad.State (State, get, put, runState)
 import Data.Array as Array
 import Data.Exists (Exists, runExists)
@@ -74,27 +75,35 @@ type QueryParams =
   , nextIndex ∷ Int
   }
 
--- | State monad for: (Query AST) → (Query String with placeholders, Parameters)
-type ShowM = State QueryParams String
+type ShowMCtx = 
+  { mkPlaceholder ∷ Int → String
+  }
 
-runShowM ∷ Int → ShowM → Tuple String QueryParams
-runShowM firstIndex m = runState m
-  { invertedParams: mempty, nextIndex: firstIndex }
+-- | Monad for: (Query AST) → (Query String with placeholders, Parameters)
+type ShowM = ReaderT ShowMCtx (State QueryParams) String
+
+runShowM ∷ (Int → String) → Int → ShowM → Tuple String QueryParams
+runShowM mkPlaceholder firstIndex m = 
+  runReaderT m { mkPlaceholder }
+    # flip runState { invertedParams: mempty, nextIndex: firstIndex }
 
 showM
-  ∷ Int
+  ∷ String
+  → Int
   → ShowM
   → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }
-showM i m = { params, nextIndex, strQuery }
+showM ph i m = { params, nextIndex, strQuery }
   where
-    (Tuple strQuery { invertedParams, nextIndex }) = runShowM i m
+    mkPh int = ph <> show int
+    (Tuple strQuery { invertedParams, nextIndex }) = runShowM mkPh i m
     params = Array.fromFoldable $ List.reverse invertedParams
 
 showForeign ∷ Foreign → ShowM
 showForeign x = do
+  { mkPlaceholder } ← ask
   s ← get
   put $ s { nextIndex = 1 + s.nextIndex, invertedParams = x : s.invertedParams }
-  pure $ "$" <> show s.nextIndex
+  pure $ mkPlaceholder s.nextIndex
 
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of

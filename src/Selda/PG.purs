@@ -4,6 +4,7 @@ module Selda.PG
   , showDeleteFrom
   , showUpdate
   , litF
+  , showPG
   ) where
 
 import Prelude
@@ -15,8 +16,9 @@ import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Database.PostgreSQL (class ToSQLValue, toSQLValue)
+import Foreign (Foreign)
 import Selda.Col (class GetCols, Col(..), getCols, showCol)
-import Selda.Expr (Expr(..), ShowM, showExpr)
+import Selda.Expr (Expr(..), ShowM, showExpr, showM)
 import Selda.PG.ShowQuery (showState)
 import Selda.PG.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
 import Selda.Query.Type (FullQuery, runQuery)
@@ -27,6 +29,11 @@ import Type.Proxy (Proxy(..))
 
 litF ∷ ∀ s a. ToSQLValue a ⇒ a → Col s a
 litF = Col <<< EForeign <<< toSQLValue
+
+showPG
+  ∷ ShowM
+  → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }
+showPG = showM "$" 1
 
 showInsert1
   ∷ ∀ t insRLcols retRLcols
