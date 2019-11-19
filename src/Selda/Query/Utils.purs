@@ -1,4 +1,4 @@
-module Selda.PG.Utils where
+module Selda.Query.Utils where
 
 import Prelude
 
@@ -15,6 +15,27 @@ import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
+
+class MappingRL f a b | f a → b
+
+class MapRL f (i ∷ RowList) (o ∷ RowList) | i → o
+instance mapRLNil ∷ MapRL f RL.Nil RL.Nil
+instance mapRLCons
+  ∷ ( MappingRL f a a'
+    , MapRL f tail tail'
+    )
+  ⇒ MapRL f (RL.Cons sym a tail) (RL.Cons sym a' tail')
+
+class MapR f (i ∷ #Type) (o ∷ #Type)
+instance mapR
+  ∷ ( RL.RowToList i il
+    , MapRL f il ol
+    , RL.RowToList o ol
+    )
+  ⇒ MapR f i o
+
+data UnColRL
+instance unColRL ∷ UnCol a b ⇒ MappingRL UnColRL a b
 
 -- | For record
 -- |   `{ n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }`
@@ -51,31 +72,21 @@ else instance failValidateSInCols
   ∷ Fail (Text sym <:> Text " is not Col or the scope 's' is wrong")
   ⇒ ValidateSInCols s (RL.Cons sym col tail)
 
-class ChangeType i o | i → o
-instance mapTypeCol ∷ ChangeType (Col s a) a
-else instance mapType ∷ ChangeType a a
+class UnCol i o | i → o
+instance mapTypeCol ∷ UnCol (Col s a) a
 
 data TupleToRecordFunc = TupleToRecordFunc
 instance tupToRec
     ∷ ( IsSymbol sym
       , R.Lacks sym r
       , R.Cons sym a r r'
-      , ChangeType i a
+      , UnCol i a
       )
     ⇒ FoldingWithIndex TupleToRecordFunc 
       (SProxy sym) (tup → { | r }) i (Tuple a tup → { | r' })
   where
   foldingWithIndex TupleToRecordFunc sym f _ =
     \(Tuple a tup) → Record.insert (SProxy ∷ SProxy sym) a $ f tup
-
-class MkTupleToRecord tup r | r → tup where
-  mkTupleToRecord ∷ { | r } → (tup → { | r })
-
-instance tupTR
-    ∷ HFoldlWithIndex TupleToRecordFunc (Unit → {}) { | r } (tup → { | r })
-    ⇒ MkTupleToRecord tup r
-  where
-  mkTupleToRecord r = hfoldlWithIndex TupleToRecordFunc (const {} ∷ Unit → {}) r
 
 data RecordToTuple = RecordToTuple
 instance rToTuple ∷ Folding RecordToTuple tail a (Tuple a tail) where

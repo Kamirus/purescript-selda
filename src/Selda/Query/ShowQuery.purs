@@ -1,4 +1,4 @@
-module Selda.PG.ShowQuery where
+module Selda.Query.ShowQuery where
 
 import Prelude
 

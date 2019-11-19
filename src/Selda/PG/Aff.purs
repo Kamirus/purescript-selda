@@ -19,7 +19,7 @@ import Selda (Col, FullQuery, Table)
 import Selda.Col (class GetCols)
 import Selda.PG.Class (class InsertRecordIntoTableReturning)
 import Selda.PG.Class as S
-import Selda.PG.Utils (class ColsToPGHandler, class TableToColsWithoutAlias)
+import Selda.Query.Utils (class ColsToPGHandler, class TableToColsWithoutAlias)
 
 runSelda
   ∷ ∀ a
