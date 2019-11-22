@@ -3,37 +3,57 @@ module Test.Utils where
 import Prelude
 
 import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.Free (Free)
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Data.Array (fromFoldable)
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable, find, foldl, for_)
 import Data.Maybe (Maybe(..))
-import Database.PostgreSQL (Connection, Query(..), Row0(..), execute)
+import Database.PostgreSQL (Connection)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Exception (error)
 import Global.Unsafe (unsafeStringify)
-import Test.Unit (TestF)
+import Test.Unit (TestSuite)
 import Test.Unit as Unit
 import Test.Unit.Assert (assert)
 
-withRollback
-  ∷ ∀ a
-  . Connection
+testQueryWith_
+  ∷ ∀ expected query queryResult
+  . (query → Aff queryResult)
+  → (expected → queryResult → Aff Unit)
+  → String
+  → expected
+  → query
+  → TestSuite
+testQueryWith_ run assertFunc msg expected query =
+  Unit.test msg $ run query >>= assertFunc expected
+
+testQuery
+  ∷ ∀ a query
+  . Show a ⇒ Eq a
+  ⇒ (query → Aff (Array a))
+  → String
+  → Array a
+  → query
+  → TestSuite
+testQuery execQuery = testQueryWith_ execQuery assertUnorderedSeqEq
+
+withRollback_
+  ∷ ∀ err a
+  . (String → Aff (Maybe err))
   → Aff a
   → Aff Unit
-withRollback conn action = do
-  begun ← execute conn (Query "BEGIN TRANSACTION") Row0
+withRollback_ exec action = do
+  let
+    throwErr msg err = throwError $ error $ msg <> unsafeStringify err
+    rollback = exec "ROLLBACK" >>= case _ of
+      Just err → throwErr "Error on transaction rollback: " err
+      Nothing → pure unit
+  begun ← exec "BEGIN TRANSACTION"
   case begun of
-    Just pgError → throwError $ error $
-      "Error on transaction initialization: " <> unsafeStringify pgError
-    Nothing →
-      void $ catchError (action >>= const rollback) (\e → rollback >>= const (throwError e))
-  where
-  rollback = execute conn (Query "ROLLBACK") Row0 >>= (case _ of
-     Just pgError → throwError $ error $ ("Error on transaction rollback: " <> unsafeStringify pgError)
-     Nothing → pure unit)
+    Just err → throwErr "Error on transaction initialization: " err
+    Nothing → void $ catchError
+      (action >>= const rollback) (\e → rollback >>= const (throwError e))
 
 runSeldaAff
   ∷ ∀ a
@@ -46,14 +66,6 @@ runSeldaAff conn m = do
     Left pgError →
       throwError $ error ("PGError occured during test execution: " <> unsafeStringify (pgError))
     Right a → pure a
-
-test
-  ∷ ∀ a
-   . Connection
-  → String
-  → Aff a
-  → Free TestF Unit
-test conn t a = Unit.test t (withRollback conn a)
 
 assertIn ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
 assertIn l1 l2 = for_ l1 \x1 → do
