@@ -24,6 +24,7 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
 import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
+import Selda.Expr (showM)
 import Selda.Table.Constraint (Auto, Default)
 ```
 ## Setup
@@ -374,16 +375,19 @@ We can either specify a value for `balance` column or leave it empty and let dat
 
 ```purescript
   hoistSelda do
-    log $ showQuery qNamesWithBalance
+    -- transform Query into (Query String, Parameters) and return only SQL as a string
+    let str m = (showM 1 m).strQuery
+
+    log $ str $ showQuery qNamesWithBalance
     query qNamesWithBalance >>= logShow
 ```
 We execute a query by calling `query` and as a result we get an array of records.
-We can also get SQL string literal from a query using `showQuery` function.
+We can also get SQL string literal from a query using the `str` helper function.
 ```purescript
-    log $ showQuery qBankAccountOwnersWithBalance
+    log $ str $ showQuery qBankAccountOwnersWithBalance
     query qBankAccountOwnersWithBalance >>= logShow
 
-    log $ showQuery qCountBankAccountOwners
+    log $ str $ showQuery qCountBankAccountOwners
     query qCountBankAccountOwners >>= logShow
 
     -- query qPersonsMaxBalance >>= logShow
