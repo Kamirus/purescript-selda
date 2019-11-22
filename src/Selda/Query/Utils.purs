@@ -15,10 +15,11 @@ import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
+import Type.RowList (class ListToRow)
 
 class MappingRL f a b | f a → b
 
-class MapRL f (i ∷ RowList) (o ∷ RowList) | i → o
+class MapRL f (i ∷ RowList) (o ∷ RowList) | f i → o
 instance mapRLNil ∷ MapRL f RL.Nil RL.Nil
 instance mapRLCons
   ∷ ( MappingRL f a a'
@@ -26,16 +27,16 @@ instance mapRLCons
     )
   ⇒ MapRL f (RL.Cons sym a tail) (RL.Cons sym a' tail')
 
-class MapR f (i ∷ #Type) (o ∷ #Type)
+class MapR f (i ∷ #Type) (o ∷ #Type) | f i → o
 instance mapR
   ∷ ( RL.RowToList i il
     , MapRL f il ol
-    , RL.RowToList o ol
+    , ListToRow ol o
     )
   ⇒ MapR f i o
 
-data UnColRL
-instance unColRL ∷ UnCol a b ⇒ MappingRL UnColRL a b
+data UnCol_
+instance unColRL ∷ UnCol a b ⇒ MappingRL UnCol_ a b
 
 -- | For record
 -- |   `{ n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }`

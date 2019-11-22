@@ -9,12 +9,14 @@ import SQLite3 (DBConnection, queryDB)
 import Selda.Col (class GetCols)
 import Selda.Query.ShowStatement (showQuery)
 import Selda.Query.Type (FullQuery, runQuery)
+import Selda.Query.Utils (class MapR, UnCol_)
 import Selda.SQLite3 (showSQLite3)
 import Simple.JSON (class ReadForeign, E, read)
 
 query
   ∷ ∀ o i s
   . GetCols i
+  ⇒ MapR UnCol_ i o
   ⇒ ReadForeign { | o }
   ⇒ DBConnection → FullQuery s { | i } → Aff (E (Array { | o }))
 query conn q = do
