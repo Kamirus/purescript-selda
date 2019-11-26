@@ -9,6 +9,8 @@ module Selda.PG.Class
   , query
   , deleteFrom
   , update
+  , hoistSeldaWith
+  , BackendPGClass
   ) where
 
 import Prelude
@@ -33,6 +35,7 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
+import Selda.Query.Class (class GenericQuery, genericQuery)
 import Selda.Query.ShowStatement (showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
@@ -40,6 +43,8 @@ import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
+
+data BackendPGClass
 
 hoistSeldaWith
   ∷ ∀ e m r
@@ -152,18 +157,24 @@ instance insertRecordIntoTableReturningInstance
     pure $ map (colsToPGHandler s tr) rows
 
 query
-  ∷ ∀ o i tup s m
-  . ColsToPGHandler s i tup o
-  ⇒ GetCols i
-  ⇒ FromSQLRow tup
-  ⇒ MonadSelda m
-  ⇒ FullQuery s (Record i) → m (Array (Record o))
-query q = do
-  let
-    (Tuple res _) = runQuery $ unwrap q
-    { strQuery, params } = showPG $ showQuery q
-  rows ← pgQuery (PostgreSQL.Query strQuery) params
-  pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
+  ∷ ∀ o i s m
+  . GenericQuery BackendPGClass m s i o
+  ⇒ FullQuery s { | i } → m (Array { | o })
+query = genericQuery (Proxy ∷ Proxy BackendPGClass)
+
+instance genericQueryPG
+    ∷ ( ColsToPGHandler s i tup o
+      , GetCols i
+      , FromSQLRow tup
+      , MonadSelda m
+      ) ⇒ GenericQuery BackendPGClass m s i o
+  where
+  genericQuery _ q = do
+    let
+      (Tuple res _) = runQuery $ unwrap q
+      { strQuery, params } = showPG $ showQuery q
+    rows ← pgQuery (PostgreSQL.Query strQuery) params
+    pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 
 deleteFrom
   ∷ ∀ r s r' m
