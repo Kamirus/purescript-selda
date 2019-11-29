@@ -398,15 +398,19 @@ testWith
 testWith assertFunc conn = 
   testQueryWith_ (\q → runSeldaAff conn $ query q) assertFunc
 
-class TestBackend b m where
+type TestCtx b m s ctx =
+  { b ∷ Proxy b
+  , m ∷ FProxy m
+  , s ∷ Proxy s
+  , ctx ∷ ctx
+  }
+
+class TestBackend b m ctx | b m → ctx where
   testWith'
     ∷ ∀ s i o
     . GenericQuery b m s i o
-    ⇒ Proxy b
-    → FProxy m
-    → Proxy s
+    ⇒ TestCtx b m s ctx
     → (Array { | o } → Array { | o } → Aff Unit)
-    -- → (m ~> Aff)
     → String
     → Array { | o }
     → FullQuery s { | i }
@@ -415,9 +419,10 @@ class TestBackend b m where
 instance testBackendPG
     ∷ TestBackend BackendPGClass
         (ExceptT PGError (ReaderT Connection Aff))
+        { conn ∷ Connection }
   where
-  testWith' b m s assertFn  = testWith_ assertFn b (runSeldaAff conn)
-    where conn = unsafeCoerce unit
+  testWith' { b, m, s, ctx: { conn } } assertFn  =
+    testWith_ assertFn b (runSeldaAff conn)
 
 testWith_
   ∷ ∀ m s i o b
@@ -433,33 +438,22 @@ testWith_ assertFn b runM =
   testQueryWith_ (\q → runM $ genericQuery b q) assertFn
 
 testSuite
-  ∷ ∀ m s b
-  . TestBackend b m
+  ∷ ∀ m s b ctx
+  . TestBackend b m ctx
   ⇒ GenericQuery b m s
-      ( age :: Col s (Maybe Int)
-      , id :: Col s Int
-      , name :: Col s String
-      )
-      ( age :: Maybe Int
-      , id :: Int
-      , name :: String
-      )
+      ( age ∷ Col s (Maybe Int), id ∷ Col s Int, name ∷ Col s String )
+      ( age ∷ Maybe Int, id ∷ Int, name ∷ String )
   ⇒ GenericQuery b m s
-      ( x :: Col s Int
-      , y :: Col s (Maybe Int)
-      )
-      ( x :: Int
-      , y :: Maybe Int
-      )
-  ⇒ Proxy b → FProxy m → Proxy s → Aff Unit
-testSuite b m s = do
+      ( x ∷ Col s Int, y ∷ Col s (Maybe Int) )
+      ( x ∷ Int, y ∷ Maybe Int )
+  ⇒ TestCtx b m s ctx → Aff Unit
+testSuite ctx = do
   let
-    -- b = (Proxy ∷ Proxy BackendPGClass)
     unordered = assertUnorderedSeqEq
-    -- runM = (runSeldaAff conn ∷ _ ~> Aff)
+    ordered = assertSeqEq
   liftEffect $ runTest $ do
     suite "Selda" $ do
-      testWith' b m s unordered "simple select people"
+      testWith' ctx unordered "simple select people"
         [ { id: 1, name: "name1", age: Just 11 }
         , { id: 2, name: "name2", age: Just 22 }
         , { id: 3, name: "name3", age: Just 33 }
@@ -467,7 +461,7 @@ testSuite b m s = do
         $ selectFrom people \r → do
             pure r
 
-      testWith' b m s unordered "select people, return different record"
+      testWith' ctx ordered "select people, return different record"
         [ { x: 1, y: Just 11 }
         , { x: 2, y: Just 22 }
         , { x: 3, y: Just 33 }
@@ -475,8 +469,11 @@ testSuite b m s = do
         $ selectFrom people \{ id, age } → do
             pure { x: id, y: age }
 
-testSuitePG ∷ ∀ s. Proxy s → Aff Unit
-testSuitePG = testSuite (Proxy ∷ Proxy BackendPGClass) (FProxy ∷ FProxy PGSelda)
+testSuitePG ∷ ∀ s. Connection → Proxy s → Aff Unit
+testSuitePG conn s = testSuite { b, m, s, ctx: { conn } } 
+  where
+    b = (Proxy ∷ Proxy BackendPGClass)
+    m = (FProxy ∷ FProxy PGSelda)
 
 dbconfig ∷ PoolConfiguration
 dbconfig = (defaultPoolConfiguration "purspg")
