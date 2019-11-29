@@ -55,11 +55,9 @@ withRollback_ exec action = do
     Nothing → void $ catchError
       (action >>= const rollback) (\e → rollback >>= const (throwError e))
 
-runSeldaAff
-  ∷ ∀ a
-  . Connection
-  → ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff) a
-  → Aff a
+type PGSelda = ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff)
+
+runSeldaAff ∷ Connection → PGSelda ~> Aff
 runSeldaAff conn m = do
   r ← runReaderT (runExceptT m) conn
   case r of

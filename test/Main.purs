@@ -2,13 +2,16 @@ module Test.Main where
 
 import Prelude
 
+import Control.Monad.Except (ExceptT)
+import Control.Monad.Reader (ReaderT)
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.Eq (class EqRecord)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Show (class ShowRecordFields)
-import Database.PostgreSQL (class FromSQLRow, Connection, PoolConfiguration, defaultPoolConfiguration)
+import Data.Variant.Internal (FProxy(..))
+import Database.PostgreSQL (class FromSQLRow, Connection, PGError, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PG
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff)
@@ -17,16 +20,21 @@ import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide.SimpleE2E
 import Partial.Unsafe (unsafePartial)
 import Prim.RowList as RL
-import Selda (FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert1_, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert1_, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
 import Selda.Col (class GetCols)
 import Selda.PG (litF)
+import Selda.PG.Class (BackendPGClass)
 import Selda.Query (notNull)
+import Selda.Query.Class (class GenericQuery, genericQuery)
 import Selda.Query.Utils (class ColsToPGHandler)
+import Selda.SQLite3.Aff as SQLite3.Aff
 import Selda.Table.Constraint (Auto, Default)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
-import Test.Utils (assertSeqEq, assertUnorderedSeqEq, runSeldaAff, test)
+import Test.Utils (PGSelda, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testQuery, testQueryWith_)
+import Type.Proxy (Proxy(..))
+import Unsafe.Coerce (unsafeCoerce)
 
 people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
 people = Table { name: "people" }
@@ -368,6 +376,7 @@ main = do
               $ selectFrom people \r → do
                   restrict $ not_ $ r.id `inArray` [ lit 1, lit 3 ]
                   pure r
+
 test'
   ∷ ∀ s o i tup ol
   . ColsToPGHandler s i tup o
@@ -377,18 +386,97 @@ test'
 test' = testWith assertUnorderedSeqEq
 
 testWith
-  ∷ ∀ s o i tup ol
+  ∷ ∀ s o i tup
   . ColsToPGHandler s i tup o
   ⇒ GetCols i ⇒ FromSQLRow tup
-  ⇒ RL.RowToList o ol ⇒ ShowRecordFields ol o ⇒ EqRecord ol o
   ⇒ (Array { | o } → Array { | o } → Aff Unit) 
   → Connection
   → String
   → Array { | o }
   → FullQuery s { | i }
   → TestSuite
-testWith assertFunc conn msg expected q = do
-  test conn msg $ (runSeldaAff conn $ query q) >>= assertFunc expected
+testWith assertFunc conn = 
+  testQueryWith_ (\q → runSeldaAff conn $ query q) assertFunc
+
+class TestBackend b m where
+  testWith'
+    ∷ ∀ s i o
+    . GenericQuery b m s i o
+    ⇒ Proxy b
+    → FProxy m
+    → Proxy s
+    → (Array { | o } → Array { | o } → Aff Unit)
+    -- → (m ~> Aff)
+    → String
+    → Array { | o }
+    → FullQuery s { | i }
+    → TestSuite
+
+instance testBackendPG
+    ∷ TestBackend BackendPGClass
+        (ExceptT PGError (ReaderT Connection Aff))
+  where
+  testWith' b m s assertFn  = testWith_ assertFn b (runSeldaAff conn)
+    where conn = unsafeCoerce unit
+
+testWith_
+  ∷ ∀ m s i o b
+  . GenericQuery b m s i o
+  ⇒ (Array { | o } → Array { | o } → Aff Unit)
+  → Proxy b
+  → (m ~> Aff)
+  → String
+  → Array { | o }
+  → FullQuery s { | i }
+  → TestSuite
+testWith_ assertFn b runM = 
+  testQueryWith_ (\q → runM $ genericQuery b q) assertFn
+
+testSuite
+  ∷ ∀ m s b
+  . TestBackend b m
+  ⇒ GenericQuery b m s
+      ( age :: Col s (Maybe Int)
+      , id :: Col s Int
+      , name :: Col s String
+      )
+      ( age :: Maybe Int
+      , id :: Int
+      , name :: String
+      )
+  ⇒ GenericQuery b m s
+      ( x :: Col s Int
+      , y :: Col s (Maybe Int)
+      )
+      ( x :: Int
+      , y :: Maybe Int
+      )
+  ⇒ Proxy b → FProxy m → Proxy s → Aff Unit
+testSuite b m s = do
+  let
+    -- b = (Proxy ∷ Proxy BackendPGClass)
+    unordered = assertUnorderedSeqEq
+    -- runM = (runSeldaAff conn ∷ _ ~> Aff)
+  liftEffect $ runTest $ do
+    suite "Selda" $ do
+      testWith' b m s unordered "simple select people"
+        [ { id: 1, name: "name1", age: Just 11 }
+        , { id: 2, name: "name2", age: Just 22 }
+        , { id: 3, name: "name3", age: Just 33 }
+        ]
+        $ selectFrom people \r → do
+            pure r
+
+      testWith' b m s unordered "select people, return different record"
+        [ { x: 1, y: Just 11 }
+        , { x: 2, y: Just 22 }
+        , { x: 3, y: Just 33 }
+        ]
+        $ selectFrom people \{ id, age } → do
+            pure { x: id, y: age }
+
+testSuitePG ∷ ∀ s. Proxy s → Aff Unit
+testSuitePG = testSuite (Proxy ∷ Proxy BackendPGClass) (FProxy ∷ FProxy PGSelda)
 
 dbconfig ∷ PoolConfiguration
 dbconfig = (defaultPoolConfiguration "purspg")
