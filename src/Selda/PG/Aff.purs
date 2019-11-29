@@ -10,8 +10,6 @@ module Selda.PG.Aff
 
 import Prelude
 
-import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.Reader (ReaderT, runReaderT)
 import Data.Either (Either)
 import Database.PostgreSQL (class FromSQLRow, Connection, PGError)
 import Effect.Aff (Aff)
@@ -19,14 +17,8 @@ import Selda (Col, FullQuery, Table)
 import Selda.Col (class GetCols)
 import Selda.PG.Class (class InsertRecordIntoTableReturning)
 import Selda.PG.Class as S
+import Selda.Query.Class (runSelda)
 import Selda.Query.Utils (class ColsToPGHandler, class TableToColsWithoutAlias)
-
-runSelda
-  ∷ ∀ a
-  . Connection
-  → ExceptT PGError (ReaderT Connection Aff) a
-  → Aff (Either PGError a)
-runSelda conn m = runReaderT (runExceptT m) conn
 
 insert_
   ∷ ∀ r t tr

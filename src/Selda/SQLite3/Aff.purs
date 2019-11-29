@@ -2,26 +2,19 @@ module Selda.SQLite3.Aff where
 
 import Prelude
 
-import Data.Newtype (unwrap)
-import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import SQLite3 (DBConnection, queryDB)
+import SQLite3 (DBConnection)
 import Selda.Col (class GetCols)
-import Selda.Query.ShowStatement (showQuery)
-import Selda.Query.Type (FullQuery, runQuery)
+import Selda.Query.Class (runSelda)
+import Selda.Query.Type (FullQuery)
 import Selda.Query.Utils (class MapR, UnCol_)
-import Selda.SQLite3 (showSQLite3)
-import Simple.JSON (class ReadForeign, E, read)
+import Selda.SQLite3.Class as S
+import Simple.JSON (class ReadForeign, E)
 
 query
-  ∷ ∀ o i s
+  ∷ ∀ s i o
   . GetCols i
   ⇒ MapR UnCol_ i o
   ⇒ ReadForeign { | o }
   ⇒ DBConnection → FullQuery s { | i } → Aff (E (Array { | o }))
-query conn q = do
-  let
-    (Tuple res _) = runQuery $ unwrap q
-    { strQuery, params } = showSQLite3 $ showQuery q
-  rows ← queryDB conn strQuery params
-  pure $ read rows
+query conn q = runSelda conn $ S.query q

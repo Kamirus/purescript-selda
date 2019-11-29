@@ -7,35 +7,28 @@ import Control.Monad.Reader (ReaderT)
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
-import Data.Eq (class EqRecord)
 import Data.Maybe (Maybe(..), fromJust, isJust)
-import Data.Show (class ShowRecordFields)
 import Data.Variant.Internal (FProxy(..))
-import Database.PostgreSQL (class FromSQLRow, Connection, PGError, PoolConfiguration, defaultPoolConfiguration)
-import Database.PostgreSQL as PG
+import Database.PostgreSQL (Connection, PGError, PoolConfiguration, defaultPoolConfiguration)
+import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide.SimpleE2E
 import Partial.Unsafe (unsafePartial)
-import Prim.RowList as RL
 import SQLite3 (DBConnection)
-import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, deleteFrom, desc, groupBy, inArray, insert1_, insert_, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, query, restrict, selectFrom, selectFrom_, sum_, update, (.==), (.>), (.||))
-import Selda.Col (class GetCols)
+import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, groupBy, inArray, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, (.==), (.>), (.||))
 import Selda.PG (litF)
-import Selda.PG.Class (BackendPGClass)
+import Selda.PG.Class (BackendPGClass, deleteFrom, insert1_, insert_, update)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery, genericQuery)
-import Selda.Query.Utils (class ColsToPGHandler)
-import Selda.SQLite3.Aff as SQLite3.Aff
 import Selda.Table.Constraint (Auto, Default)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
-import Test.Utils (PGSelda, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testQuery, testQueryWith_)
+import Test.Utils (PGSelda, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testQueryWith_)
 import Type.Proxy (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
 
 people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
 people = Table { name: "people" }
@@ -67,12 +60,12 @@ main = do
   Guide.SimpleE2E.main
 
   -- integration test suite
-  pool ← PG.newPool dbconfig
+  pool ← PostgreSQL.newPool dbconfig
   void $ launchAff do
-    PG.withConnection pool case _ of
+    PostgreSQL.withConnection pool case _ of
       Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
       Right conn → do
-        createdb ← PG.execute conn (PG.Query """
+        createdb ← PostgreSQL.execute conn (PostgreSQL.Query """
           DROP TABLE IF EXISTS people;
           CREATE TABLE people (
             id INTEGER PRIMARY KEY,
@@ -116,7 +109,7 @@ main = do
             salary INTEGER DEFAULT 500,
             date DATE NOT NULL DEFAULT '2000-10-20'
           );
-        """) PG.Row0
+        """) PostgreSQL.Row0
         when (isJust createdb) $
           failure ("PostgreSQL createdb error: " <> unsafeStringify createdb)
 

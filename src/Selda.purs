@@ -1,7 +1,6 @@
 module Selda
   ( module Query.Type
   , module Col
-  , module PG.Class
   , module ShowStatement
   , module Query
   , module Table
@@ -29,7 +28,6 @@ import Selda.Aggr (Aggr(..))
 import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
-import Selda.PG.Class (class MonadSelda, insert_, insert, insert1, insert1_, query, deleteFrom, update) as PG.Class
 import Selda.Query (crossJoin, crossJoin_, restrict, notNull, leftJoin, leftJoin_, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
 import Selda.Query.Type (Order(..))
