@@ -2,15 +2,17 @@ module Test.Types where
 
 import Prelude
 
-import Control.Monad.Except (runExcept)
+import Control.Monad.Except (except, runExcept)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.List.NonEmpty (singleton)
 import Database.PostgreSQL (class FromSQLValue, class ToSQLValue)
-import Foreign (readString, unsafeToForeign)
+import Foreign (ForeignError(..), F, readString, unsafeToForeign)
 import Selda (class Lit)
 import Selda.Expr (Literal(..))
+import Simple.JSON (class ReadForeign)
 
 data AccountType
   = Business
@@ -37,3 +39,10 @@ instance toSQLValueProductType ∷ ToSQLValue AccountType where
 
 instance litAccountType ∷ Lit AccountType where
   literal x = Any (printAccountType x)
+
+readAccountTypeF ∷ String → F AccountType
+readAccountTypeF =
+  except <<< lmap (singleton <<< ForeignError) <<< readAccountType
+
+instance readForeignAccountType ∷ ReadForeign AccountType where
+  readImpl = readString >=> readAccountTypeF

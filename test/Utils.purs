@@ -2,17 +2,19 @@ module Test.Utils where
 
 import Prelude
 
-import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.Reader (ReaderT, runReaderT)
+import Control.Monad.Except (ExceptT)
+import Control.Monad.Reader (ReaderT)
 import Data.Array (fromFoldable)
-import Data.Either (Either(..))
+import Data.Either (either)
 import Data.Foldable (class Foldable, find, foldl, for_)
 import Data.Maybe (Maybe(..))
-import Database.PostgreSQL (Connection)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Exception (error)
+import Foreign (MultipleErrors, renderForeignError)
 import Global.Unsafe (unsafeStringify)
+import SQLite3 (DBConnection)
+import Selda.Query.Class (runSelda)
 import Test.Unit (TestSuite)
 import Test.Unit as Unit
 import Test.Unit.Assert (assert)
@@ -55,15 +57,24 @@ withRollback_ exec action = do
     Nothing → void $ catchError
       (action >>= const rollback) (\e → rollback >>= const (throwError e))
 
-type PGSelda = ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff)
+runSeldaAff ∷ ∀ r e. r → ExceptT e (ReaderT r Aff) ~> Aff
+runSeldaAff = runSeldaAffWith unsafeStringify
 
-runSeldaAff ∷ Connection → PGSelda ~> Aff
-runSeldaAff conn m = do
-  r ← runReaderT (runExceptT m) conn
-  case r of
-    Left pgError →
-      throwError $ error ("PGError occured during test execution: " <> unsafeStringify (pgError))
-    Right a → pure a
+runSeldaAffWith ∷ ∀ e r. (e → String) → r → ExceptT e (ReaderT r Aff) ~> Aff
+runSeldaAffWith fe conn m = runSelda conn m >>= either onError pure
+  where
+    msg = "Error occured during text execution: "
+    onError e = throwError $ error $ msg <> fe e
+
+runPGSeldaAff ∷ PostgreSQL.Connection → PGSelda ~> Aff
+runPGSeldaAff = runSeldaAffWith $ show
+
+runSQLite3SeldaAff ∷ DBConnection → SQLite3Selda ~> Aff
+runSQLite3SeldaAff = runSeldaAffWith $ show <<< map renderForeignError
+
+type SQLite3Selda = ExceptT MultipleErrors (ReaderT DBConnection Aff)
+
+type PGSelda = ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff)
 
 assertIn ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
 assertIn l1 l2 = for_ l1 \x1 → do

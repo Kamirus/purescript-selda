@@ -10,5 +10,7 @@
 
 package-lock.json
 
+test/db.sqlite3
+
 # generated literate files
 guide/src/*

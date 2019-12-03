@@ -7,6 +7,7 @@ import Control.Monad.Reader (ReaderT)
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
+import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Variant.Internal (FProxy(..))
 import Database.PostgreSQL (Connection, PGError, PoolConfiguration, defaultPoolConfiguration)
@@ -14,6 +15,7 @@ import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff)
 import Effect.Class (liftEffect)
+import Foreign (ForeignError)
 import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide.SimpleE2E
 import Partial.Unsafe (unsafePartial)
@@ -23,11 +25,12 @@ import Selda.PG (litF)
 import Selda.PG.Class (BackendPGClass, deleteFrom, insert1_, insert_, update)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery, genericQuery)
+import Selda.SQLite3.Class (BackendSQLite3Class)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Unit.Main (runTest)
-import Test.Utils (PGSelda, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testQueryWith_)
+import Test.Utils (PGSelda, SQLite3Selda, assertSeqEq, assertUnorderedSeqEq, runPGSeldaAff, runSQLite3SeldaAff, runSeldaAff, testQueryWith_)
 import Type.Proxy (Proxy(..))
 
 people ∷ Table ( name ∷ String , age ∷ Maybe Int , id ∷ Int )
@@ -279,7 +282,7 @@ legacySuite ctx = do
     $ aggregate $ selectFrom people \{ id, name, age } → do
         pure { maxId: max_ id }
 
-  testWith ctx unordered "aggr: max people id"
+  testWith ctx unordered "aggr: max people id from bankAccounts with counts"
     [ { pid: 1, m: Just 150, c: "2" }
     , { pid: 3, m: Just 300, c: "1" }
     ]
@@ -355,14 +358,14 @@ legacySuite ctx = do
         text ← notNull maybeText
         pure { id, text }
 
-  testWith ctx unordered "employees inserted with default and without salary"
-    [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
-    , { id: 2, name: "E2", salary: 500, date: date 2000 11 21 }
-    -- , { id: 3, name: "E3", salary: 500, date: date 2000 12 22 }
-    ]
-    $ selectFrom employees \r → do
-        restrict $ not_ $ r.date .> (litF $ date 2000 11 21)
-        pure r
+  -- testWith ctx unordered "employees inserted with default and without salary"
+  --   [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
+  --   , { id: 2, name: "E2", salary: 500, date: date 2000 11 21 }
+  --   -- , { id: 3, name: "E3", salary: 500, date: date 2000 12 22 }
+  --   ]
+  --   $ selectFrom employees \r → do
+  --       restrict $ not_ $ r.date .> (litF $ date 2000 11 21)
+  --       pure r
 
   testWith ctx unordered "inArray"
     [ { id: 1, name: "name1", age: Just 11 }
@@ -422,8 +425,16 @@ instance testBackendPG
         (ExceptT PGError (ReaderT Connection Aff))
         { conn ∷ Connection }
   where
-  testWith { b, m, s, ctx: { conn } } assertFn  =
-    testWith_ assertFn b (runSeldaAff conn)
+  testWith { b, m, s, ctx: { conn } } assertFn  = do
+    testWith_ assertFn b (runPGSeldaAff conn)
+
+instance testBackendSQLite3
+    ∷ TestBackend BackendSQLite3Class
+        (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
+        { conn ∷ DBConnection }
+  where
+  testWith { b, m, s, ctx: { conn } } assertFn = do
+    testWith_ assertFn b (runSQLite3SeldaAff conn)
 
 testWith_
   ∷ ∀ m s i o b
@@ -438,16 +449,19 @@ testWith_
 testWith_ assertFn b runM = 
   testQueryWith_ (\q → runM $ genericQuery b q) assertFn
 
--- testSuite
---   ∷ ∀ m s b ctx
---   . TestBackend b m ctx
---   ⇒ GenericQuery b m s
---       ( age ∷ Col s (Maybe Int), id ∷ Col s Int, name ∷ Col s String )
---       ( age ∷ Maybe Int, id ∷ Int, name ∷ String )
---   ⇒ GenericQuery b m s
---       ( x ∷ Col s Int, y ∷ Col s (Maybe Int) )
---       ( x ∷ Int, y ∷ Maybe Int )
---   ⇒ TestCtx b m s ctx → Aff Unit
+testSuite
+  ∷ ∀ m s b ctx
+  . TestBackend b m ctx
+  ⇒ GenericQuery b m s
+      ( age ∷ Col s (Maybe Int), id ∷ Col s Int, name ∷ Col s String )
+      ( age ∷ Maybe Int, id ∷ Int, name ∷ String )
+  ⇒ GenericQuery b m s
+      ( x ∷ Col s Int, y ∷ Col s (Maybe Int) )
+      ( x ∷ Int, y ∷ Maybe Int )
+  ⇒ GenericQuery b m s
+      ( id ∷ Col s Int )
+      ( id ∷ Int )
+  ⇒ TestCtx b m s ctx → Aff Unit
 testSuite ctx = do
   let
     unordered = assertUnorderedSeqEq
@@ -496,16 +510,16 @@ testWithPG conn k = k { b, m, s, ctx: { conn } }
     m = (FProxy ∷ FProxy PGSelda)
     s = (Proxy ∷ Proxy s)
 
--- testWithSQLite3
---   ∷ ∀ a s
---   . DBConnection
---   → (TestCtx BackendPGClass PGSelda s { conn ∷ Connection } → a)
---   → a
--- testWithSQLite3 conn k = k { b, m, s, ctx: { conn } } 
---   where
---     b = (Proxy ∷ Proxy BackendPGClass)
---     m = (FProxy ∷ FProxy PGSelda)
---     s = (Proxy ∷ Proxy s)
+testWithSQLite3
+  ∷ ∀ a s
+  . DBConnection
+  → (TestCtx BackendSQLite3Class SQLite3Selda s { conn ∷ DBConnection } → a)
+  → a
+testWithSQLite3 conn k = k { b, m, s, ctx: { conn } } 
+  where
+    b = (Proxy ∷ Proxy BackendSQLite3Class)
+    m = (FProxy ∷ FProxy SQLite3Selda)
+    s = (Proxy ∷ Proxy s)
 
 dbconfig ∷ PoolConfiguration
 dbconfig = (defaultPoolConfiguration "purspg")
