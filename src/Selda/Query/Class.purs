@@ -17,7 +17,7 @@ class GenericQuery b m s i o | i → o where
 hoistSeldaWith
   ∷ ∀ r e' e m r'
   . MonadThrow e' m
-   ⇒MonadAsk r' m
+  ⇒ MonadAsk r' m
   ⇒ MonadAff m
   ⇒ (e → e')
   → (r' → r)

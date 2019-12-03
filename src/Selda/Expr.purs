@@ -2,7 +2,7 @@ module Selda.Expr where
 
 import Prelude
 
-import Control.Monad.Reader (ReaderT(..), ask, runReaderT)
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Control.Monad.State (State, get, put, runState)
 import Data.Array as Array
 import Data.Exists (Exists, runExists)
@@ -108,11 +108,11 @@ showForeign x = do
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
   LBoolean b _ → show b
-  LString s _ → "E'" <> primPGEscape s <> "'"
+  LString s _ → "'" <> primPGEscape s <> "'"
   LInt i _ → show i
   LNull _ → "null"
   LJust x → runExists (\(Some l _) → showLiteral l) x
-  Any s → "E'" <> primPGEscape s <> "'"
+  Any s → "'" <> primPGEscape s <> "'"
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
@@ -148,10 +148,11 @@ showUnExp (UnExp op e) = do
 showFn ∷ ∀ o i. Fn o i → ShowM
 showFn fn = 
   let ret op e = (\s → op <> "(" <> s <> ")") <$> showExpr e in
+  let castToString s = "CAST(" <> s <> " AS TEXT)" in
   case fn of
-    FnMax e _ → ret "max" e
-    FnCount e _ → ret "count" e
-    FnSum e _ → ret "sum" e
+    FnMax e _ → ret "MAX" e
+    FnCount e _ → castToString <$> ret "COUNT" e
+    FnSum e _ → castToString <$> ret "SUM" e
 
 showInArray ∷ ∀ o i. InArray o i → ShowM
 showInArray (InArray x xs _) = do
