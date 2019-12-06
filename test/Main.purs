@@ -283,16 +283,16 @@ legacySuite ctx = do
         pure { maxId: max_ id }
 
   testWith ctx unordered "aggr: max people id from bankAccounts with counts"
-    [ { pid: 1, m: Just 150, c: "2" }
-    , { pid: 3, m: Just 300, c: "1" }
+    [ { pid: 1, m: Just 150, c: 2 }
+    , { pid: 3, m: Just 300, c: 1 }
     ]
     $ aggregate $ selectFrom bankAccounts \{ personId, balance } → do
         pid ← groupBy personId
         pure { pid, m: max_ balance, c: count personId }
 
   testWith ctx ordered "aggr: order by max people id desc"
-    [ { pid: 3, m: 300, c: "1" }
-    , { pid: 1, m: 150, c: "2" }
+    [ { pid: 3, m: 300, c: 1 }
+    , { pid: 1, m: 150, c: 2 }
     ]
     $ selectFrom_ do
         aggregate $ selectFrom bankAccounts \{ personId, balance } → do
@@ -304,7 +304,7 @@ legacySuite ctx = do
             pure { pid, m, c }
 
   testWith ctx unordered "aggr: max people id having count > 1"
-    [ { pid: 1, m: 150, c: "2" }
+    [ { pid: 1, m: 150, c: 2 }
     ]
     $ selectFrom_ do
         aggregate $ selectFrom bankAccounts \{ personId, balance } → do
@@ -312,7 +312,7 @@ legacySuite ctx = do
             pure { pid, m: max_ balance, c: count personId }
         $ \r@{ pid, c } → do
             m ← notNull r.m
-            restrict $ c .> lit "1"
+            restrict $ c .> lit 1
             pure { pid, m, c }
 
   testWith ctx unordered "limit negative returns 0"
@@ -343,7 +343,7 @@ legacySuite ctx = do
             pure { id }
 
   testWith ctx unordered "sum(balance); OR operator"
-    [ { pid: 1, sum: Just "250" }
+    [ { pid: 1, sum: Just 250 }
     , { pid: 2, sum: Nothing }
     ]
     $ aggregate $ selectFrom people \p → do

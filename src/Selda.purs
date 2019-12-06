@@ -47,14 +47,14 @@ binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
 
 -- | returns String because the value might not fit in the underlying js float
-count ∷ ∀ s a. Col s a → Aggr s String
+count ∷ ∀ s a. Col s a → Aggr s Int
 count (Col e) = Aggr $ Col $ EFn $ mkExists $ FnCount e identity
 
 -- | returns Maybe in case of empty set aggregation
 max_ ∷ ∀ s a. Col s a → Aggr s (Maybe a)
 max_ (Col e) = Aggr $ Col $ EFn $ mkExists $ FnMax e identity
 
-sum_ ∷ ∀ s a. Col s a → Aggr s (Maybe String)
+sum_ ∷ ∀ s a. Col s a → Aggr s (Maybe Int)
 sum_ (Col e) = Aggr $ Col $ EFn $ mkExists $ FnSum e identity
 
 not_ ∷ ∀ s. Col s Boolean → Col s Boolean

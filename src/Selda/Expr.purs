@@ -53,8 +53,8 @@ data UnExp o i = UnExp (UnOp i o) (Expr i)
 
 data Fn o i
   = FnMax (Expr i) (Maybe i ~ o)
-  | FnCount (Expr i) (String ~ o)
-  | FnSum (Expr i) (Maybe String ~ o)
+  | FnCount (Expr i) (Int ~ o)
+  | FnSum (Expr i) (Maybe Int ~ o)
 
 data InArray o i = InArray (Expr i) (Array (Expr i)) (Boolean ~ o)
 
@@ -148,7 +148,7 @@ showUnExp (UnExp op e) = do
 showFn ∷ ∀ o i. Fn o i → ShowM
 showFn fn = 
   let ret op e = (\s → op <> "(" <> s <> ")") <$> showExpr e in
-  let castToString s = "CAST(" <> s <> " AS TEXT)" in
+  let castToString s = "CAST(" <> s <> " AS INTEGER)" in
   case fn of
     FnMax e _ → ret "MAX" e
     FnCount e _ → castToString <$> ret "COUNT" e

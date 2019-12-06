@@ -228,7 +228,7 @@ To validate and use the query (nest it or execute it) we have to call `aggregate
 
 ```purescript
 qCountBankAccountOwners
-  ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s String }
+  ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s Int }
 qCountBankAccountOwners = 
   aggregate $ selectFrom_
     (aggregate $ selectFrom bankAccounts \{ id, personId } → do
