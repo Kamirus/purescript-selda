@@ -6,7 +6,7 @@ import Control.Monad.Except (ExceptT)
 import Control.Monad.Reader (ReaderT)
 import Data.Array (fromFoldable)
 import Data.Either (either)
-import Data.Foldable (class Foldable, find, foldl, for_)
+import Data.Foldable (class Foldable, find, foldl, for_, length)
 import Data.Maybe (Maybe(..))
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff, catchError, throwError)
@@ -86,6 +86,11 @@ assertUnorderedSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldab
 assertUnorderedSeqEq l1 l2 = do
   assertIn l1 l2
   assertIn l2 l1
+  let 
+    len1 = (length l1 ∷ Int)
+    len2 = (length l2 ∷ Int)
+    msg = "The same elements, but the length is different : " <> show len1 <> " != " <> show len2
+  assert msg $ len1 == len2
 
 assertSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
 assertSeqEq l1 l2 = assert msg $ xs == ys
