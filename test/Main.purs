@@ -159,10 +159,31 @@ main = do
             suite "PG" $ testWithPG conn legacySuite
             -- suite "SQLite3" $ testWithSQLite3 conn legacySuite
 
+testSelectEscapedString
+  ∷ ∀ b m ctx s
+  . TestBackend b m ctx
+  ⇒ GenericQuery b m s
+      ( val ∷ Col s String )
+      ( val ∷ String )
+  ⇒ TestCtx b m s ctx
+  → TestSuite
+testSelectEscapedString ctx = do
+  testWith ctx assertUnorderedSeqEq "select escaped string"
+    [ { val: "'abc' \' \"def\"" } ]
+    $ aux
+  where
+    aux ∷ FullQuery s { val ∷ Col s String }
+    aux = selectFrom people \r → do
+      restrict $ r.id .== lit 1
+      pure { val: lit "'abc' \' \"def\"" }
+
 legacySuite ctx = do
   let
     unordered = assertUnorderedSeqEq
     ordered = assertSeqEq
+
+  testSelectEscapedString ctx
+
   testWith ctx unordered "simple select people"
     [ { id: 1, name: "name1", age: Just 11 }
     , { id: 2, name: "name2", age: Just 22 }

@@ -64,7 +64,6 @@ primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
   escape ∷ Char → Array Char
   escape c = case c of
     '\'' → [c, c]
-    '\\' → [c, c]
     _ → pure c
 
 -- | Keeps a list of parameters that will be passed to the backend-specific
