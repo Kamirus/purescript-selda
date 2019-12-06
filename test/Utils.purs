@@ -7,17 +7,92 @@ import Control.Monad.Reader (ReaderT)
 import Data.Array (fromFoldable)
 import Data.Either (either)
 import Data.Foldable (class Foldable, find, foldl, for_, length)
+import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
-import Database.PostgreSQL as PostgreSQL
+import Data.Variant.Internal (FProxy(..))
+import Database.PostgreSQL (Connection, PGError)
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Exception (error)
-import Foreign (MultipleErrors, renderForeignError)
+import Foreign (ForeignError, MultipleErrors, renderForeignError)
 import Global.Unsafe (unsafeStringify)
 import SQLite3 (DBConnection)
-import Selda.Query.Class (runSelda)
+import Selda (FullQuery)
+import Selda.PG.Class (BackendPGClass)
+import Selda.Query.Class (class GenericQuery, genericQuery, runSelda)
+import Selda.SQLite3.Class (BackendSQLite3Class)
 import Test.Unit (TestSuite)
 import Test.Unit as Unit
 import Test.Unit.Assert (assert)
+import Type.Proxy (Proxy(..))
+
+type TestCtx b m s ctx =
+  { b ∷ Proxy b
+  , m ∷ FProxy m
+  , s ∷ Proxy s
+  , ctx ∷ ctx
+  }
+
+class TestBackend b m ctx | b m → ctx where
+  testWith
+    ∷ ∀ s i o
+    . GenericQuery b m s i o
+    ⇒ TestCtx b m s ctx
+    → (Array { | o } → Array { | o } → Aff Unit)
+    → String
+    → Array { | o }
+    → FullQuery s { | i }
+    → TestSuite
+
+instance testBackendPG
+    ∷ TestBackend BackendPGClass
+        (ExceptT PGError (ReaderT Connection Aff))
+        { conn ∷ Connection }
+  where
+  testWith { b, m, s, ctx: { conn } } assertFn  = do
+    testWith_ assertFn b (runPGSeldaAff conn)
+
+instance testBackendSQLite3
+    ∷ TestBackend BackendSQLite3Class
+        (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
+        { conn ∷ DBConnection }
+  where
+  testWith { b, m, s, ctx: { conn } } assertFn = do
+    testWith_ assertFn b (runSQLite3SeldaAff conn)
+
+testWith_
+  ∷ ∀ m s i o b
+  . GenericQuery b m s i o
+  ⇒ (Array { | o } → Array { | o } → Aff Unit)
+  → Proxy b
+  → (m ~> Aff)
+  → String
+  → Array { | o }
+  → FullQuery s { | i }
+  → TestSuite
+testWith_ assertFn b runM = 
+  testQueryWith_ (\q → runM $ genericQuery b q) assertFn
+
+testWithPG
+  ∷ ∀ a s
+  . Connection
+  → (TestCtx BackendPGClass PGSelda s { conn ∷ Connection } → a)
+  → a
+testWithPG conn k = k { b, m, s, ctx: { conn } } 
+  where
+    b = (Proxy ∷ Proxy BackendPGClass)
+    m = (FProxy ∷ FProxy PGSelda)
+    s = (Proxy ∷ Proxy s)
+
+testWithSQLite3
+  ∷ ∀ a s
+  . DBConnection
+  → (TestCtx BackendSQLite3Class SQLite3Selda s { conn ∷ DBConnection } → a)
+  → a
+testWithSQLite3 conn k = k { b, m, s, ctx: { conn } } 
+  where
+    b = (Proxy ∷ Proxy BackendSQLite3Class)
+    m = (FProxy ∷ FProxy SQLite3Selda)
+    s = (Proxy ∷ Proxy s)
 
 testQueryWith_
   ∷ ∀ expected query queryResult
@@ -66,7 +141,7 @@ runSeldaAffWith fe conn m = runSelda conn m >>= either onError pure
     msg = "Error occured during text execution: "
     onError e = throwError $ error $ msg <> fe e
 
-runPGSeldaAff ∷ PostgreSQL.Connection → PGSelda ~> Aff
+runPGSeldaAff ∷ Connection → PGSelda ~> Aff
 runPGSeldaAff = runSeldaAffWith $ show
 
 runSQLite3SeldaAff ∷ DBConnection → SQLite3Selda ~> Aff
@@ -74,7 +149,7 @@ runSQLite3SeldaAff = runSeldaAffWith $ show <<< map renderForeignError
 
 type SQLite3Selda = ExceptT MultipleErrors (ReaderT DBConnection Aff)
 
-type PGSelda = ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff)
+type PGSelda = ExceptT PGError (ReaderT Connection Aff)
 
 assertIn ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
 assertIn l1 l2 = for_ l1 \x1 → do

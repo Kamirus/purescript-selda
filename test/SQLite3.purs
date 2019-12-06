@@ -3,17 +3,16 @@ module Test.SQLite3 where
 import Prelude
 
 import Data.Foldable (for_)
-import Data.String (Pattern(..), split)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log, logShow)
-import Foreign (unsafeToForeign)
+import Effect.Class.Console (log)
 import Global.Unsafe (unsafeStringify)
 import SQLite3 (newDB, queryDB)
-import Test.Main (legacySuite, testWithSQLite3)
+import Test.Common (legacySuite)
 import Test.Unit (suite)
 import Test.Unit.Main (runTest)
+import Test.Utils (testWithSQLite3)
 
 main ∷ Effect Unit
 main = launchAff_ do
@@ -46,8 +45,8 @@ main = launchAff_ do
     """ []
   
   -- test
-  queryDB conn "SELECT id FROM people WHERE 10 > 2" [] >>= (log <<< unsafeStringify)
-  queryDB conn "SELECT sum(id), count(id), max(id) FROM emptyTable" [] >>= (log <<< unsafeStringify)
+  -- queryDB conn "SELECT id FROM people WHERE 10 > 2" [] >>= (log <<< unsafeStringify)
+  -- queryDB conn "SELECT sum(id), count(id), max(id) FROM emptyTable" [] >>= (log <<< unsafeStringify)
   liftEffect $ runTest do
     suite "SQLite3" $ testWithSQLite3 conn legacySuite
 
