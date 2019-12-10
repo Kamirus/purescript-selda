@@ -14,7 +14,7 @@ import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), lit, not_, restrict, selectFrom, (.==), (.>))
 import Selda.PG (litF)
-import Selda.PG.Class (deleteFrom, insert1_, insert_, update)
+import Selda.PG.Class (deleteFrom, insert1, insert1_, insert_, update)
 import Selda.Query.Class (class GenericQuery)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
@@ -138,11 +138,11 @@ main cont = do
 
       -- simple test update
       runSeldaAff conn do
-        insert1_ people { id: 5, name: "update", age: Just 999 }
+        { name, age } ← insert1 people { id: 5, name: "update", age: Just 999 }
         update people
-          (\r → r.name .== lit "update")
+          (\r → r.name .== lit name)
           (\r → r { age = lit $ Just 1000 })
-        deleteFrom people \r → r.age .> lit (Just 999)
+        deleteFrom people \r → r.age .> lit age
 
         update employees
           (\r → r.name .== lit "E3")

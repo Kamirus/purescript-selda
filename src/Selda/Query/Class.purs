@@ -8,11 +8,15 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, asks, r
 import Data.Either (Either, either)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
+import Selda (Table)
 import Selda.Query.Type (FullQuery)
 import Type.Proxy (Proxy)
 
-class GenericQuery b m s i o | i → o where
-    genericQuery ∷ Proxy b → FullQuery s { | i } → m (Array { | o })
+class GenericQuery b m s i o | i → o, b → m where
+  genericQuery ∷ Proxy b → FullQuery s { | i } → m (Array { | o })
+
+class GenericInsert b m t r | t → r, b → m where
+  genericInsert ∷ Proxy b → Table t → Array { | r } → m Unit
 
 hoistSeldaWith
   ∷ ∀ r e' e m r'

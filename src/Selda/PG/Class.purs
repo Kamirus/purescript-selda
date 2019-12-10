@@ -23,16 +23,17 @@ import Data.Tuple (Tuple(..))
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, Connection, PGError)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
+import Foreign (Foreign)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Partial.Unsafe (unsafePartial)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
-import Selda.Query.Class (class GenericQuery, class MonadSelda, genericQuery)
-import Selda.Query.ShowStatement (showDeleteFrom, showQuery, showUpdate)
+import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericQuery)
+import Selda.Query.ShowStatement (genericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery, runQuery)
-import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
+import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
@@ -67,11 +68,18 @@ pgExecute m = do
 
 -- | Executes an insert query for each input record.
 insert_
-  ∷ ∀ m r t ret
-  . InsertRecordIntoTableReturning r t ret
+  ∷ ∀ m t r
+  . GenericInsert BackendPGClass m t r
   ⇒ MonadSeldaPG m
   ⇒ Table t → Array { | r } → m Unit
-insert_ t r = void $ insert t r
+insert_ = genericInsert (Proxy ∷ Proxy BackendPGClass)
+
+insert1_
+  ∷ ∀ m t r
+  . GenericInsert BackendPGClass m t r
+  ⇒ MonadSeldaPG m
+  ⇒ Table t → { | r } → m Unit
+insert1_ table r = insert_ table [r]
 
 -- | Executes an insert query for each input record.
 -- | Column constraints: `Default`s are optional, `Auto`s are forbidden
@@ -90,13 +98,6 @@ insert1
   ⇒ Table t → { | r } → m { | ret }
 insert1 table r =
   unsafePartial $ head <$> insertRecordIntoTableReturning r table
-
-insert1_
-  ∷ ∀ m r t ret
-  . InsertRecordIntoTableReturning r t ret
-  ⇒ MonadSeldaPG m
-  ⇒ Table t → { | r } → m Unit
-insert1_ table r = void $ insert1 table r
 
 -- | Inserts `{ | r }` into `Table t`. Checks constraints (Auto, Default).
 -- | Returns inserted record with every column from `Table t`.
@@ -129,6 +130,22 @@ instance insertRecordIntoTableReturningInstance
       q = showInsert1 table colsToinsert colsToRet
     rows ← pgQuery (PostgreSQL.Query q) rTuple
     pure $ map (colsToPGHandler s tr) rows
+
+instance genericInsertPGClass
+    ∷ ( HFoldl RecordToArrayForeign (Array Foreign) { | r } (Array Foreign)
+      , MonadSeldaPG m
+      , TableColumnNames rl
+      , RL.RowToList r rl
+      , CanInsertColumnsIntoTable rl t
+      , RowListLength rl
+      ) ⇒ GenericInsert BackendPGClass m t r
+  where
+  genericInsert _ table rs = do
+    let
+      q = genericShowInsert { ph: "$", fstPH: 1 } table rs
+      rsTuple = rs >>= hfoldl RecordToArrayForeign ([] ∷ Array Foreign)
+    conn ← ask
+    PostgreSQL.PG.execute conn (PostgreSQL.Query q) rsTuple
 
 query
   ∷ ∀ o i s m

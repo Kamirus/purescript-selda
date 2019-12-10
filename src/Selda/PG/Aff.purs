@@ -10,21 +10,31 @@ module Selda.PG.Aff
 
 import Prelude
 
+import Control.Monad.Except (ExceptT)
+import Control.Monad.Reader (ReaderT)
 import Data.Either (Either)
 import Database.PostgreSQL (class FromSQLRow, Connection, PGError)
 import Effect.Aff (Aff)
 import Selda (Col, FullQuery, Table)
 import Selda.Col (class GetCols)
-import Selda.PG.Class (class InsertRecordIntoTableReturning)
+import Selda.PG.Class (class InsertRecordIntoTableReturning, BackendPGClass)
 import Selda.PG.Class as S
-import Selda.Query.Class (runSelda)
+import Selda.Query.Class (class GenericInsert, runSelda)
 import Selda.Query.Utils (class ColsToPGHandler, class TableToColsWithoutAlias)
 
+type PGSelda = ExceptT PGError (ReaderT Connection Aff)
+
 insert_
-  ∷ ∀ r t tr
-  . InsertRecordIntoTableReturning r t tr
+  ∷ ∀ t r
+  . GenericInsert BackendPGClass PGSelda t r
   ⇒ Connection → Table t → Array { | r } → Aff (Either PGError Unit)
 insert_ conn t r = runSelda conn $ S.insert_ t r
+
+insert1_
+  ∷ ∀ r t
+  . GenericInsert BackendPGClass PGSelda t r
+  ⇒ Connection → Table t → { | r } → Aff (Either PGError Unit)
+insert1_ conn t r = runSelda conn $ S.insert1_ t r
 
 insert
   ∷ ∀ r t tr
@@ -37,12 +47,6 @@ insert1
   . InsertRecordIntoTableReturning r t tr
   ⇒ Connection → Table t → { | r } → Aff (Either PGError { | tr })
 insert1 conn t r = runSelda conn $ S.insert1 t r
-
-insert1_
-  ∷ ∀ r t tr
-  . InsertRecordIntoTableReturning r t tr
-  ⇒ Connection → Table t → { | r } → Aff (Either PGError Unit)
-insert1_ conn t r = runSelda conn $ S.insert1_ t r
 
 query
   ∷ ∀ o i tup s
