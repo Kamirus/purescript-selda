@@ -1,20 +1,24 @@
--- | Common to-string functions for SQL statements (SELECT, UPDATE, DELETE)
--- | shared between backends.
+-- | Common to-string functions for SQL statements
+-- | (SELECT, UPDATE, DELETE, INSERT) shared between backends.
 module Selda.Query.ShowStatement where
 
 import Prelude
 
+import Data.Array as Array
 import Data.Exists (runExists)
 import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.ShowQuery (showState)
 import Selda.Query.Type (FullQuery, runQuery)
-import Selda.Query.Utils (class TableToColsWithoutAlias, tableToColsWithoutAlias)
-import Selda.Table (Table(..))
+import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
+import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
+import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
+import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 
 showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → ShowM
@@ -46,3 +50,31 @@ showUpdate table@(Table { name }) pred up = do
   pred_str ← showCol $ pred recordWithCols
   vals ← joinWith ", " <$> (traverse f $ getCols $ up recordWithCols)
   pure $ "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
+
+genericShowInsert
+  ∷ ∀ r rl t
+  . TableColumnNames rl
+  ⇒ RL.RowToList r rl
+  ⇒ CanInsertColumnsIntoTable rl t
+  ⇒ RowListLength rl
+  ⇒ { ph ∷ String, fstPH ∷ Int } → Table t → Array { | r } → String
+genericShowInsert { ph, fstPH } (Table { name }) rs =
+  let
+    cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
+    len = rowListLength (RLProxy ∷ RLProxy rl)
+    placeholders = mkPlaceholders ph fstPH len $ Array.length rs
+  in
+    ["INSERT INTO ", name, " (", cols, ") VALUES ", placeholders, ";"]
+      # joinWith ""
+
+mkPlaceholders ∷ String → Int → Int → Int → String
+mkPlaceholders ph fstPH len n = if n <= 0 then "" else
+  Array.range 0 (n - 1)
+    # map ((*) len >>> (+) fstPH >>> phs)
+    # joinWith ", "
+  where
+    phs i =
+      Array.range i (i + len - 1)
+        # map (\j → ph <> show j)
+        # joinWith ", "
+        # \s → "(" <> s <> ")"

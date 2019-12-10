@@ -173,3 +173,7 @@ assertSeqEq l1 l2 = assert msg $ xs == ys
   msg = show xs <> " != " <> show ys
   xs = fromFoldable l1
   ys = fromFoldable l2
+
+assertEq ∷ ∀ a. Show a ⇒ Eq a ⇒ a → a → Aff Unit
+assertEq x y = assert msg $ x == y
+  where msg = show x <> " != " <> show y
