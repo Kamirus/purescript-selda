@@ -12,8 +12,9 @@ import Effect.Aff.Class (liftAff)
 import Foreign (Foreign, ForeignError, MultipleErrors)
 import Heterogeneous.Folding (class HFoldl)
 import SQLite3 (DBConnection, queryDB)
+import Selda (Table)
 import Selda.Col (class GetCols)
-import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert_, genericQuery)
+import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericInsert_, genericQuery)
 import Selda.Query.ShowStatement (class GenericShowInsert, showQuery)
 import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Query.Utils (class MapR, class ToForeign, RecordToArrayForeign, UnCol_)
@@ -51,6 +52,12 @@ instance genericQuerySQLite3
     conn ← ask
     rows ← liftAff $ queryDB conn strQuery params
     either throwError pure (read rows)
+
+insert_
+  ∷ ∀ m t r
+  . GenericInsert BackendSQLite3Class m t r
+  ⇒ Table t → Array { | r } → m Unit
+insert_ = genericInsert (Proxy ∷ Proxy BackendSQLite3Class)
 
 instance sqlite3ToForeign ∷ WriteForeign a ⇒ ToForeign BackendSQLite3Class a where
   toForeign _ = write

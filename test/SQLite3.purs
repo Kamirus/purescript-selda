@@ -3,11 +3,14 @@ module Test.SQLite3 where
 import Prelude
 
 import Data.Foldable (for_)
+import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import SQLite3 (newDB, queryDB)
-import Test.Common (legacySuite)
+import Selda.SQLite3.Class (insert_)
+import Test.Common (bankAccounts, descriptions, legacySuite, people)
+import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, suite)
-import Test.Utils (testWithSQLite3)
+import Test.Utils (runSeldaAff, testWithSQLite3)
 
 main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do
@@ -18,27 +21,22 @@ main cont = do
   for_ strsCreateTables \s → queryDB conn s []
   
   -- inserts
-  _ ← queryDB conn """
-    INSERT INTO people (id, name, age)
-    VALUES
-      (1,'name1',11),
-      (2,'name2',22),
-      (3,'name3',33);
-    """ []
-  _ ← queryDB conn """
-    INSERT INTO bank_accounts (id, personId, balance, accountType)
-    VALUES
-      (1, 1, 100, 'business'),
-      (2, 1, 150, 'personal'),
-      (3, 3, 300, 'personal');
-    """ []
-  _ ← queryDB conn """
-    INSERT INTO descriptions (id, text)
-    VALUES
-      (1, 'text1'),
-      (3, null);
-    """ []
-  
+  runSeldaAff conn do
+    insert_ people
+      [ { id: 1, name: "name1", age: Just 11 }
+      , { id: 2, name: "name2", age: Just 22 }
+      , { id: 3, name: "name3", age: Just 33 }
+      ]
+    insert_ bankAccounts
+      [ { id: 1, personId: 1, balance: 100, accountType: Business }
+      , { id: 2, personId: 1, balance: 150, accountType: Personal }
+      , { id: 3, personId: 3, balance: 300, accountType: Personal }
+      ]
+    insert_ descriptions
+      [ { id: 1, text: Just "text1" }
+      , { id: 3, text: Nothing }
+      ]
+
   -- test
   -- queryDB conn "SELECT id FROM people WHERE 10 > 2" [] >>= (log <<< unsafeStringify)
   -- queryDB conn "SELECT sum(id), count(id), max(id) FROM emptyTable" [] >>= (log <<< unsafeStringify)

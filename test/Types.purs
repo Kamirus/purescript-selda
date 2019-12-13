@@ -12,7 +12,7 @@ import Database.PostgreSQL (class FromSQLValue, class ToSQLValue)
 import Foreign (ForeignError(..), F, readString, unsafeToForeign)
 import Selda (class Lit)
 import Selda.Expr (Literal(..))
-import Simple.JSON (class ReadForeign)
+import Simple.JSON (class ReadForeign, class WriteForeign, write)
 
 data AccountType
   = Business
@@ -46,3 +46,6 @@ readAccountTypeF =
 
 instance readForeignAccountType ∷ ReadForeign AccountType where
   readImpl = readString >=> readAccountTypeF
+
+instance writeForeignAccountType ∷ WriteForeign AccountType where
+  writeImpl = printAccountType >>> write
