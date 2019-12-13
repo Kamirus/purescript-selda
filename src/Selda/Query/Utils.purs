@@ -18,6 +18,9 @@ import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import Type.RowList (class ListToRow)
 
+type App a b = a b
+infixr 0 type App as :=>
+
 class MappingRL f a b | f a → b
 
 class MapRL f (i ∷ RowList) (o ∷ RowList) | f i → o
