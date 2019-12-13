@@ -20,7 +20,7 @@ import Data.Array.Partial (head)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, Connection, PGError)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, toSQLValue)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
 import Foreign (Foreign)
@@ -33,7 +33,7 @@ import Selda.PG (showInsert1, showPG)
 import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericQuery)
 import Selda.Query.ShowStatement (genericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery, runQuery)
-import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
+import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
@@ -131,8 +131,12 @@ instance insertRecordIntoTableReturningInstance
     rows ← pgQuery (PostgreSQL.Query q) rTuple
     pure $ map (colsToPGHandler s tr) rows
 
+instance pgToForeign ∷ ToSQLValue a ⇒ ToForeign BackendPGClass a where
+  toForeign _ = toSQLValue
+
 instance genericInsertPGClass
-    ∷ ( HFoldl RecordToArrayForeign (Array Foreign) { | r } (Array Foreign)
+    ∷ ( HFoldl (RecordToArrayForeign BackendPGClass)
+          (Array Foreign) { | r } (Array Foreign)
       , MonadSeldaPG m
       , TableColumnNames rl
       , RL.RowToList r rl
@@ -140,10 +144,10 @@ instance genericInsertPGClass
       , RowListLength rl
       ) ⇒ GenericInsert BackendPGClass m t r
   where
-  genericInsert _ table rs = do
+  genericInsert b table rs = do
     let
       q = genericShowInsert { ph: "$", fstPH: 1 } table rs
-      rsTuple = rs >>= hfoldl RecordToArrayForeign ([] ∷ Array Foreign)
+      rsTuple = rs >>= hfoldl (RecordToArrayForeign b) ([] ∷ Array Foreign)
     conn ← ask
     PostgreSQL.PG.execute conn (PostgreSQL.Query q) rsTuple
 

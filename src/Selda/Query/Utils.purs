@@ -4,7 +4,6 @@ import Prelude
 
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class ToSQLValue, toSQLValue)
 import Foreign (Foreign)
 import Heterogeneous.Folding (class Folding, class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Prim.Row as R
@@ -95,12 +94,15 @@ data RecordToTuple = RecordToTuple
 instance rToTuple ∷ Folding RecordToTuple tail a (Tuple a tail) where
   folding _ tail a = Tuple a tail
 
-data RecordToArrayForeign = RecordToArrayForeign
+data RecordToArrayForeign b = RecordToArrayForeign (Proxy b)
 instance rToArrForeign
-    ∷ ToSQLValue a
-    ⇒ Folding RecordToArrayForeign (Array Foreign) a (Array Foreign)
+    ∷ ToForeign b a
+    ⇒ Folding (RecordToArrayForeign b) (Array Foreign) a (Array Foreign)
   where
-  folding _ acc a = [toSQLValue a] <> acc
+  folding (RecordToArrayForeign b) acc a = [toForeign b a] <> acc
+
+class ToForeign b a where
+  toForeign ∷ Proxy b → a → Foreign
 
 class TupleRev t1 acc t2 | t1 acc → t2 where
   tupleRev ∷ t1 → acc → t2
