@@ -51,21 +51,28 @@ showUpdate table@(Table { name }) pred up = do
   vals ← joinWith ", " <$> (traverse f $ getCols $ up recordWithCols)
   pure $ "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
 
-genericShowInsert
-  ∷ ∀ r rl t
-  . TableColumnNames rl
-  ⇒ RL.RowToList r rl
-  ⇒ CanInsertColumnsIntoTable rl t
-  ⇒ RowListLength rl
-  ⇒ { ph ∷ String, fstPH ∷ Int } → Table t → Array { | r } → String
-genericShowInsert { ph, fstPH } (Table { name }) rs =
-  let
-    cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
-    len = rowListLength (RLProxy ∷ RLProxy rl)
-    placeholders = mkPlaceholders ph fstPH len $ Array.length rs
-  in
-    ["INSERT INTO ", name, " (", cols, ") VALUES ", placeholders, ";"]
-      # joinWith ""
+class GenericShowInsert t r where
+  genericShowInsert
+    ∷ { ph ∷ String }
+    → Table t
+    → Array { | r }
+    → String
+
+instance genericShowInsertImpl
+    ∷ ( TableColumnNames rl
+      , RL.RowToList r rl
+      , CanInsertColumnsIntoTable rl t
+      , RowListLength rl
+      ) ⇒ GenericShowInsert t r
+  where
+  genericShowInsert { ph } (Table { name }) rs =
+    let
+      cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
+      len = rowListLength (RLProxy ∷ RLProxy rl)
+      placeholders = mkPlaceholders ph 1 len $ Array.length rs
+    in
+      ["INSERT INTO ", name, " (", cols, ") VALUES ", placeholders, ";"]
+        # joinWith ""
 
 mkPlaceholders ∷ String → Int → Int → Int → String
 mkPlaceholders ph fstPH len n = if n <= 0 then "" else

@@ -22,7 +22,7 @@ testSuite = suite "Unit" do
       ""
 
   test "genericShowInsert" do
-    let ctx = { ph: "$", fstPH: 1 }
+    let ctx = { ph: "$" }
     assertEq
       (genericShowInsert ctx testTable [{ c: 1, a: "a1", z: 11}])
       "INSERT INTO testTable (z, c, a) VALUES ($1, $2, $3);"

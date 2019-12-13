@@ -8,8 +8,12 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, asks, r
 import Data.Either (Either, either)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
+import Foreign (Foreign)
+import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Selda (Table)
+import Selda.Query.ShowStatement (class GenericShowInsert, genericShowInsert)
 import Selda.Query.Type (FullQuery)
+import Selda.Query.Utils (RecordToArrayForeign(..))
 import Type.Proxy (Proxy)
 
 class GenericQuery b m s i o | i → o, b → m where
@@ -17,6 +21,22 @@ class GenericQuery b m s i o | i → o, b → m where
 
 class GenericInsert b m t r | t → r, b → m where
   genericInsert ∷ Proxy b → Table t → Array { | r } → m Unit
+
+-- | parametrized implementation of `genericInsert`
+genericInsert_
+  ∷ ∀ t r a b
+  . GenericShowInsert t r
+  ⇒ HFoldl (RecordToArrayForeign b) (Array Foreign) { | r } (Array Foreign)
+  ⇒ { ph ∷ String, exec ∷ String → Array Foreign → a }
+  → Proxy b
+  → Table t
+  → Array { | r }
+  → a
+genericInsert_ { ph, exec } b table rs = do
+  let
+    q = genericShowInsert { ph } table rs
+    l = rs >>= hfoldl (RecordToArrayForeign b) ([] ∷ Array Foreign)
+  exec q l
 
 hoistSeldaWith
   ∷ ∀ r e' e m r'

@@ -30,10 +30,10 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
-import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericQuery)
-import Selda.Query.ShowStatement (genericShowInsert, showDeleteFrom, showQuery, showUpdate)
+import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericInsert_, genericQuery)
+import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery, runQuery)
-import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
+import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
@@ -138,18 +138,14 @@ instance genericInsertPGClass
     ∷ ( HFoldl (RecordToArrayForeign BackendPGClass)
           (Array Foreign) { | r } (Array Foreign)
       , MonadSeldaPG m
-      , TableColumnNames rl
-      , RL.RowToList r rl
-      , CanInsertColumnsIntoTable rl t
-      , RowListLength rl
+      , GenericShowInsert t r
       ) ⇒ GenericInsert BackendPGClass m t r
   where
-  genericInsert b table rs = do
-    let
-      q = genericShowInsert { ph: "$", fstPH: 1 } table rs
-      rsTuple = rs >>= hfoldl (RecordToArrayForeign b) ([] ∷ Array Foreign)
-    conn ← ask
-    PostgreSQL.PG.execute conn (PostgreSQL.Query q) rsTuple
+  genericInsert = genericInsert_ { exec, ph: "$" }
+    where
+      exec q l = do
+        conn ← ask
+        PostgreSQL.PG.execute conn (PostgreSQL.Query q) l
 
 query
   ∷ ∀ o i s m
