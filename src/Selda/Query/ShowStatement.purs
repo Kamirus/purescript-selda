@@ -15,7 +15,7 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.ShowQuery (showState)
 import Selda.Query.Type (FullQuery, runQuery)
-import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
+import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, type (:=>), rowListLength, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
@@ -27,20 +27,23 @@ showQuery q = showState st
     (Tuple res st') = runQuery $ unwrap q
     st = st' { cols = getCols res }
 
+type ShowDeleteFrom t s r a =
+  TableToColsWithoutAlias s t r ⇒ a
+
 showDeleteFrom
-  ∷ ∀ r s r'
-  . TableToColsWithoutAlias s r r'
-  ⇒ Table r → ({ | r' } → Col s Boolean) → ShowM
+  ∷ ∀ t s r
+  . ShowDeleteFrom t s r :=> (Table t → ({ | r } → Col s Boolean) → ShowM)
 showDeleteFrom table@(Table { name }) pred = do
   let recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
   pred_str ← showCol $ pred recordWithCols
   pure $ "DELETE FROM " <> name <> " WHERE " <> pred_str
 
+type ShowUpdate t s r a = TableToColsWithoutAlias s t r ⇒ GetCols r ⇒ a
+
 showUpdate
-  ∷ ∀ r s r'
-  . TableToColsWithoutAlias s r r'
-  ⇒ GetCols r'
-  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → ShowM
+  ∷ ∀ t s r
+  . ShowUpdate t s r
+  :=> (Table t → ({ | r } → Col s Boolean) → ({ | r } → { | r }) → ShowM)
 showUpdate table@(Table { name }) pred up = do
   let
     recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
@@ -51,6 +54,7 @@ showUpdate table@(Table { name }) pred up = do
   vals ← joinWith ", " <$> (traverse f $ getCols $ up recordWithCols)
   pure $ "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
 
+-- | typeclass-alias for `genericShowInsert` constraints
 class GenericShowInsert t r where
   genericShowInsert
     ∷ { ph ∷ String }
@@ -58,6 +62,7 @@ class GenericShowInsert t r where
     → Array { | r }
     → String
 
+-- | the alias hides the auxiliary type parameter `rl`
 instance genericShowInsertImpl
     ∷ ( TableColumnNames rl
       , RL.RowToList r rl
