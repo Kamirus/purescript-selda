@@ -6,7 +6,8 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import SQLite3 (newDB, queryDB)
-import Selda.SQLite3.Class (insert_)
+import Selda (lit, (.==), (.>))
+import Selda.SQLite3.Class (deleteFrom, insert_, update)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, suite)
@@ -37,9 +38,19 @@ main cont = do
       , { id: 3, text: Nothing }
       ]
 
-  -- test
-  -- queryDB conn "SELECT id FROM people WHERE 10 > 2" [] >>= (log <<< unsafeStringify)
-  -- queryDB conn "SELECT sum(id), count(id), max(id) FROM emptyTable" [] >>= (log <<< unsafeStringify)
+  -- simple test delete
+  runSeldaAff conn do
+    insert_ people [{ id: 4, name: "delete", age: Just 999 }]
+    deleteFrom people \r → r.id .== lit 4
+
+  -- simple test update
+  runSeldaAff conn do
+    insert_ people [{ id: 5, name: "update", age: Just 999 }]
+    update people
+      (\r → r.name .== lit "update")
+      (\r → r { age = lit $ Just 1000 })
+    deleteFrom people \r → r.age .> lit (Just 999)
+
   cont do
     suite "SQLite3" $ testWithSQLite3 conn legacySuite
 
