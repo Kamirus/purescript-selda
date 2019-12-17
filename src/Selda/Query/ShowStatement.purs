@@ -15,7 +15,7 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.ShowQuery (showState)
 import Selda.Query.Type (FullQuery, runQuery)
-import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, type (:=>), rowListLength, tableToColsWithoutAlias)
+import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
@@ -27,23 +27,20 @@ showQuery q = showState st
     (Tuple res st') = runQuery $ unwrap q
     st = st' { cols = getCols res }
 
-type ShowDeleteFrom t s r a =
-  TableToColsWithoutAlias s t r ⇒ a
-
 showDeleteFrom
   ∷ ∀ t s r
-  . ShowDeleteFrom t s r :=> (Table t → ({ | r } → Col s Boolean) → ShowM)
+  . TableToColsWithoutAlias s t r
+  ⇒ Table t → ({ | r } → Col s Boolean) → ShowM
 showDeleteFrom table@(Table { name }) pred = do
   let recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
   pred_str ← showCol $ pred recordWithCols
   pure $ "DELETE FROM " <> name <> " WHERE " <> pred_str
 
-type ShowUpdate t s r a = TableToColsWithoutAlias s t r ⇒ GetCols r ⇒ a
-
 showUpdate
   ∷ ∀ t s r
-  . ShowUpdate t s r
-  :=> (Table t → ({ | r } → Col s Boolean) → ({ | r } → { | r }) → ShowM)
+  . TableToColsWithoutAlias s t r
+  ⇒ GetCols r
+  ⇒ Table t → ({ | r } → Col s Boolean) → ({ | r } → { | r }) → ShowM
 showUpdate table@(Table { name }) pred up = do
   let
     recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
