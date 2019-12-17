@@ -30,7 +30,7 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
-import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericInsert_, genericQuery)
+import Selda.Query.Class (class GenericDelete, class GenericInsert, class GenericQuery, class GenericUpdate, class MonadSelda, genericDelete, genericInsert, genericInsert_, genericQuery, genericUpdate)
 import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery, runQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
@@ -168,16 +168,28 @@ instance genericQueryPG
     pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
 
 deleteFrom
-  ∷ ∀ r s r' m
-  . TableToColsWithoutAlias s r r'
-  ⇒ MonadSeldaPG m
-  ⇒ Table r → ({ | r' } → Col s Boolean) → m Unit
-deleteFrom table pred = pgExecute $ showDeleteFrom table pred
+  ∷ ∀ t s r m
+  . GenericDelete BackendPGClass m s t r
+  ⇒ Table t → ({ | r } → Col s Boolean) → m Unit
+deleteFrom = genericDelete (Proxy ∷ Proxy BackendPGClass)
+
+instance genericDeletePG
+    ∷ ( TableToColsWithoutAlias s t r
+      , MonadSeldaPG m
+      ) ⇒ GenericDelete BackendPGClass m s t r
+  where
+  genericDelete _ table pred = pgExecute $ showDeleteFrom table pred
 
 update
-  ∷ ∀ r s r' m
-  . TableToColsWithoutAlias s r r'
-  ⇒ GetCols r'
-  ⇒ MonadSeldaPG m
-  ⇒ Table r → ({ | r' } → Col s Boolean) → ({ | r' } → { | r' }) → m Unit
-update table pred up = pgExecute $ showUpdate table pred up
+  ∷ ∀ t s r m
+  . GenericUpdate BackendPGClass m s t r
+  ⇒ Table t → ({ | r } → Col s Boolean) → ({ | r } → { | r }) → m Unit
+update = genericUpdate (Proxy ∷ Proxy BackendPGClass)
+
+instance genericUpdatePG
+    ∷ ( TableToColsWithoutAlias s t r
+      , GetCols r
+      , MonadSeldaPG m
+      ) ⇒ GenericUpdate BackendPGClass m s t r
+  where
+  genericUpdate _ table pred up = pgExecute $ showUpdate table pred up
