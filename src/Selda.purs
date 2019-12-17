@@ -1,8 +1,7 @@
 module Selda
   ( module Query.Type
   , module Col
-  , module PG
-  , module PG.Class
+  , module ShowStatement
   , module Query
   , module Table
   , (.==), expEq
@@ -29,9 +28,8 @@ import Selda.Aggr (Aggr(..))
 import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
-import Selda.PG (showInsert1, showQuery, showDeleteFrom, showUpdate) as PG
-import Selda.PG.Class (class MonadSelda, insert_, insert, insert1, insert1_, query, deleteFrom, update) as PG.Class
 import Selda.Query (crossJoin, crossJoin_, restrict, notNull, leftJoin, leftJoin_, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
+import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
 import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
@@ -49,14 +47,14 @@ binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
 
 -- | returns String because the value might not fit in the underlying js float
-count ∷ ∀ s a. Col s a → Aggr s String
+count ∷ ∀ s a. Col s a → Aggr s Int
 count (Col e) = Aggr $ Col $ EFn $ mkExists $ FnCount e identity
 
 -- | returns Maybe in case of empty set aggregation
 max_ ∷ ∀ s a. Col s a → Aggr s (Maybe a)
 max_ (Col e) = Aggr $ Col $ EFn $ mkExists $ FnMax e identity
 
-sum_ ∷ ∀ s a. Col s a → Aggr s (Maybe String)
+sum_ ∷ ∀ s a. Col s a → Aggr s (Maybe Int)
 sum_ (Col e) = Aggr $ Col $ EFn $ mkExists $ FnSum e identity
 
 not_ ∷ ∀ s. Col s Boolean → Col s Boolean

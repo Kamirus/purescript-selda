@@ -2,6 +2,7 @@ module Selda.Expr where
 
 import Prelude
 
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Control.Monad.State (State, get, put, runState)
 import Data.Array as Array
 import Data.Exists (Exists, runExists)
@@ -52,8 +53,8 @@ data UnExp o i = UnExp (UnOp i o) (Expr i)
 
 data Fn o i
   = FnMax (Expr i) (Maybe i ~ o)
-  | FnCount (Expr i) (String ~ o)
-  | FnSum (Expr i) (Maybe String ~ o)
+  | FnCount (Expr i) (Int ~ o)
+  | FnSum (Expr i) (Maybe Int ~ o)
 
 data InArray o i = InArray (Expr i) (Array (Expr i)) (Boolean ~ o)
 
@@ -63,7 +64,6 @@ primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
   escape ∷ Char → Array Char
   escape c = case c of
     '\'' → [c, c]
-    '\\' → [c, c]
     _ → pure c
 
 -- | Keeps a list of parameters that will be passed to the backend-specific
@@ -74,36 +74,44 @@ type QueryParams =
   , nextIndex ∷ Int
   }
 
--- | State monad for: (Query AST) → (Query String with placeholders, Parameters)
-type ShowM = State QueryParams String
+type ShowMCtx = 
+  { mkPlaceholder ∷ Int → String
+  }
 
-runShowM ∷ Int → ShowM → Tuple String QueryParams
-runShowM firstIndex m = runState m
-  { invertedParams: mempty, nextIndex: firstIndex }
+-- | Monad for: (Query AST) → (Query String with placeholders, Parameters)
+type ShowM = ReaderT ShowMCtx (State QueryParams) String
+
+runShowM ∷ (Int → String) → Int → ShowM → Tuple String QueryParams
+runShowM mkPlaceholder firstIndex m = 
+  runReaderT m { mkPlaceholder }
+    # flip runState { invertedParams: mempty, nextIndex: firstIndex }
 
 showM
-  ∷ Int
+  ∷ String
+  → Int
   → ShowM
   → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }
-showM i m = { params, nextIndex, strQuery }
+showM ph i m = { params, nextIndex, strQuery }
   where
-    (Tuple strQuery { invertedParams, nextIndex }) = runShowM i m
+    mkPh int = ph <> show int
+    (Tuple strQuery { invertedParams, nextIndex }) = runShowM mkPh i m
     params = Array.fromFoldable $ List.reverse invertedParams
 
 showForeign ∷ Foreign → ShowM
 showForeign x = do
+  { mkPlaceholder } ← ask
   s ← get
   put $ s { nextIndex = 1 + s.nextIndex, invertedParams = x : s.invertedParams }
-  pure $ "$" <> show s.nextIndex
+  pure $ mkPlaceholder s.nextIndex
 
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
   LBoolean b _ → show b
-  LString s _ → "E'" <> primPGEscape s <> "'"
+  LString s _ → "'" <> primPGEscape s <> "'"
   LInt i _ → show i
   LNull _ → "null"
   LJust x → runExists (\(Some l _) → showLiteral l) x
-  Any s → "E'" <> primPGEscape s <> "'"
+  Any s → "'" <> primPGEscape s <> "'"
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
@@ -139,10 +147,11 @@ showUnExp (UnExp op e) = do
 showFn ∷ ∀ o i. Fn o i → ShowM
 showFn fn = 
   let ret op e = (\s → op <> "(" <> s <> ")") <$> showExpr e in
+  let castToString s = "CAST(" <> s <> " AS INTEGER)" in
   case fn of
-    FnMax e _ → ret "max" e
-    FnCount e _ → ret "count" e
-    FnSum e _ → ret "sum" e
+    FnMax e _ → ret "MAX" e
+    FnCount e _ → castToString <$> ret "COUNT" e
+    FnSum e _ → castToString <$> ret "SUM" e
 
 showInArray ∷ ∀ o i. InArray o i → ShowM
 showInArray (InArray x xs _) = do

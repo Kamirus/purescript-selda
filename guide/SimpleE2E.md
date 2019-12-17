@@ -22,9 +22,10 @@ import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
-import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, insert_, leftJoin, lit, notNull, query, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
+import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, leftJoin, lit, notNull, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
-import Selda.Expr (showM)
+import Selda.PG (showPG)
+import Selda.PG.Class (insert_, query)
 import Selda.Table.Constraint (Auto, Default)
 ```
 ## Setup
@@ -227,7 +228,7 @@ To validate and use the query (nest it or execute it) we have to call `aggregate
 
 ```purescript
 qCountBankAccountOwners
-  ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s String }
+  ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s Int }
 qCountBankAccountOwners = 
   aggregate $ selectFrom_
     (aggregate $ selectFrom bankAccounts \{ id, personId } → do
@@ -301,12 +302,12 @@ The aggregate function `max_` returns nullable values, because SQL's function `M
 
 Now we will show how to execute queries and perform insert operations using `purescript-selda`.
 We perform these actions in a monad that satisfies three constraints: `MonadAff m, MonadError PGError m, MonadReader PostgreSQL.Connection m`.
-There is a provided 'shortcut' for these classes called `MonadSelda m`.
+There is a provided 'shortcut' for these classes called `MonadSeldaPG m`.
 
-> **MonadSelda vs Aff:** <br>
+> **MonadSeldaPG vs Aff:** <br>
 > To avoid monad stack one can use alternative functions in the `PG.Aff` module that work with plain monad `Aff`.
 
-In the example below, we'll use an incompatible monad stack with the `MonadSelda` constraint to show what to do in this situation.
+In the example below, we'll use an incompatible monad stack with the `MonadSeldaPG` constraint to show what to do in this situation.
 Our Reader's context is a record and for an error type we use the polymorphic variant from [purescript-variant](https://github.com/natefaubion/purescript-variant).
 
 ```purescript
@@ -325,7 +326,7 @@ runApp ∷ ∀ a. Context → App a → Aff (Either AppError a)
 runApp ctx m = runExceptT $ runReaderT m ctx
 ```
 
-We define a hoist function that transforms a basic `MonadSelda` stack instance into a more general one that will be suitable for our `App` monad.
+We define a hoist function that transforms a basic `MonadSeldaPG` stack instance into a more general one that will be suitable for our `App` monad.
 
 ```purescript
 hoistSeldaWith
@@ -376,7 +377,7 @@ We can either specify a value for `balance` column or leave it empty and let dat
 ```purescript
   hoistSelda do
     -- transform Query into (Query String, Parameters) and return only SQL as a string
-    let str m = (showM 1 m).strQuery
+    let str m = (showPG m).strQuery
 
     log $ str $ showQuery qNamesWithBalance
     query qNamesWithBalance >>= logShow

@@ -2,58 +2,154 @@ module Test.Utils where
 
 import Prelude
 
-import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.Free (Free)
-import Control.Monad.Reader (ReaderT, runReaderT)
+import Control.Monad.Except (ExceptT)
+import Control.Monad.Reader (ReaderT)
 import Data.Array (fromFoldable)
-import Data.Either (Either(..))
-import Data.Foldable (class Foldable, find, foldl, for_)
+import Data.Either (either)
+import Data.Foldable (class Foldable, find, foldl, for_, length)
+import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
-import Database.PostgreSQL (Connection, Query(..), Row0(..), execute)
-import Database.PostgreSQL as PostgreSQL
+import Data.Variant.Internal (FProxy(..))
+import Database.PostgreSQL (Connection, PGError)
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Exception (error)
+import Foreign (ForeignError, MultipleErrors, renderForeignError)
 import Global.Unsafe (unsafeStringify)
-import Test.Unit (TestF)
+import SQLite3 (DBConnection)
+import Selda (FullQuery)
+import Selda.PG.Class (BackendPGClass)
+import Selda.Query.Class (class GenericQuery, genericQuery, runSelda)
+import Selda.SQLite3.Class (BackendSQLite3Class)
+import Test.Unit (TestSuite)
 import Test.Unit as Unit
 import Test.Unit.Assert (assert)
+import Type.Proxy (Proxy(..))
 
-withRollback
-  ∷ ∀ a
+type TestCtx b m s ctx =
+  { b ∷ Proxy b
+  , m ∷ FProxy m
+  , s ∷ Proxy s
+  , ctx ∷ ctx
+  }
+
+class TestBackend b m ctx | b m → ctx where
+  testWith
+    ∷ ∀ s i o
+    . GenericQuery b m s i o
+    ⇒ TestCtx b m s ctx
+    → (Array { | o } → Array { | o } → Aff Unit)
+    → String
+    → Array { | o }
+    → FullQuery s { | i }
+    → TestSuite
+
+instance testBackendPG
+    ∷ TestBackend BackendPGClass
+        (ExceptT PGError (ReaderT Connection Aff))
+        { conn ∷ Connection }
+  where
+  testWith { b, m, s, ctx: { conn } } assertFn  = do
+    testWith_ assertFn b (runPGSeldaAff conn)
+
+instance testBackendSQLite3
+    ∷ TestBackend BackendSQLite3Class
+        (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
+        { conn ∷ DBConnection }
+  where
+  testWith { b, m, s, ctx: { conn } } assertFn = do
+    testWith_ assertFn b (runSQLite3SeldaAff conn)
+
+testWith_
+  ∷ ∀ m s i o b
+  . GenericQuery b m s i o
+  ⇒ (Array { | o } → Array { | o } → Aff Unit)
+  → Proxy b
+  → (m ~> Aff)
+  → String
+  → Array { | o }
+  → FullQuery s { | i }
+  → TestSuite
+testWith_ assertFn b runM = 
+  testQueryWith_ (\q → runM $ genericQuery b q) assertFn
+
+testWithPG
+  ∷ ∀ a s
   . Connection
+  → (TestCtx BackendPGClass PGSelda s { conn ∷ Connection } → a)
+  → a
+testWithPG conn k = k { b, m, s, ctx: { conn } } 
+  where
+    b = (Proxy ∷ Proxy BackendPGClass)
+    m = (FProxy ∷ FProxy PGSelda)
+    s = (Proxy ∷ Proxy s)
+
+testWithSQLite3
+  ∷ ∀ a s
+  . DBConnection
+  → (TestCtx BackendSQLite3Class SQLite3Selda s { conn ∷ DBConnection } → a)
+  → a
+testWithSQLite3 conn k = k { b, m, s, ctx: { conn } } 
+  where
+    b = (Proxy ∷ Proxy BackendSQLite3Class)
+    m = (FProxy ∷ FProxy SQLite3Selda)
+    s = (Proxy ∷ Proxy s)
+
+testQueryWith_
+  ∷ ∀ expected query queryResult
+  . (query → Aff queryResult)
+  → (expected → queryResult → Aff Unit)
+  → String
+  → expected
+  → query
+  → TestSuite
+testQueryWith_ run assertFunc msg expected query =
+  Unit.test msg $ run query >>= assertFunc expected
+
+testQuery
+  ∷ ∀ a query
+  . Show a ⇒ Eq a
+  ⇒ (query → Aff (Array a))
+  → String
+  → Array a
+  → query
+  → TestSuite
+testQuery execQuery = testQueryWith_ execQuery assertUnorderedSeqEq
+
+withRollback_
+  ∷ ∀ err a
+  . (String → Aff (Maybe err))
   → Aff a
   → Aff Unit
-withRollback conn action = do
-  begun ← execute conn (Query "BEGIN TRANSACTION") Row0
+withRollback_ exec action = do
+  let
+    throwErr msg err = throwError $ error $ msg <> unsafeStringify err
+    rollback = exec "ROLLBACK" >>= case _ of
+      Just err → throwErr "Error on transaction rollback: " err
+      Nothing → pure unit
+  begun ← exec "BEGIN TRANSACTION"
   case begun of
-    Just pgError → throwError $ error $
-      "Error on transaction initialization: " <> unsafeStringify pgError
-    Nothing →
-      void $ catchError (action >>= const rollback) (\e → rollback >>= const (throwError e))
+    Just err → throwErr "Error on transaction initialization: " err
+    Nothing → void $ catchError
+      (action >>= const rollback) (\e → rollback >>= const (throwError e))
+
+runSeldaAff ∷ ∀ r e. r → ExceptT e (ReaderT r Aff) ~> Aff
+runSeldaAff = runSeldaAffWith unsafeStringify
+
+runSeldaAffWith ∷ ∀ e r. (e → String) → r → ExceptT e (ReaderT r Aff) ~> Aff
+runSeldaAffWith fe conn m = runSelda conn m >>= either onError pure
   where
-  rollback = execute conn (Query "ROLLBACK") Row0 >>= (case _ of
-     Just pgError → throwError $ error $ ("Error on transaction rollback: " <> unsafeStringify pgError)
-     Nothing → pure unit)
+    msg = "Error occured during text execution: "
+    onError e = throwError $ error $ msg <> fe e
 
-runSeldaAff
-  ∷ ∀ a
-  . Connection
-  → ExceptT PostgreSQL.PGError (ReaderT PostgreSQL.Connection Aff) a
-  → Aff a
-runSeldaAff conn m = do
-  r ← runReaderT (runExceptT m) conn
-  case r of
-    Left pgError →
-      throwError $ error ("PGError occured during test execution: " <> unsafeStringify (pgError))
-    Right a → pure a
+runPGSeldaAff ∷ Connection → PGSelda ~> Aff
+runPGSeldaAff = runSeldaAffWith $ show
 
-test
-  ∷ ∀ a
-   . Connection
-  → String
-  → Aff a
-  → Free TestF Unit
-test conn t a = Unit.test t (withRollback conn a)
+runSQLite3SeldaAff ∷ DBConnection → SQLite3Selda ~> Aff
+runSQLite3SeldaAff = runSeldaAffWith $ show <<< map renderForeignError
+
+type SQLite3Selda = ExceptT MultipleErrors (ReaderT DBConnection Aff)
+
+type PGSelda = ExceptT PGError (ReaderT Connection Aff)
 
 assertIn ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
 assertIn l1 l2 = for_ l1 \x1 → do
@@ -65,6 +161,11 @@ assertUnorderedSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldab
 assertUnorderedSeqEq l1 l2 = do
   assertIn l1 l2
   assertIn l2 l1
+  let 
+    len1 = (length l1 ∷ Int)
+    len2 = (length l2 ∷ Int)
+    msg = "The same elements, but the length is different : " <> show len1 <> " != " <> show len2
+  assert msg $ len1 == len2
 
 assertSeqEq ∷ ∀ f2 f1 a. Show a ⇒ Eq a ⇒ Foldable f2 ⇒ Foldable f1 ⇒ f1 a → f2 a → Aff Unit
 assertSeqEq l1 l2 = assert msg $ xs == ys
@@ -72,3 +173,7 @@ assertSeqEq l1 l2 = assert msg $ xs == ys
   msg = show xs <> " != " <> show ys
   xs = fromFoldable l1
   ys = fromFoldable l2
+
+assertEq ∷ ∀ a. Show a ⇒ Eq a ⇒ a → a → Aff Unit
+assertEq x y = assert msg $ x == y
+  where msg = show x <> " != " <> show y
