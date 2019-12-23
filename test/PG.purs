@@ -13,7 +13,7 @@ import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), lit, not_, restrict, selectFrom, (.==), (.>))
-import Selda.PG (litF)
+import Selda.PG (extract, litF)
 import Selda.PG.Class (deleteFrom, insert1, insert1_, insert_, update)
 import Selda.Query.Class (class GenericQuery)
 import Selda.Table.Constraint (Auto, Default)
@@ -40,6 +40,9 @@ testSuite
   ⇒ GenericQuery b m s
       ( date ∷ Col s Date, id ∷ Col s Int, name ∷ Col s String, salary ∷ Col s Int )
       ( date ∷ Date, id ∷ Int, name ∷ String, salary ∷ Int )
+  ⇒ GenericQuery b m s
+      ( y ∷ Col s Int, m ∷ Col s Int, d ∷ Col s Int )
+      ( y ∷ Int, m ∷ Int, d ∷ Int )
   ⇒ TestCtx b m s ctx
   → TestSuite
 testSuite ctx = do
@@ -55,6 +58,17 @@ testSuite ctx = do
     $ selectFrom employees \r → do
         restrict $ not_ $ r.date .> (litF $ date 2000 11 21)
         pure r
+
+  testWith ctx unordered "extract month from employees"
+    [ { y: 2000, m: 10, d: 20 }
+    , { y: 2000, m: 11, d: 21 }
+    , { y: 2000, m: 12, d: 22 }
+    ]
+    $ selectFrom employees \r → do
+        let y = extract "year" r.date
+        let m = extract "month" r.date
+        let d = extract "day" r.date
+        pure { y, m, d }
 
 main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do

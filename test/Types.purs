@@ -10,8 +10,6 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.List.NonEmpty (singleton)
 import Database.PostgreSQL (class FromSQLValue, class ToSQLValue)
 import Foreign (ForeignError(..), F, readString, unsafeToForeign)
-import Selda (class Lit)
-import Selda.Expr (Literal(..))
 import Simple.JSON (class ReadForeign, class WriteForeign, write)
 
 data AccountType
@@ -36,9 +34,6 @@ instance fromSqlValueAccountType ∷ FromSQLValue AccountType where
 
 instance toSQLValueProductType ∷ ToSQLValue AccountType where
   toSQLValue = printAccountType >>> unsafeToForeign
-
-instance litAccountType ∷ Lit AccountType where
-  literal x = Any (printAccountType x)
 
 readAccountTypeF ∷ String → F AccountType
 readAccountTypeF =

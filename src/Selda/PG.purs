@@ -6,11 +6,11 @@ import Data.Array as Array
 import Data.String (joinWith)
 import Database.PostgreSQL (class ToSQLValue, toSQLValue)
 import Foreign (Foreign)
-import Selda.Col (Col(..))
+import Selda.Col (Col(..), showCol)
 import Selda.Expr (Expr(..), ShowM, showM)
+import Selda.Query.Utils (class RowListLength, rowListLength)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
-import Selda.Query.Utils (class RowListLength, rowListLength)
 import Type.Data.RowList (RLProxy)
 
 litF ∷ ∀ s a. ToSQLValue a ⇒ a → Col s a
@@ -39,3 +39,11 @@ showInsert1 (Table { name }) colsToinsert colsToRet =
   "INSERT INTO " <> name <> " (" <> cols <> ") " 
     <> "VALUES " <> "(" <> placeholders <> ") "
     <> "RETURNING " <> rets
+
+-- | **PG specific** - The extract function retrieves subfields
+-- | such as year or hour from date/time values.
+-- | e.g. extract "year" (d ∷ Col s JSDate) 
+extract ∷ ∀ a s. String → Col s a → Col s Int
+extract field srcCol = Col $ Any do
+  s ← showCol srcCol
+  pure $ "extract(" <> field <> " from " <> s <> ")"

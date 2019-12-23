@@ -23,7 +23,6 @@ data Literal a
   | LInt Int (Int ~ a)
   | LNull (Exists (None a))
   | LJust (Exists (Some a))
-  | Any String
 
 data Some a b = Some (Literal b) (Maybe b ~ a)
 
@@ -49,6 +48,7 @@ data Expr o
   | EFn (Exists (Fn o))
   | EInArray (Exists (InArray o)) 
   | EForeign Foreign
+  | Any ShowM
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
@@ -114,7 +114,6 @@ showLiteral = case _ of
   LInt i _ → show i
   LNull _ → "null"
   LJust x → runExists (\(Some l _) → showLiteral l) x
-  Any s → "'" <> primPGEscape s <> "'"
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
@@ -134,6 +133,7 @@ showExpr = case _ of
   EFn fn → runExists showFn fn
   EInArray e → runExists showInArray e
   EForeign x → showForeign x
+  Any m → primPGEscape <$> m
 
 showBinExp ∷ ∀ o i. BinExp o i → ShowM
 showBinExp (BinExp op e1 e2) = do
