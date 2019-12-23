@@ -32,6 +32,9 @@ data None a b = None (Maybe b ~ a)
 data BinOp i o
   = Or (Boolean ~ i) (Boolean ~ o)
   | Gt (Boolean ~ o)
+  | Ge (Boolean ~ o)
+  | Lt (Boolean ~ o)
+  | Le (Boolean ~ o)
   | Eq (Boolean ~ o)
 
 data UnOp i o
@@ -117,6 +120,9 @@ showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
   Or _ _ → " or "
   Gt _ → " > "
+  Ge _ → " >= "
+  Lt _ → " < "
+  Le _ → " <= "
   Eq _ → " = "
 
 showExpr ∷ ∀ a. Expr a → ShowM

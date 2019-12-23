@@ -6,9 +6,9 @@ module Selda
   , module Table
   , (.==), expEq
   , (.>), expGt
-  -- , (.<)
-  -- , (.>=)
-  -- , (.<=)
+  , (.<), expLt
+  , (.>=), expGe
+  , (.<=), expLe
   -- , (.&&)
   , (.||), expOr
   , count
@@ -39,6 +39,15 @@ expOr = binOp (Or identity identity)
 
 expGt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
 expGt = binOp (Gt identity)
+
+expGe ∷ ∀ s a. Col s a → Col s a → Col s Boolean
+expGe = binOp (Ge identity)
+
+expLt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
+expLt = binOp (Lt identity)
+
+expLe ∷ ∀ s a. Col s a → Col s a → Col s Boolean
+expLe = binOp (Le identity)
 
 expEq ∷ ∀ s a. Col s a → Col s a → Col s Boolean
 expEq = binOp (Eq identity)
@@ -75,8 +84,8 @@ desc = Desc
 -- infixl 4 `like`
 infixl 4 expEq as .==
 infixl 4 expGt as .>
--- infixl 4 expLt as .<
--- infixl 4 expGe as .>=
--- infixl 4 expLe as .<=
+infixl 4 expLt as .<
+infixl 4 expGe as .>=
+infixl 4 expLe as .<=
 -- infixr 3 expAnd as .&&
 infixr 2 expOr as .||
