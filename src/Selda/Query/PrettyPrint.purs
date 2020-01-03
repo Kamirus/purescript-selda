@@ -9,11 +9,12 @@ import Data.Array (reverse)
 import Data.Array as Array
 import Data.Foldable (foldM)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Foreign (Foreign)
 import Prettier.Printer (DOC, line, nest, pretty, text)
 import Selda.Expr (QueryParams, ShowMCtx, showExpr, showM)
 import Selda.Query.ShowQuery (showCols, showGrouping, showLimit, showOrdering, showRestricts)
-import Selda.Query.Type (GenState, SQL(..), Source(..))
+import Selda.Query.Type (GenState_, SQL(..), Source(..))
 
 type PrettyM = ReaderT ShowMCtx (State QueryParams) DOC
 
@@ -24,9 +25,9 @@ prettyM
   → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }
 prettyM ph i m = showM ph i $ pretty 0 <$> m
 
-ppState ∷ GenState → PrettyM
-ppState { cols, sources, restricts, aggr, order, limit } =
-  (text <$> (<>) " " <$> showCols cols)
+ppState ∷ GenState_ → PrettyM
+ppState { cols, sources, restricts, aggr, order, limit, distinct } =
+  (text <$> (<>) " " <$> showCols distinct cols)
     `appDoc` ppSources sources
     `appTxt` showRestricts restricts
     `appTxt` showGrouping aggr
@@ -68,5 +69,5 @@ ppSQL ∷ SQL → PrettyM
 ppSQL = case _ of
   FromTable t → pure $ text $ t.name <> " " <> t.alias
   SubQuery alias state → do
-    s ← ppState state
+    s ← ppState $ unwrap state
     pure $ nest 2 $ line <> text "(" <> nest 1 (s <> text (" ) " <> alias))

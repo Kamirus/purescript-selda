@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, groupBy, inArray, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, (.==), (.>), (.||))
 import Selda.PG (litF)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery)
@@ -256,3 +256,10 @@ legacySuite ctx = do
     $ selectFrom people \r → do
         restrict $ not_ $ r.id `inArray` [ lit 1, lit 3 ]
         pure r
+
+  testWith ctx unordered "select distinct personId from bankAccounts"
+    [ { pid: 1 }
+    , { pid: 3 }
+    ]
+    $ distinct $ selectFrom bankAccounts \r → do
+        pure { pid: r.personId }

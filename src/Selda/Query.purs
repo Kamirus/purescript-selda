@@ -2,11 +2,10 @@ module Selda.Query where
 
 import Prelude
 
-import Control.Monad.State (modify_)
 import Data.Array ((:))
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (unwrap, wrap)
 import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
@@ -15,7 +14,7 @@ import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
-import Selda.Query.Type (FullQuery(..), Order, Query(..), SQL(..), Source(..), freshId, runQuery)
+import Selda.Query.Type (FullQuery(..), GenState(..), Order, Query, SQL(..), Source(..), freshId, modify_, runQuery)
 import Selda.Query.Utils (class ContainsOnlyColTypes)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
@@ -39,7 +38,7 @@ selectFrom_
 selectFrom_ iq k = FullQuery $ crossJoin_ iq >>= k
 
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
-restrict (Col e) = Query $ modify_ \st → st { restricts = e : st.restricts }
+restrict (Col e) = modify_ \st → st { restricts = e : st.restricts }
 
 notNull ∷ ∀ s a. Col s (Maybe a) → Query s (Col s a)
 notNull col@(Col e) = do 
@@ -52,7 +51,7 @@ notNull col@(Col e) = do
 crossJoin ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
 crossJoin table = do
   { res, sql } ← fromTable table
-  Query $ modify_ $ \st → st { sources = Product sql : st.sources }
+  modify_ \st → st { sources = Product sql : st.sources }
   pure res
 
 crossJoin_
@@ -63,8 +62,16 @@ crossJoin_
 crossJoin_ iq = do
   let q = unwrap iq
   { res, sql } ← fromSubQuery q
-  Query $ modify_ $ \st → st { sources = Product sql : st.sources }
+  modify_ \st → st { sources = Product sql : st.sources }
   pure res
+
+distinct
+  ∷ ∀ s r
+  . FullQuery s { | r }
+  → FullQuery s { | r }
+distinct (FullQuery q) = FullQuery do
+  modify_ \st → st { distinct = true }
+  q
 
 aggregate
   ∷ ∀ s aggr res
@@ -75,7 +82,7 @@ aggregate q = map (hmapWithIndex UnAggr) q
 
 groupBy ∷ ∀ s a. Col s a → Query s (Aggr s a)
 groupBy col@(Col e) = do
-  Query $ modify_ \st → st { aggr = st.aggr <> [mkExists e] }
+  modify_ \st → st { aggr = st.aggr <> [mkExists e] }
   pure $ Aggr col
 
 groupBy'
@@ -86,15 +93,15 @@ groupBy'
   → Query s { | o }
 groupBy' i = do
   let aggr = map snd $ getCols i
-  Query $ modify_ \st → st { aggr = st.aggr <> aggr }
+  modify_ \st → st { aggr = st.aggr <> aggr }
   pure $ hmap WrapWithAggr i
 
 orderBy ∷ ∀ s a. Order → Col s a → Query s Unit
 orderBy order (Col e) =
-  Query $ modify_ \st → st { order = st.order <> [Tuple order $ mkExists e] }
+  modify_ \st → st { order = st.order <> [Tuple order $ mkExists e] }
 
 limit ∷ ∀ s. Int → Query s Unit
-limit i = Query $ modify_ $ _ { limit = Just i }
+limit i = modify_ $ _ { limit = Just i }
 
 leftJoin
   ∷ ∀ r s res mres
@@ -106,7 +113,7 @@ leftJoin
 leftJoin table on = do
   { res, sql } ← fromTable table
   let Col e = on res
-  Query $ modify_ \ st → st { sources = LeftJoin sql e : st.sources }
+  modify_ \ st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
 -- | `leftJoin_ on q`
@@ -126,7 +133,7 @@ leftJoin_ on iq = do
   let q = unwrap iq
   { res, sql } ← fromSubQuery q
   let Col e = on res
-  Query $ modify_ \st → st { sources = LeftJoin sql e : st.sources }
+  modify_ \st → st { sources = LeftJoin sql e : st.sources }
   pure $ hmap WrapWithMaybe res
 
 class FromTable s t c | s t → c where
@@ -177,11 +184,11 @@ instance fromSubQueryI
     ⇒ FromSubQuery s inner res
   where
   fromSubQuery q = do
-    let (Tuple innerRes st) = runQuery q
+    let (Tuple innerRes (GenState st)) = runQuery q
     let res0 = hmapWithIndex OuterCols innerRes
     alias ← subQueryAlias
     let res = createSubQueryResult alias res0
-    pure $ { res, sql: SubQuery alias $ st { cols = getCols res0 }, alias }
+    pure $ { res, sql: SubQuery alias $ wrap $ st { cols = getCols res0 }, alias }
 
 -- | Outside of the subquery, every returned col (in SELECT ...) 
 -- | (no matter if it's just a column of some table or expression or function or ...)

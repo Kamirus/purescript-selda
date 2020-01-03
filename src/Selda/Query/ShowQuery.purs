@@ -7,17 +7,18 @@ import Data.Array as Array
 import Data.Exists (Exists, runExists)
 import Data.Foldable (foldM)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Selda.Expr (Expr, ShowM, showExpr)
-import Selda.Query.Type (GenState, Order(..), SQL(..), Source(..))
+import Selda.Query.Type (GenState_, Order(..), SQL(..), Source(..))
 import Selda.Table (Alias)
 
-showState ∷ GenState → ShowM
-showState { cols, sources, restricts, aggr, order, limit } = 
+showState ∷ GenState_ → ShowM
+showState { cols, sources, restricts, aggr, order, limit, distinct } = 
   let appendM a b = (<>) <$> a <*> b in
-  showCols cols
+  showCols distinct cols
     `appendM` showSources sources
     `appendM` showRestricts restricts
     `appendM` showGrouping aggr
@@ -47,7 +48,7 @@ showSQL ∷ SQL → ShowM
 showSQL = case _ of
   FromTable t → pure $ t.name <> " " <> t.alias
   SubQuery alias state → do
-    s ← showState state
+    s ← showState $ unwrap state
     pure $ "(" <> s <> ") " <> alias
 
 showXS ∷ ∀ a m. Monad m ⇒ String → String → (a → m String) → Array a → m String
@@ -57,8 +58,9 @@ showXS clause sep f = case _ of
     ss ← traverse f xs
     pure $ clause <> joinWith sep ss
 
-showCols ∷ Array (Tuple Alias (Exists Expr)) → ShowM
-showCols = showXS "SELECT " ", " showAliasedCol
+showCols ∷ Boolean → Array (Tuple Alias (Exists Expr)) → ShowM
+showCols distinct = showXS s ", " showAliasedCol
+  where s = "SELECT " <> if distinct then "DISTINCT " else ""
 
 showRestricts ∷ Array (Expr Boolean) → ShowM
 showRestricts = showXS " WHERE " " AND " showExpr

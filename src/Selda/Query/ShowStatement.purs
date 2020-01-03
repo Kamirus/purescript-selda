@@ -15,7 +15,7 @@ import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.PrettyPrint (PrettyM, ppState)
 import Selda.Query.ShowQuery (showState)
-import Selda.Query.Type (FullQuery, runQuery)
+import Selda.Query.Type (FullQuery, GenState(..), runQuery)
 import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
@@ -25,13 +25,13 @@ import Type.Proxy (Proxy(..))
 ppQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s { | i } → PrettyM
 ppQuery q = ppState st
   where
-    (Tuple res st') = runQuery $ unwrap q
+    (Tuple res (GenState st')) = runQuery $ unwrap q
     st = st' { cols = getCols res }
 
 showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → ShowM
 showQuery q = showState st
   where
-    (Tuple res st') = runQuery $ unwrap q
+    (Tuple res (GenState st')) = runQuery $ unwrap q
     st = st' { cols = getCols res }
 
 showDeleteFrom
