@@ -9,7 +9,7 @@ module Selda
   , (.<), expLt
   , (.>=), expGe
   , (.<=), expLe
-  -- , (.&&)
+  , (.&&), expAnd
   , (.||), expOr
   , count
   , max_
@@ -33,6 +33,9 @@ import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as Show
 import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
+ 
+expAnd ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
+expAnd = binOp (And identity identity)
 
 expOr ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
 expOr = binOp (Or identity identity)
@@ -87,5 +90,5 @@ infixl 4 expGt as .>
 infixl 4 expLt as .<
 infixl 4 expGe as .>=
 infixl 4 expLe as .<=
--- infixr 3 expAnd as .&&
+infixr 3 expAnd as .&&
 infixr 2 expOr as .||

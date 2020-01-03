@@ -30,6 +30,7 @@ data None a b = None (Maybe b ~ a)
 
 data BinOp i o
   = Or (Boolean ~ i) (Boolean ~ o)
+  | And (Boolean ~ i) (Boolean ~ o)
   | Gt (Boolean ~ o)
   | Ge (Boolean ~ o)
   | Lt (Boolean ~ o)
@@ -118,6 +119,7 @@ showLiteral = case _ of
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
   Or _ _ → " or "
+  And _ _ → " and "
   Gt _ → " > "
   Ge _ → " >= "
   Lt _ → " < "
