@@ -116,33 +116,51 @@ let upstream =
 
 let overrides = {=}
 
+let prettier-printer = 
+  { dependencies = 
+      [ "console"
+      , "lists"
+      , "prelude"
+      , "psci-support"
+      , "quickcheck"
+      , "spec"
+      , "spec-discovery"
+      , "tuples"
+      ]
+  , repo =
+      "https://github.com/paulyoung/purescript-prettier-printer.git"
+  , version = 
+      "paulyoung/spago"
+  }
+
 let additions =
-      { postgresql-client =
-          mkPackage
-          [ "aff"
-          , "arrays"
-          , "bifunctors"
-          , "bytestrings"
-          , "datetime"
-          , "decimals"
-          , "effect"
-          , "either"
-          , "exceptions"
-          , "foldable-traversable"
-          , "foreign"
-          , "foreign-generic"
-          , "foreign-object"
-          , "js-date"
-          , "lists"
-          , "maybe"
-          , "newtype"
-          , "nullable"
-          , "prelude"
-          , "transformers"
-          , "tuples"
-          ]
-          "https://github.com/rightfold/purescript-postgresql-client.git"
-          "v3.0.0"
-      }
+  { postgresql-client =
+      mkPackage
+      [ "aff"
+      , "arrays"
+      , "bifunctors"
+      , "bytestrings"
+      , "datetime"
+      , "decimals"
+      , "effect"
+      , "either"
+      , "exceptions"
+      , "foldable-traversable"
+      , "foreign"
+      , "foreign-generic"
+      , "foreign-object"
+      , "js-date"
+      , "lists"
+      , "maybe"
+      , "newtype"
+      , "nullable"
+      , "prelude"
+      , "transformers"
+      , "tuples"
+      ]
+      "https://github.com/rightfold/purescript-postgresql-client.git"
+      "v3.0.0"
+  , prettier-printer = prettier-printer
+  }
 
 in  upstream // overrides // additions

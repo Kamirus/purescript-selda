@@ -21,6 +21,7 @@ You can edit this file as you like.
     , "test-unit"
     , "transformers"
     , "variant"
+    , "prettier-printer"
     ]
 , packages =
     ./packages.dhall
