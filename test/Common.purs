@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, (.&&), (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, (.&&), (.==), (.>), (.||))
 import Selda.PG (litF)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery)
@@ -273,3 +273,9 @@ legacySuite ctx = do
           (\b → r.id .== b.personId .&& b.balance .> lit 100)
         _ ← notNull b.id 
         pure { pid: r.id }
+
+  testWith ctx unordered "select not null text from descriptions"
+    [ { id: 3, text: Nothing } ]
+    $ selectFrom descriptions \r → do
+        restrict $ isNull r.text
+        pure r

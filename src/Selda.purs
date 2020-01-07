@@ -16,6 +16,7 @@ module Selda
   , sum_
   , not_
   , inArray
+  , isNull
   , asc, desc
   ) where
 
@@ -25,8 +26,8 @@ import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Selda.Aggr (Aggr(..))
-import Selda.Col (Col(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
+import Selda.Col (Col(..))
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
 import Selda.Query (crossJoin, crossJoin_, restrict, notNull, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
@@ -75,6 +76,9 @@ not_ (Col e) = Col $ EUnOp $ mkExists $ UnExp (Not identity identity) e
 inArray ∷ ∀ s a. Col s a → Array (Col s a) → Col s Boolean
 inArray (Col e) cols = Col $ EInArray $ mkExists $ InArray e exprs identity
   where exprs = map unwrap cols
+
+isNull ∷ ∀ s a. Col s (Maybe a) → Col s Boolean
+isNull (Col e) = Col $ EUnOp $ mkExists $ UnExp (IsNull identity) e
 
 asc ∷ Order
 asc = Asc

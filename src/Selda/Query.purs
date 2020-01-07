@@ -40,10 +40,12 @@ selectFrom_ iq k = FullQuery $ crossJoin_ iq >>= k
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = modify_ \st → st { restricts = e : st.restricts }
 
+-- | `nutNull col` adds to the WHERE clause that col is not null
+-- | and returns the coerced column.
 notNull ∷ ∀ s a. Col s (Maybe a) → Query s (Col s a)
 notNull col@(Col e) = do 
   let
-    notNullCol = Col $ EUnOp $ mkExists $ UnExp (IsNull identity) e
+    notNullCol = Col $ EUnOp $ mkExists $ UnExp (IsNotNull identity) e
     fromMaybeCol = (unsafeCoerce ∷ Col s (Maybe a) → Col s a)
   restrict notNullCol
   pure $ fromMaybeCol col

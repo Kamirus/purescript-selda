@@ -38,7 +38,8 @@ data BinOp i o
   | Eq (Boolean ~ o)
 
 data UnOp i o
-  = IsNull (Boolean ~ o)
+  = IsNotNull (Boolean ~ o)
+  | IsNull (Boolean ~ o)
   | Not (Boolean ~ i) (Boolean ~ o)
 
 data Expr o
@@ -148,7 +149,8 @@ showUnExp (UnExp op e) = do
   let
     ret s = "(" <> s <> ")"
     matchOp s = case op of
-      IsNull _ → s <> " IS NOT NULL"
+      IsNotNull _ → s <> " IS NOT NULL"
+      IsNull _ → s <> " IS NULL"
       Not _ _ → "NOT " <> s
   ret <$> matchOp <$> showExpr e
 
