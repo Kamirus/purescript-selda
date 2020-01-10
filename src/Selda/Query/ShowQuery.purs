@@ -4,40 +4,12 @@ import Prelude
 
 import Data.Exists (Exists, runExists)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Selda.Expr (Expr, ShowM, showExpr)
-import Selda.Query.Type (GenState_, Order(..), QBinOp(..), SQL(..), Source(..))
+import Selda.Query.Type (Order(..), QBinOp(..))
 import Selda.Table (Alias)
-
-showState ∷ GenState_ → ShowM
-showState { cols, source, restricts, aggr, order, limit, distinct } = 
-  let appendM a b = (<>) <$> a <*> b in
-  showCols distinct cols
-    `appendM` ((<>) " FROM " <$> showSource source)
-    `appendM` showRestricts restricts
-    `appendM` showGrouping aggr
-    `appendM` showOrdering order
-    `appendM` (showLimit >>> pure) limit
-
-showSource ∷ Source → ShowM
-showSource = case _ of
-  From t → showSQL t
-  CrossJoin src sql → do
-    src' ← showSource src
-    sql' ← showSQL sql
-    pure $ src' <> " CROSS JOIN " <> sql'
-  LeftJoin src sql e → do
-    src' ← showSource src
-    sql' ← showSQL sql
-    e' ← showExpr e
-    pure $ src' <> " LEFT JOIN " <> sql' <> " ON (" <> e' <> ")"
-  Combination op q1 q2 alias → do
-    s1 ← showState $ unwrap q1
-    s2 ← showState $ unwrap q2
-    pure $ "(" <> s1 <> showCompoundOp op <> s2 <> ") " <> alias
 
 showCompoundOp ∷ QBinOp → String
 showCompoundOp = case _ of
@@ -45,13 +17,6 @@ showCompoundOp = case _ of
   UnionAll → " UNION ALL "
   Intersect → " INTERSECT "
   Except → " EXCEPT "
-
-showSQL ∷ SQL → ShowM
-showSQL = case _ of
-  FromTable t → pure $ t.name <> " " <> t.alias
-  SubQuery alias state → do
-    s ← showState $ unwrap state
-    pure $ "(" <> s <> ") " <> alias
 
 showXS ∷ ∀ a m. Monad m ⇒ String → String → (a → m String) → Array a → m String
 showXS clause sep f = case _ of

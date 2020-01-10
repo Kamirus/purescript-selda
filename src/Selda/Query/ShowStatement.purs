@@ -14,11 +14,11 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.PrettyPrint (PrettyM, ppState)
-import Selda.Query.ShowQuery (showState)
 import Selda.Query.Type (FullQuery, GenState(..), runQuery)
 import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
+import Text.Pretty (render)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 
@@ -29,10 +29,7 @@ ppQuery q = ppState st
     st = st' { cols = getCols res }
 
 showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → ShowM
-showQuery q = showState st
-  where
-    (Tuple res (GenState st')) = runQuery $ unwrap q
-    st = st' { cols = getCols res }
+showQuery q = render 0 <$> ppQuery q
 
 showDeleteFrom
   ∷ ∀ t s r

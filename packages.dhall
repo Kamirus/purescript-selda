@@ -116,21 +116,18 @@ let upstream =
 
 let overrides = {=}
 
-let prettier-printer = 
+let prettyprinter = 
   { dependencies = 
-      [ "console"
-      , "lists"
-      , "prelude"
-      , "psci-support"
-      , "quickcheck"
-      , "spec"
-      , "spec-discovery"
-      , "tuples"
+      [ "prelude"
+      , "unfoldable"
+      , "random"
+      , "ansi"
+      , "console"
       ]
   , repo =
-      "https://github.com/paulyoung/purescript-prettier-printer.git"
+      "https://github.com/Kamirus/purescript-prettyprinter.git"
   , version = 
-      "paulyoung/spago"
+      "master"
   }
 
 let additions =
@@ -160,7 +157,7 @@ let additions =
       ]
       "https://github.com/rightfold/purescript-postgresql-client.git"
       "v3.0.0"
-  , prettier-printer = prettier-printer
+  , prettyprinter = prettyprinter
   }
 
 in  upstream // overrides // additions
