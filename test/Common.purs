@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<), (.<=), (.==), (.>), (.||))
 import Selda.PG (litF)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery)
@@ -285,7 +285,7 @@ legacySuite ctx = do
     , { id: 2, name: "name2", age: Just 22 }
     , { id: 3, name: "name3", age: Just 33 }
     ]
-    $ selectFrom people pure `union` selectFrom people pure
+    $ selectFrom people pure `union` selectFrom people pure $ pure
 
   testWith ctx unordered "union people with itself - nested variant"
     [ { id: 1 }
@@ -293,7 +293,7 @@ legacySuite ctx = do
     , { id: 3 }
     ]
     $ selectFrom_
-        (selectFrom people pure `union` selectFrom people pure)
+        (selectFrom people pure `union` selectFrom people pure $ pure)
         \{ id } → pure { id }
 
   testWith ctx unordered "union age and balance"
@@ -301,11 +301,12 @@ legacySuite ctx = do
     , { v: 22 }
     , { v: 33 }
     , { v: 100 } 
-    , { v: 150 }
-    , { v: 300 }
     ]
     $ union
         (selectFrom bankAccounts \r → pure { v: r.balance })
         (selectFrom people \r → do
           v ← notNull r.age
           pure { v })
+        \r → do
+          restrict $ r.v .<= lit 100
+          pure r

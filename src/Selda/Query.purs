@@ -143,11 +143,12 @@ leftJoin_ on iq = do
   pure $ hmap WrapWithMaybe res
 
 type CombineQuery
-  = ∀ s r inner i
+  = ∀ s r inner i o
   . FromSubQuery s inner i
-  ⇒ HMapWithIndex SubQueryResult { | i } { | r }
+  ⇒ HMapWithIndex SubQueryResult { | i } { | o }
   ⇒ FullQuery (Inner s) { | inner }
   → FullQuery (Inner s) { | inner }
+  → ({ | o } → Query s { | r })
   → FullQuery s { | r }
 
 union ∷ CombineQuery
@@ -163,20 +164,21 @@ except ∷ CombineQuery
 except = combineWith Except
 
 combineWith
-  ∷ ∀ s r inner i
+  ∷ ∀ s r inner i o
   . FromSubQuery s inner i
-  ⇒ HMapWithIndex SubQueryResult { | i } { | r }
+  ⇒ HMapWithIndex SubQueryResult { | i } { | o }
   ⇒ QBinOp
   → FullQuery (Inner s) { | inner }
   → FullQuery (Inner s) { | inner }
+  → ({ | o } → Query s { | r })
   → FullQuery s { | r }
-combineWith op q1 q2 = FullQuery do
+combineWith op q1 q2 k = FullQuery do
   r1 ← fromSubQuery q1
   r2 ← fromSubQuery q2
   alias ← freshId <#> \id → "comb_q" <> show id
   modify_ \st → st { source = Combination op r1.st r2.st alias }
   -- records `r1.res` and `r2.res` are identical, so we use either
-  pure $ createSubQueryResult alias r1.res
+  k $ createSubQueryResult alias r1.res
 
 class FromTable s t c | s t → c where
   fromTable ∷ Table t → Query s { res ∷ { | c } , sql ∷ SQL }
