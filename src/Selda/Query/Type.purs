@@ -10,6 +10,7 @@ import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Tuple (Tuple)
 import Selda.Expr (Expr)
 import Selda.Table (AliasedTable, Alias)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- table or subquery, each with alias
 data SQL
@@ -17,20 +18,25 @@ data SQL
   | SubQuery Alias GenState
 
 -- describes elements which appear after FROM in generated sql
--- `Product`: produced using `select` function, generates cartesian product
--- `LeftJoin` produces LEFT JOIN <SQL> on (<Expr>)
--- Current repr requires Product to be the first Source in sources
 data Source
-  = Product SQL
-  | LeftJoin SQL (Expr Boolean)
+  = From SQL
+  | CrossJoin Source SQL
+  | LeftJoin Source SQL (Expr Boolean)
+  | Combination QBinOp GenState GenState Alias
+
+data QBinOp
+  = Union
+  | UnionAll
+  | Intersect
+  | Except
 
 -- main state
--- FROM+JOIN[S] components in `sources`
+-- FROM+JOIN[S] components in `source`
 -- WHERE components in `restricts`
 -- SELECT components in `cols`, list of `Expr a`, where type `a` is irrelevant
 -- `nextId` provides fresh identifiers
 type GenState_ = 
-  { sources ∷ Array Source
+  { source ∷ Source
   , restricts ∷ Array (Expr Boolean)
   , nextId ∷ Int
   , cols ∷ Array (Tuple Alias (Exists Expr))
@@ -63,7 +69,7 @@ data Order = Asc | Desc
 
 initState ∷ GenState
 initState = GenState
-  { sources: []
+  { source: (unsafeCoerce unit ∷ Source)
   , restricts: []
   , nextId: 0
   , cols: []
@@ -92,3 +98,6 @@ freshId = do
 
 runQuery ∷ ∀ a s. Query s a → Tuple a GenState
 runQuery (Query st) = runState st initState
+
+runFullQuery ∷ ∀ a s. FullQuery s a → Tuple a GenState
+runFullQuery = unwrap >>> runQuery

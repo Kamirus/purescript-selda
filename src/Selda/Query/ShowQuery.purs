@@ -2,47 +2,49 @@ module Selda.Query.ShowQuery where
 
 import Prelude
 
-import Data.Array (reverse)
-import Data.Array as Array
 import Data.Exists (Exists, runExists)
-import Data.Foldable (foldM)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Selda.Expr (Expr, ShowM, showExpr)
-import Selda.Query.Type (GenState_, Order(..), SQL(..), Source(..))
+import Selda.Query.Type (GenState_, Order(..), QBinOp(..), SQL(..), Source(..))
 import Selda.Table (Alias)
 
 showState ∷ GenState_ → ShowM
-showState { cols, sources, restricts, aggr, order, limit, distinct } = 
+showState { cols, source, restricts, aggr, order, limit, distinct } = 
   let appendM a b = (<>) <$> a <*> b in
   showCols distinct cols
-    `appendM` showSources sources
+    `appendM` ((<>) " FROM " <$> showSource source)
     `appendM` showRestricts restricts
     `appendM` showGrouping aggr
     `appendM` showOrdering order
     `appendM` (showLimit >>> pure) limit
 
-showSources ∷ Array Source → ShowM
-showSources sources = case Array.uncons $ reverse sources of
-  Nothing → pure ""
-  Just { head, tail } → do 
-    let
-      f acc x = do
-        src ← showSource x
-        pure $ acc <> sepFor x <> src
-    h ← showSource head
-    (<>) " FROM " <$> foldM f h tail
-
 showSource ∷ Source → ShowM
 showSource = case _ of
-  Product t → showSQL t
-  LeftJoin t e → do
-    sql ← showSQL t
-    exp ← showExpr e
-    pure $ sql <> " ON (" <> exp <> ")"
+  From t → showSQL t
+  CrossJoin src sql → do
+    src' ← showSource src
+    sql' ← showSQL sql
+    pure $ src' <> " CROSS JOIN " <> sql'
+  LeftJoin src sql e → do
+    src' ← showSource src
+    sql' ← showSQL sql
+    e' ← showExpr e
+    pure $ src' <> " LEFT JOIN " <> sql' <> " ON (" <> e' <> ")"
+  Combination op q1 q2 alias → do
+    s1 ← showState $ unwrap q1
+    s2 ← showState $ unwrap q2
+    pure $ "(" <> s1 <> showCompoundOp op <> s2 <> ") " <> alias
+
+showCompoundOp ∷ QBinOp → String
+showCompoundOp = case _ of
+  Union → " UNION "
+  UnionAll → " UNION ALL "
+  Intersect → " INTERSECT "
+  Except → " EXCEPT "
 
 showSQL ∷ SQL → ShowM
 showSQL = case _ of
@@ -83,11 +85,6 @@ showLimit ∷ Maybe Int → String
 showLimit = case _ of
   Nothing → ""
   Just i → " LIMIT " <> (show $ max 0 i)
-
-sepFor ∷ Source → String
-sepFor = case _ of
-  Product _ → ", "
-  LeftJoin _ _ → " LEFT JOIN "
 
 showAliasedCol ∷ Tuple Alias (Exists Expr) → ShowM
 showAliasedCol (Tuple alias ee) = do

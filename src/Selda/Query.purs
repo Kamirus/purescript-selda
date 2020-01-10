@@ -5,7 +5,7 @@ import Prelude
 import Data.Array ((:))
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap, wrap)
+import Data.Newtype (wrap)
 import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
@@ -14,7 +14,7 @@ import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
-import Selda.Query.Type (FullQuery(..), GenState(..), Order, Query, SQL(..), Source(..), freshId, modify_, runQuery)
+import Selda.Query.Type (FullQuery(..), GenState(..), Order, QBinOp(..), Query, SQL(..), Source(..), freshId, modify_, runFullQuery)
 import Selda.Query.Utils (class ContainsOnlyColTypes)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
@@ -27,7 +27,10 @@ selectFrom
   ⇒ Table r
   → ({ | cols } → Query s { | res })
   → FullQuery s { | res }
-selectFrom table k = FullQuery $ crossJoin table >>= k
+selectFrom table k = FullQuery do
+  { res, sql } ← fromTable table
+  modify_ \st → st { source = From sql }
+  k res
 
 selectFrom_
   ∷ ∀ inner s resi reso
@@ -35,7 +38,10 @@ selectFrom_
   ⇒ FullQuery (Inner s) { | inner }
   → ({ | resi } → Query s { | reso })
   → FullQuery s { | reso }
-selectFrom_ iq k = FullQuery $ crossJoin_ iq >>= k
+selectFrom_ iq k = FullQuery do
+  { res, sql } ← fromSubQuery iq
+  modify_ \st → st { source = From sql }
+  k res
 
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = modify_ \st → st { restricts = e : st.restricts }
@@ -53,7 +59,7 @@ notNull col@(Col e) = do
 crossJoin ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
 crossJoin table = do
   { res, sql } ← fromTable table
-  modify_ \st → st { sources = Product sql : st.sources }
+  modify_ \st → st { source = CrossJoin st.source sql }
   pure res
 
 crossJoin_
@@ -62,9 +68,8 @@ crossJoin_
   ⇒ FullQuery (Inner s) { | inner }
   → Query s { | res }
 crossJoin_ iq = do
-  let q = unwrap iq
-  { res, sql } ← fromSubQuery q
-  modify_ \st → st { sources = Product sql : st.sources }
+  { res, sql } ← fromSubQuery iq
+  modify_ \st → st { source = CrossJoin st.source sql }
   pure res
 
 distinct
@@ -115,7 +120,7 @@ leftJoin
 leftJoin table on = do
   { res, sql } ← fromTable table
   let Col e = on res
-  modify_ \ st → st { sources = LeftJoin sql e : st.sources }
+  modify_ \ st → st { source = LeftJoin st.source sql e }
   pure $ hmap WrapWithMaybe res
 
 -- | `leftJoin_ on q`
@@ -132,11 +137,46 @@ leftJoin_
   → FullQuery (Inner s) { | inner }
   → Query s { | mres }
 leftJoin_ on iq = do
-  let q = unwrap iq
-  { res, sql } ← fromSubQuery q
+  { res, sql } ← fromSubQuery iq
   let Col e = on res
-  modify_ \st → st { sources = LeftJoin sql e : st.sources }
+  modify_ \st → st { source = LeftJoin st.source sql e }
   pure $ hmap WrapWithMaybe res
+
+type CombineQuery
+  = ∀ s r inner i
+  . FromSubQuery s inner i
+  ⇒ HMapWithIndex SubQueryResult { | i } { | r }
+  ⇒ FullQuery (Inner s) { | inner }
+  → FullQuery (Inner s) { | inner }
+  → FullQuery s { | r }
+
+union ∷ CombineQuery
+union = combineWith Union
+
+unionAll ∷ CombineQuery
+unionAll = combineWith UnionAll
+
+intersect ∷ CombineQuery
+intersect = combineWith Intersect
+
+except ∷ CombineQuery
+except = combineWith Except
+
+combineWith
+  ∷ ∀ s r inner i
+  . FromSubQuery s inner i
+  ⇒ HMapWithIndex SubQueryResult { | i } { | r }
+  ⇒ QBinOp
+  → FullQuery (Inner s) { | inner }
+  → FullQuery (Inner s) { | inner }
+  → FullQuery s { | r }
+combineWith op q1 q2 = FullQuery do
+  r1 ← fromSubQuery q1
+  r2 ← fromSubQuery q2
+  alias ← freshId <#> \id → "comb_q" <> show id
+  modify_ \st → st { source = Combination op r1.st r2.st alias }
+  -- records `r1.res` and `r2.res` are identical, so we use either
+  pure $ createSubQueryResult alias r1.res
 
 class FromTable s t c | s t → c where
   fromTable ∷ Table t → Query s { res ∷ { | c } , sql ∷ SQL }
@@ -173,8 +213,8 @@ subQueryAlias = do
 
 class FromSubQuery s inner res | s inner → res where
   fromSubQuery
-    ∷ Query (Inner s) { | inner }
-    → Query s { res ∷ { | res } , sql ∷ SQL , alias ∷ Alias }
+    ∷ FullQuery (Inner s) { | inner }
+    → Query s { res ∷ { | res } , sql ∷ SQL , alias ∷ Alias , st ∷ GenState }
 
 instance fromSubQueryI 
     ∷ ( ContainsOnlyColTypes inner_rl
@@ -186,11 +226,12 @@ instance fromSubQueryI
     ⇒ FromSubQuery s inner res
   where
   fromSubQuery q = do
-    let (Tuple innerRes (GenState st)) = runQuery q
+    let (Tuple innerRes (GenState st)) = runFullQuery q
     let res0 = hmapWithIndex OuterCols innerRes
     alias ← subQueryAlias
     let res = createSubQueryResult alias res0
-    pure $ { res, sql: SubQuery alias $ wrap $ st { cols = getCols res0 }, alias }
+    let genState = wrap $ st { cols = getCols res0 }
+    pure $ { res, sql: SubQuery alias genState, alias, st: genState }
 
 -- | Outside of the subquery, every returned col (in SELECT ...) 
 -- | (no matter if it's just a column of some table or expression or function or ...)
