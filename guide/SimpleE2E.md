@@ -24,6 +24,7 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
 import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, leftJoin, lit, notNull, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
 import Selda.Aggr (Aggr)
+import Selda.Col (class GetCols)
 import Selda.PG (showPG)
 import Selda.PG.Class (insert_, query)
 import Selda.Table.Constraint (Auto, Default)
@@ -349,7 +350,30 @@ hoistSelda
   ⇒ MonadAff m
   ⇒ ExceptT PGError (ReaderT PostgreSQL.Connection Aff) ~> m
 hoistSelda = hoistSeldaWith (inj _pgError) (_.conn)
+```
 
+#### Query Pretty Printing
+To get a generated SQL string from a query we can use the following function.
+
+```purescript
+generateSQLStringFromQuery
+  ∷ ∀ s r
+  . GetCols r
+  ⇒ FullQuery s { | r }
+  → String
+generateSQLStringFromQuery = showQuery >>> showPG >>> _.strQuery
+```
+
+Selda utilises prepared statements, so a query may contain parameters and placeholders for them in the generated SQL.
+Different backends handle it differently, that's why the generated SQL from the `showQuery` function is returned inside the monad `ShowM`.
+
+To run the `ShowM` computation we need to specify the backend.
+In our case we can use the predefined `showPG` function.
+We get as a result a record that contains the array of foreign parameters (here it is always empty, this functionality will be explained in an upcoming guide) and the expected generated SQL under the *"strQuery"* label.
+
+#### Execution
+
+```purescript
 app ∷ App Unit
 app = do
   hoistSelda $ insert_ people
@@ -376,19 +400,19 @@ We can either specify a value for `balance` column or leave it empty and let dat
 
 ```purescript
   hoistSelda do
-    -- transform Query into (Query String, Parameters) and return only SQL as a string
-    let str m = (showPG m).strQuery
+    -- shortcut for the `generateSQLStringFromQuery`
+    let str = generateSQLStringFromQuery
 
-    log $ str $ showQuery qNamesWithBalance
+    log $ str qNamesWithBalance
     query qNamesWithBalance >>= logShow
 ```
 We execute a query by calling `query` and as a result we get an array of records.
 We can also get SQL string literal from a query using the `str` helper function.
 ```purescript
-    log $ str $ showQuery qBankAccountOwnersWithBalance
+    log $ str qBankAccountOwnersWithBalance
     query qBankAccountOwnersWithBalance >>= logShow
 
-    log $ str $ showQuery qCountBankAccountOwners
+    log $ str qCountBankAccountOwners
     query qCountBankAccountOwners >>= logShow
 
     -- query qPersonsMaxBalance >>= logShow

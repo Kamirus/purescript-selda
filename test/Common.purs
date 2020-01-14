@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<), (.<=), (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<=), (.==), (.>), (.||))
 import Selda.PG (litF)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery)
@@ -292,9 +292,8 @@ legacySuite ctx = do
     , { id: 2 }
     , { id: 3 }
     ]
-    $ selectFrom_
-        (selectFrom people pure `union` selectFrom people pure $ pure)
-        \{ id } → pure { id }
+    $ selectFrom people pure `union` selectFrom people pure $ \r → do
+        pure { id: r.id }
 
   testWith ctx unordered "union age and balance"
     [ { v: 11 }
