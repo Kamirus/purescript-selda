@@ -6,7 +6,6 @@ import Prelude
 
 import Data.Array as Array
 import Data.Exists (runExists)
-import Data.Newtype (unwrap)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -14,7 +13,7 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.PrettyPrint (PrettyM, ppState)
-import Selda.Query.Type (FullQuery, GenState(..), runQuery)
+import Selda.Query.Type (FullQuery, GenState(..), runFullQuery)
 import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
@@ -25,7 +24,7 @@ import Type.Proxy (Proxy(..))
 ppQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s { | i } → PrettyM
 ppQuery q = ppState st
   where
-    (Tuple res (GenState st')) = runQuery $ unwrap q
+    (Tuple res (GenState st')) = runFullQuery q
     st = st' { cols = getCols res }
 
 showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → ShowM

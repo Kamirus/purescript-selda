@@ -17,7 +17,6 @@ import Prelude
 import Control.Monad.Reader (ask)
 import Data.Array (concat)
 import Data.Array.Partial (head)
-import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, toSQLValue)
@@ -32,7 +31,7 @@ import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
 import Selda.Query.Class (class GenericDelete, class GenericInsert, class GenericQuery, class GenericUpdate, class MonadSelda, genericDelete, genericInsert, genericInsert_, genericQuery, genericUpdate)
 import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
-import Selda.Query.Type (FullQuery, runQuery)
+import Selda.Query.Type (FullQuery, runFullQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
@@ -162,7 +161,7 @@ instance genericQueryPG
   where
   genericQuery _ q = do
     let
-      (Tuple res _) = runQuery $ unwrap q
+      (Tuple res _) = runFullQuery q
       { strQuery, params } = showPG $ showQuery q
     rows ← pgQuery (PostgreSQL.Query strQuery) params
     pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
