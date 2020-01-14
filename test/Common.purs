@@ -7,6 +7,7 @@ import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, dist
 import Selda.PG (litF)
 import Selda.Query (notNull)
 import Selda.Query.Class (class GenericQuery)
+import Selda.Query.Type (Order(..))
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
 import Test.Utils (class TestBackend, TestCtx, assertSeqEq, assertUnorderedSeqEq, testWith)
@@ -309,3 +310,27 @@ legacySuite ctx = do
         \r → do
           restrict $ r.v .<= lit 100
           pure r
+
+  testWith ctx unordered "limit + orderby in subquery"
+    [ { pid: 1, balance: 100 }
+    , { pid: 1, balance: 150 }
+    ]
+    $ selectFrom people \r → do
+        b ← leftJoin_ (\b → b.personId .== r.id) $
+              selectFrom bankAccounts \b → do
+                limit 2
+                orderBy Asc b.balance
+                pure b
+        balance ← notNull b.balance
+        pure { pid: r.id, balance }
+
+  testWith ctx unordered "limit in union's subqueries"
+    [ { id: 1 }
+    ]
+    $ 
+    let 
+      subQ = selectFrom people \r → do
+        limit 1
+        restrict $ r.id .== litF 1
+        pure { id: r.id }
+    in subQ `union` subQ $ pure

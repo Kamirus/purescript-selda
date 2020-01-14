@@ -53,10 +53,15 @@ ppSource = case _ of
   Combination op q1 q2 alias → do
     s1 ← ppState $ unwrap q1
     s2 ← ppState $ unwrap q2
+    let
+      ppCombinedSubQuery s = mempty
+        <> text "SELECT * FROM" <> line 
+        <> text "(" <> nest 1 s <> line
+        <> text ") combined_sub_query"
     pure $ nest 2 $ line
-      <> text "(" <> nest 1 s1 <> line
+      <> text "(" <> nest 1 (ppCombinedSubQuery s1) <> line
       <> text (showCompoundOp op) <> line
-      <> text " " <> nest 1 s2 <> line
+      <> text " " <> nest 1 (ppCombinedSubQuery s2) <> line
       <> text (") " <> alias)
 
 ppSQL ∷ SQL → PrettyM
