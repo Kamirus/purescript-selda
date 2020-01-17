@@ -86,11 +86,4 @@ strsCreateTables =
       id INTEGER PRIMARY KEY
     );
     """
-  , "DROP TABLE IF EXISTS keyword_table;"
-  , """
-    CREATE TABLE keyword_table (
-      "end" INTEGER,
-      "drop" TEXT
-    );
-    """
   ]

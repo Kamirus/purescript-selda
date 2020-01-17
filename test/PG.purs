@@ -30,6 +30,17 @@ employees ∷ Table
   )
 employees = Table { name: "employees" }
 
+-- | Table with a problematic column name in Postgresql. Only for querying
+pgKeywordTable ∷ Table ( end ∷ Int )
+pgKeywordTable = Table { name: "pg_keyword_table" }
+
+-- | Table with a problematic column name in Postgresql
+-- | with manually escaped column name.
+-- | Use for insert/update/delete. Not safe for querying though.
+pgKeywordTable_quote ∷ Table ( "\"end\"" ∷ Int )
+pgKeywordTable_quote = Table t
+  where (Table t) = pgKeywordTable
+
 date ∷ Int → Int → Int → Date
 date y m d = unsafePartial $ fromJust $
   canonicalDate <$> toEnum y <*> toEnum m <*> toEnum d
@@ -43,6 +54,9 @@ testSuite
   ⇒ GenericQuery b m s
       ( y ∷ Col s Int, m ∷ Col s Int, d ∷ Col s Int )
       ( y ∷ Int, m ∷ Int, d ∷ Int )
+  ⇒ GenericQuery b m s
+      ( end ∷ Col s Int )
+      ( end ∷ Int )
   ⇒ TestCtx b m s ctx
   → TestSuite
 testSuite ctx = do
@@ -69,6 +83,10 @@ testSuite ctx = do
         let m = extract "month" r.date
         let d = extract "day" r.date
         pure { y, m, d }
+
+  testWith ctx unordered "select * from keyword table"
+    ([] ∷ Array ({ end ∷ Int }))
+    $ selectFrom pgKeywordTable pure
 
 main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do
@@ -113,10 +131,9 @@ main cont = do
           id INTEGER PRIMARY KEY
         );
 
-        DROP TABLE IF EXISTS keyword_table;
-        CREATE TABLE keyword_table (
-          "end" INTEGER,
-          "drop" TEXT
+        DROP TABLE IF EXISTS pg_keyword_table;
+        CREATE TABLE pg_keyword_table (
+          "end" INTEGER NOT NULL
         );
 
         DROP TABLE IF EXISTS employees;
@@ -167,6 +184,15 @@ main cont = do
         update employees
           (\r → r.name .== lit "E3")
           (\r → r { date = litF $ date 2000 12 22 })
+
+      -- test a table with SQL keyword as a column name
+      runSeldaAff conn do
+        insert1_ pgKeywordTable_quote { "\"end\"": 1 }
+        update pgKeywordTable_quote
+          (\r → r."\"end\"" .== lit 1)
+          (\r → r { "\"end\"" = lit 2} )
+        deleteFrom pgKeywordTable_quote
+          (\r → r."\"end\"" .== lit 2)
 
       cont do
         suite "PG" $ testWithPG conn legacySuite
