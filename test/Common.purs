@@ -24,6 +24,9 @@ descriptions = Table { name: "descriptions" }
 emptyTable ∷ Table ( id ∷ Int )
 emptyTable = Table { name: "emptyTable" }
 
+keywordTable ∷ Table ( end ∷ Int, drop ∷ String )
+keywordTable = Table { name: "keyword_table" }
+
 testSelectEscapedString
   ∷ ∀ b m ctx s
   . TestBackend b m ctx
@@ -334,3 +337,7 @@ legacySuite ctx = do
         restrict $ r.id .== litF 1
         pure { id: r.id }
     in subQ `union` subQ $ pure
+
+  testWith ctx unordered "select * from keyword table"
+    ([] ∷ Array ({ end ∷ Int, drop ∷ String }))
+    $ selectFrom keywordTable pure

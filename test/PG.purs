@@ -113,6 +113,12 @@ main cont = do
           id INTEGER PRIMARY KEY
         );
 
+        DROP TABLE IF EXISTS keyword_table;
+        CREATE TABLE keyword_table (
+          "end" INTEGER,
+          "drop" TEXT
+        );
+
         DROP TABLE IF EXISTS employees;
         CREATE TABLE employees (
           id SERIAL PRIMARY KEY,
