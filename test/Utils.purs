@@ -12,13 +12,18 @@ import Data.Maybe (Maybe(..))
 import Data.Variant.Internal (FProxy(..))
 import Database.PostgreSQL (Connection, PGError)
 import Effect.Aff (Aff, catchError, throwError)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign (ForeignError, MultipleErrors, renderForeignError)
 import Global.Unsafe (unsafeStringify)
 import SQLite3 (DBConnection)
-import Selda (FullQuery)
+import Selda (FullQuery, showQuery)
+import Selda.Col (class GetCols)
+import Selda.Expr (ShowM)
+import Selda.PG (showPG)
 import Selda.PG.Class (BackendPGClass)
 import Selda.Query.Class (class GenericQuery, genericQuery, runSelda)
+import Selda.SQLite3 (showSQLite3)
 import Selda.SQLite3.Class (BackendSQLite3Class)
 import Test.Unit (TestSuite)
 import Test.Unit as Unit
@@ -36,6 +41,7 @@ class TestBackend b m ctx | b m → ctx where
   testWith
     ∷ ∀ s i o
     . GenericQuery b m s i o
+    ⇒ GetCols i
     ⇒ TestCtx b m s ctx
     → (Array { | o } → Array { | o } → Aff Unit)
     → String
@@ -49,7 +55,7 @@ instance testBackendPG
         { conn ∷ Connection }
   where
   testWith { b, m, s, ctx: { conn } } assertFn  = do
-    testWith_ assertFn b (runPGSeldaAff conn)
+    testWith_ assertFn (showPG >>> _.strQuery) b (runPGSeldaAff conn)
 
 instance testBackendSQLite3
     ∷ TestBackend BackendSQLite3Class
@@ -57,20 +63,22 @@ instance testBackendSQLite3
         { conn ∷ DBConnection }
   where
   testWith { b, m, s, ctx: { conn } } assertFn = do
-    testWith_ assertFn b (runSQLite3SeldaAff conn)
+    testWith_ assertFn (showSQLite3 >>> _.strQuery) b (runSQLite3SeldaAff conn)
 
 testWith_
   ∷ ∀ m s i o b
   . GenericQuery b m s i o
+  ⇒ GetCols i
   ⇒ (Array { | o } → Array { | o } → Aff Unit)
+  → (ShowM → String)
   → Proxy b
   → (m ~> Aff)
   → String
   → Array { | o }
   → FullQuery s { | i }
   → TestSuite
-testWith_ assertFn b runM = 
-  testQueryWith_ (\q → runM $ genericQuery b q) assertFn
+testWith_ assertFn showB b runM  = 
+  testQueryWith_ (\q → runM $ genericQuery b q) assertFn (showQuery >>> showB)
 
 testWithPG
   ∷ ∀ a s
@@ -98,22 +106,17 @@ testQueryWith_
   ∷ ∀ expected query queryResult
   . (query → Aff queryResult)
   → (expected → queryResult → Aff Unit)
+  → (query → String)
   → String
   → expected
   → query
   → TestSuite
-testQueryWith_ run assertFunc msg expected query =
-  Unit.test msg $ run query >>= assertFunc expected
-
-testQuery
-  ∷ ∀ a query
-  . Show a ⇒ Eq a
-  ⇒ (query → Aff (Array a))
-  → String
-  → Array a
-  → query
-  → TestSuite
-testQuery execQuery = testQueryWith_ execQuery assertUnorderedSeqEq
+testQueryWith_ run assertFunc showQ msg expected query =
+  Unit.test msg do
+    run query >>= assertFunc expected # catchError $ \e → do
+      log "Error occured - Printing the query below"
+      log $ showQ query
+      throwError e
 
 withRollback_
   ∷ ∀ err a
