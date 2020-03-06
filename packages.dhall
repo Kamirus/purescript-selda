@@ -130,9 +130,8 @@ let prettyprinter =
       "master"
   }
 
-let additions =
-  { postgresql-client =
-      mkPackage
+let postgresql-client =
+  { dependencies =
       [ "aff"
       , "arrays"
       , "bifunctors"
@@ -155,8 +154,14 @@ let additions =
       , "transformers"
       , "tuples"
       ]
+  , repo =
       "https://github.com/rightfold/purescript-postgresql-client.git"
+  , version =
       "v3.0.0"
+  }
+
+let additions =
+  { postgresql-client = postgresql-client
   , prettyprinter = prettyprinter
   }
 
