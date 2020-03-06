@@ -64,6 +64,10 @@ derive newtype instance stateQuery ∷ MonadState GenState (Query s)
 newtype FullQuery s a = FullQuery (Query s a)
 derive instance newtypeFullQuery ∷ Newtype (FullQuery s a) _
 derive newtype instance functorFullQuery ∷ Functor (FullQuery s)
+derive newtype instance applyFullQuery ∷ Apply (FullQuery s)
+derive newtype instance applicativeFullQuery ∷ Applicative (FullQuery s)
+derive newtype instance bindFullQuery ∷ Bind (FullQuery s)
+derive newtype instance monadFullQuery ∷ Monad (FullQuery s)
 
 data Order = Asc | Desc
 
