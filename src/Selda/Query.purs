@@ -213,7 +213,7 @@ subQueryAlias = do
   id ← freshId
   pure $ "sub_q" <> show id
 
-class FromSubQuery s inner res | s inner → res where
+class FromSubQuery s inner res | inner → s res where
   fromSubQuery
     ∷ FullQuery (Inner s) { | inner }
     → Query s { res ∷ { | res } , sql ∷ SQL , alias ∷ Alias , st ∷ GenState }
