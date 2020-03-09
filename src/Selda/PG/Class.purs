@@ -15,7 +15,7 @@ module Selda.PG.Class
 import Prelude
 
 import Control.Monad.Reader (ask)
-import Data.Array (concat)
+import Data.Array (concat, null)
 import Data.Array.Partial (head)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -142,7 +142,7 @@ instance genericInsertPGClass
   where
   genericInsert = genericInsert_ { exec, ph: "$" }
     where
-      exec q l = do
+      exec q l = when (not $ null l) do
         conn ← ask
         PostgreSQL.PG.execute conn (PostgreSQL.Query q) l
 

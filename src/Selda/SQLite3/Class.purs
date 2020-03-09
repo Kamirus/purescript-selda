@@ -10,6 +10,7 @@ module Selda.SQLite3.Class
 import Prelude
 
 import Control.Monad.Reader (ask)
+import Data.Array (null)
 import Data.Either (either)
 import Data.List.Types (NonEmptyList)
 import Effect.Aff (throwError)
@@ -70,7 +71,8 @@ instance genericInsertSQLite3
       , GenericShowInsert t r
       ) ⇒ GenericInsert BackendSQLite3Class m t r
   where
-  genericInsert = genericInsert_ { exec: execSQLite3_, ph: "?" }
+  genericInsert proxy table l = when (not $ null l) do
+    genericInsert_ { exec: execSQLite3_, ph: "?" } proxy table l
 
 deleteFrom
   ∷ ∀ t s r m

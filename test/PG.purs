@@ -14,7 +14,7 @@ import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), lit, not_, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, litF)
-import Selda.PG.Class (deleteFrom, insert1, insert1_, insert_, update)
+import Selda.PG.Class (deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Query.Class (class GenericQuery)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
@@ -193,6 +193,10 @@ main cont = do
           (\r → r { "\"end\"" = lit 2} )
         deleteFrom pgKeywordTable_quote
           (\r → r."\"end\"" .== lit 2)
+
+      runSeldaAff conn do
+        _ ← insert people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })
+        insert_ people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })
 
       cont do
         suite "PG" $ testWithPG conn legacySuite

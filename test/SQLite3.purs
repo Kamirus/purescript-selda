@@ -51,6 +51,9 @@ main cont = do
       (\r → r { age = lit $ Just 1000 })
     deleteFrom people \r → r.age .> lit (Just 999)
 
+  runSeldaAff conn do
+    insert_ people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })
+
   cont do
     suite "SQLite3" $ testWithSQLite3 conn legacySuite
 
