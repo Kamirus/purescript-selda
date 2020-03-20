@@ -29,7 +29,7 @@ import Selda.Aggr (Aggr(..))
 import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Col (Col(..))
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
-import Selda.Query (crossJoin, crossJoin_, restrict, notNull, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
+import Selda.Query (crossJoin, crossJoin_, innerJoin, innerJoin_, restrict, notNull, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
 import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type

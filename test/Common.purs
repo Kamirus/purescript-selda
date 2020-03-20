@@ -3,11 +3,9 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<=), (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<=), (.==), (.>), (.||))
 import Selda.PG (litF)
-import Selda.Query (innerJoin, innerJoin_, notNull)
 import Selda.Query.Class (class GenericQuery)
-import Selda.Query.Type (Order(..))
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
 import Test.Utils (class TestBackend, TestCtx, assertSeqEq, assertUnorderedSeqEq, testWith)
@@ -328,7 +326,7 @@ legacySuite ctx = do
         b ← leftJoin_ (\b → b.personId .== r.id) $
               selectFrom bankAccounts \b → do
                 limit 2
-                orderBy Asc b.balance
+                orderBy asc b.balance
                 pure b
         balance ← notNull b.balance
         pure { pid: r.id, balance }
@@ -341,7 +339,7 @@ legacySuite ctx = do
         { balance } ← innerJoin_ (\b → b.personId .== r.id) $
               selectFrom bankAccounts \b → do
                 limit 2
-                orderBy Asc b.balance
+                orderBy asc b.balance
                 pure b
         pure { pid: r.id, balance }
 
