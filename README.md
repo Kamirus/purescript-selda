@@ -2,12 +2,14 @@
 
 ## About
 
-**purescript-selda** is a **SQL library** which allows a user to write **type-safe queries**.
-Generated SQL is guaranteed to be correct by the type system.
-It supports arbitrarily nested queries with capabilities of filtering, joins and aggregation.
-We used standard monadic abstraction which supports writing queries in a linear, natural style.
+**purescript-selda** is an **SQL library** (*eDSL*) which allows a user to write **type-safe queries**.
+- Generated SQL is guaranteed to be correct by the type system.
+- It supports **arbitrarily nested queries** with capabilities of **filtering**, **joins** and **aggregation**.
+- We used **standard monadic abstraction** which supports writing queries in a linear, natural style.
+- Our main target is **PostgreSQL** though in the upcoming release (already on master) we add **SQLite3** support (with ability to support other db backends).
 
-## Example query
+
+## Example Query
 
 To declare a type for a SQL table (already created in the db)
 we write the following table definition:
@@ -34,6 +36,12 @@ WHERE ((people_0.id > 1))
 ```
 
 For a more gentle introduction and more examples please refer to the [Step-by-Step Guide](guide/SimpleE2E.md).
+
+## More Help
+
+**If you have any questions please don't hesitate to ask**.
+<br>I'll be happy to help and provide any guidance if necessary.
+<br>Open an issue or hit me up directly (either on [slack](https://functionalprogramming.slack.com/), [forum](https://discourse.purescript.org/) or directly via email).
 
 ## Install
 
