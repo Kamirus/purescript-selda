@@ -14,7 +14,7 @@ import Selda.Aggr (Aggr(..), UnAggr(..), WrapWithAggr(..))
 import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
-import Selda.Query.Type (FullQuery(..), GenState(..), Order, QBinOp(..), Query, SQL(..), Source(..), freshId, modify_, runFullQuery)
+import Selda.Query.Type (FullQuery(..), GenState(..), JoinType(..), Order, QBinOp(..), Query, SQL(..), Source(..), freshId, modify_, runFullQuery)
 import Selda.Query.Utils (class ContainsOnlyColTypes)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
@@ -110,6 +110,38 @@ orderBy order (Col e) =
 limit ∷ ∀ s. Int → Query s Unit
 limit i = modify_ $ _ { limit = Just i }
 
+-- | `innerJoin table predicate` is equivalent to `JOIN <table> ON <predicate>`.
+-- | Returns the columns from the joined table.
+innerJoin
+  ∷ ∀ r s res
+  . FromTable s r res
+  ⇒ Table r
+  → ({ | res } → Col s Boolean)
+  → Query s { | res }
+innerJoin table on = do
+  { res, sql } ← fromTable table
+  let Col e = on res
+  modify_ \ st → st { source = JoinOn InnerJoin st.source sql e }
+  pure res
+
+-- | `innerJoin_ predicate subquery` is equivalent to `JOIN <subquery> ON <predicate>`.
+-- | Returns the columns from the joined subquery.
+innerJoin_
+  ∷ ∀ s res inner
+  . FromSubQuery s inner res
+  ⇒ ({ | res } → Col s Boolean)
+  → FullQuery (Inner s) { | inner }
+  → Query s { | res }
+innerJoin_ on iq = do
+  { res, sql } ← fromSubQuery iq
+  let Col e = on res
+  modify_ \st → st { source = JoinOn InnerJoin st.source sql e }
+  pure res
+
+-- | `leftJoin table predicate` is equivalent to `LEFT JOIN <table> ON <predicate>`.
+-- | Returns the columns from the joined table.
+-- | These columns become nullable due to the LEFT JOIN semantics
+-- | hence they are wrapped in Maybe.
 leftJoin
   ∷ ∀ r s res mres
   . FromTable s r res
@@ -120,15 +152,13 @@ leftJoin
 leftJoin table on = do
   { res, sql } ← fromTable table
   let Col e = on res
-  modify_ \ st → st { source = LeftJoin st.source sql e }
+  modify_ \ st → st { source = JoinOn LeftJoin st.source sql e }
   pure $ hmap WrapWithMaybe res
 
--- | `leftJoin_ on q`
--- | run sub query `q`;
--- | with this execute `on` to get JOIN constraint;
--- | add sub query to sources;
--- | return previously mapped record with each value in Col wrapped in Maybe
--- | (because LEFT JOIN can return null for each column)
+-- | `leftJoin_ predicate subquery` is equivalent to `LEFT JOIN <subquery> ON <predicate>`.
+-- | Returns the columns from the joined subquery.
+-- | These columns become nullable due to the LEFT JOIN semantics
+-- | hence they are wrapped in Maybe.
 leftJoin_
   ∷ ∀ s res mres inner
   . FromSubQuery s inner res
@@ -139,7 +169,7 @@ leftJoin_
 leftJoin_ on iq = do
   { res, sql } ← fromSubQuery iq
   let Col e = on res
-  modify_ \st → st { source = LeftJoin st.source sql e }
+  modify_ \st → st { source = JoinOn LeftJoin st.source sql e }
   pure $ hmap WrapWithMaybe res
 
 type CombineQuery

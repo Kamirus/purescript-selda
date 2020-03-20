@@ -5,7 +5,7 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Selda (Col, FullQuery, Table(..), aggregate, count, crossJoin, desc, distinct, groupBy, inArray, isNull, leftJoin, leftJoin_, limit, lit, max_, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<=), (.==), (.>), (.||))
 import Selda.PG (litF)
-import Selda.Query (notNull)
+import Selda.Query (innerJoin, innerJoin_, notNull)
 import Selda.Query.Class (class GenericQuery)
 import Selda.Query.Type (Order(..))
 import Test.Types (AccountType(..))
@@ -126,6 +126,15 @@ legacySuite ctx = do
     $ selectFrom people \{ id, name, age } → do
         { accountType, balance, personId } ← crossJoin bankAccounts
         restrict $ id .== personId
+        pure { accountType, id, balance }
+  
+  testWith ctx unordered "inner join - natural join"
+    [ { id: 1, balance: 100, accountType: Business }
+    , { id: 1, balance: 150, accountType: Personal }
+    , { id: 3, balance: 300, accountType: Personal }
+    ]
+    $ selectFrom people \{ id, name, age } → do
+        { accountType, balance } ← innerJoin bankAccounts $ \b → id .== b.personId
         pure { accountType, id, balance }
 
   testWith ctx unordered "left join"
@@ -311,7 +320,7 @@ legacySuite ctx = do
           restrict $ r.v .<= lit 100
           pure r
 
-  testWith ctx unordered "limit + orderby in subquery"
+  testWith ctx unordered "limit + orderby in subquery - with left join"
     [ { pid: 1, balance: 100 }
     , { pid: 1, balance: 150 }
     ]
@@ -322,6 +331,18 @@ legacySuite ctx = do
                 orderBy Asc b.balance
                 pure b
         balance ← notNull b.balance
+        pure { pid: r.id, balance }
+
+  testWith ctx unordered "limit + orderby in subquery - with inner join"
+    [ { pid: 1, balance: 100 }
+    , { pid: 1, balance: 150 }
+    ]
+    $ selectFrom people \r → do
+        { balance } ← innerJoin_ (\b → b.personId .== r.id) $
+              selectFrom bankAccounts \b → do
+                limit 2
+                orderBy Asc b.balance
+                pure b
         pure { pid: r.id, balance }
 
   testWith ctx unordered "limit in union's subqueries"

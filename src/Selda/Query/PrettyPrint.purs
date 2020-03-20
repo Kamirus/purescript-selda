@@ -9,7 +9,7 @@ import Data.Newtype (unwrap)
 import Foreign (Foreign)
 import Selda.Expr (QueryParams, ShowMCtx, showExpr, showM)
 import Selda.Query.ShowQuery (showCols, showCompoundOp, showGrouping, showLimit, showOrdering, showRestricts)
-import Selda.Query.Type (GenState_, SQL(..), Source(..))
+import Selda.Query.Type (GenState_, JoinType(..), SQL(..), Source(..))
 import Text.Pretty (Doc, line, nest, render, text)
 
 type PrettyM = ReaderT ShowMCtx (State QueryParams) (Doc String)
@@ -44,12 +44,12 @@ ppSource = case _ of
     src' ← ppSource src
     sql' ← ppSQL sql
     pure $ src' <> line <> text " CROSS JOIN " <> sql'
-  LeftJoin src sql e → do
+  JoinOn joinType src sql e → do
     src' ← ppSource src
     sql' ← ppSQL sql
     e' ← showExpr e
     pure $ src' <> line <> 
-      text " LEFT JOIN " <> sql' <> text (" ON (" <> e' <> ")")
+      ppJoinType joinType <> sql' <> text (" ON (" <> e' <> ")")
   Combination op q1 q2 alias → do
     s1 ← ppState $ unwrap q1
     s2 ← ppState $ unwrap q2
@@ -70,3 +70,8 @@ ppSQL = case _ of
   SubQuery alias state → do
     s ← ppState $ unwrap state
     pure $ nest 2 $ line <> text "(" <> nest 1 (s <> text (" ) " <> alias))
+
+ppJoinType ∷ JoinType → Doc String
+ppJoinType = text <<< case _ of
+  LeftJoin → " LEFT JOIN "
+  InnerJoin → " JOIN "

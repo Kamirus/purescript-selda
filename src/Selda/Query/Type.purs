@@ -21,8 +21,12 @@ data SQL
 data Source
   = From SQL
   | CrossJoin Source SQL
-  | LeftJoin Source SQL (Expr Boolean)
+  | JoinOn JoinType Source SQL (Expr Boolean)
   | Combination QBinOp GenState GenState Alias
+
+data JoinType
+  = LeftJoin
+  | InnerJoin
 
 data QBinOp
   = Union
