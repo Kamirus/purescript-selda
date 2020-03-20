@@ -21,6 +21,35 @@ import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
+-- | `selectFrom table k` creates a fully described query which is a valid SQL query.
+-- | 
+-- | It starts with the following SQL query scheme:
+-- | 
+-- | ```sql
+-- | SELECT <res>
+-- | FROM <table>
+-- | <query_description>
+-- | ```
+-- | 
+-- | The continuation `k` is executed with a record of columns from the `table`
+-- | The rest of the query - `<query_description>` - is specified using 
+-- | actions in the `Query` monad (such as `restrict`)
+-- | 
+-- | Query result <res> is specified as a result of the continuation `k`
+-- | 
+-- | EXAMPLE:
+-- | ```purescript
+-- | selectFrom tableWithIdAndName \r → do
+-- |   restrict $ r.id .== lit 17
+-- |   pure { nameOfaUserWithId17: r.name }
+-- | ```
+-- | 
+-- | SQL equivalent:
+-- | ```SQL
+-- | SELECT r.name AS nameOfaUserWithId17
+-- | FROM tableWithIdAndName r
+-- | WHERE r.id == 17
+-- | ```
 selectFrom
   ∷ ∀ r s cols res
   . FromTable s r cols
@@ -32,6 +61,8 @@ selectFrom table k = FullQuery do
   modify_ \st → st { source = From sql }
   k res
 
+-- | Similar to the `selectFrom` but starts a query from the given sub query (not a table)
+-- | See the `selectFrom` documentation for more details.
 selectFrom_
   ∷ ∀ inner s resi reso
   . FromSubQuery s inner resi
@@ -43,6 +74,8 @@ selectFrom_ iq k = FullQuery do
   modify_ \st → st { source = From sql }
   k res
 
+-- | `restrict condition` adds the `condition` to the SQL `WHERE` clause.
+-- | Multiple `restrict` operations are joined with `AND`
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = modify_ \st → st { restricts = e : st.restricts }
 
@@ -56,12 +89,16 @@ notNull col@(Col e) = do
   restrict notNullCol
   pure $ fromMaybeCol col
 
+-- | `crossJoin table predicate` is equivalent to `CROSS JOIN <table> ON <predicate>`.
+-- | Returns the columns from the joined table.
 crossJoin ∷ ∀ s r res. FromTable s r res ⇒ Table r → Query s { | res }
 crossJoin table = do
   { res, sql } ← fromTable table
   modify_ \st → st { source = CrossJoin st.source sql }
   pure res
 
+-- | `crossJoin_ subquery predicate` is equivalent to `CROSS JOIN <subquery> ON <predicate>`.
+-- | Returns the columns from the joined subquery.
 crossJoin_
   ∷ ∀ inner s res
   . FromSubQuery s inner res
