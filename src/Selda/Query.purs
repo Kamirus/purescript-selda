@@ -15,7 +15,6 @@ import Selda.Col (class GetCols, class ToCols, Col(..), getCols, toCols)
 import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
 import Selda.Query.Type (FullQuery(..), GenState(..), JoinType(..), Order, QBinOp(..), Query, SQL(..), Source(..), freshId, modify_, runFullQuery)
-import Selda.Query.Utils (class ContainsOnlyColTypes)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
@@ -286,9 +285,7 @@ class FromSubQuery s inner res | inner → s res where
     → Query s { res ∷ { | res } , sql ∷ SQL , alias ∷ Alias , st ∷ GenState }
 
 instance fromSubQueryI 
-    ∷ ( ContainsOnlyColTypes inner_rl
-      , RL.RowToList inner inner_rl
-      , HMapWithIndex OuterCols { | inner } { | res0 }
+    ∷ ( HMapWithIndex OuterCols { | inner } { | res0 }
       , GetCols res0
       , HMapWithIndex SubQueryResult { | res0 } { | res }
       )

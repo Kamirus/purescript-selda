@@ -11,7 +11,6 @@ import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Prim.TypeError (class Fail, Text, Beside)
 import Record as Record
-import Selda.Aggr (Aggr)
 import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table(..), tableColumns)
 import Type.Data.RowList (RLProxy(..))
@@ -58,15 +57,6 @@ instance colsToPGHandlerI
   where
   colsToPGHandler _ i = hfoldlWithIndex TupleToRecordFunc f i
     where f = (const {} ∷ Unit → {})
-
-class ContainsOnlyColTypes (rl ∷ RowList)
-instance colOnlyNil ∷ ContainsOnlyColTypes RL.Nil
-else instance failColOnly
-  ∷ Fail (Text "column `" <:> Text sym <:> Text "` has type `Aggr`, expected `Col`")
-  ⇒ ContainsOnlyColTypes (RL.Cons sym (Aggr s a) tail)
-else instance colOnlyCons
-  ∷ ContainsOnlyColTypes tail
-  ⇒ ContainsOnlyColTypes (RL.Cons sym (Col s a) tail)
 
 class ValidateSInCols s (il ∷ RowList)
 instance rLUnColNil ∷ ValidateSInCols s RL.Nil
