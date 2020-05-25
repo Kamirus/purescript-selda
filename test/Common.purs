@@ -23,19 +23,19 @@ emptyTable ∷ Table ( id ∷ Int )
 emptyTable = Table { name: "emptyTable" }
 
 testSelectEscapedString
-  ∷ ∀ b m ctx s
+  ∷ ∀ b m ctx
   . TestBackend b m ctx
-  ⇒ GenericQuery b m s
-      ( val ∷ Col s String )
+  ⇒ GenericQuery b m
+      ( val ∷ Col Unit String )
       ( val ∷ String )
-  ⇒ TestCtx b m s ctx
+  ⇒ TestCtx b m ctx
   → TestSuite
 testSelectEscapedString ctx = do
   testWith ctx assertUnorderedSeqEq "select escaped string"
     [ { val: "'abc' \' \"def\"" } ]
     $ aux
   where
-    aux ∷ FullQuery s { val ∷ Col s String }
+    aux ∷ FullQuery Unit { val ∷ Col Unit String }
     aux = selectFrom people \r → do
       restrict $ r.id .== lit 1
       pure { val: lit "'abc' \' \"def\"" }

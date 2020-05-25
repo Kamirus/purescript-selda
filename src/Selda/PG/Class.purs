@@ -147,24 +147,24 @@ instance genericInsertPGClass
         PostgreSQL.PG.execute conn (PostgreSQL.Query q) l
 
 query
-  ∷ ∀ o i s m
-  . GenericQuery BackendPGClass m s i o
-  ⇒ FullQuery s { | i } → m (Array { | o })
+  ∷ ∀ o i m
+  . GenericQuery BackendPGClass m i o
+  ⇒ FullQuery Unit { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendPGClass)
 
 instance genericQueryPG
-    ∷ ( ColsToPGHandler s i tup o
+    ∷ ( ColsToPGHandler Unit i tup o
       , GetCols i
       , FromSQLRow tup
       , MonadSeldaPG m
-      ) ⇒ GenericQuery BackendPGClass m s i o
+      ) ⇒ GenericQuery BackendPGClass m i o
   where
   genericQuery _ q = do
     let
       (Tuple res _) = runFullQuery q
       { strQuery, params } = showPG $ showQuery q
     rows ← pgQuery (PostgreSQL.Query strQuery) params
-    pure $ map (colsToPGHandler (Proxy ∷ Proxy s) res) rows
+    pure $ map (colsToPGHandler (Proxy ∷ Proxy Unit) res) rows
 
 deleteFrom
   ∷ ∀ t s r m

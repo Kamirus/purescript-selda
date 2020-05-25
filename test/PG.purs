@@ -46,18 +46,18 @@ date y m d = unsafePartial $ fromJust $
   canonicalDate <$> toEnum y <*> toEnum m <*> toEnum d
 
 testSuite
-  ∷ ∀ b m ctx s
+  ∷ ∀ b m ctx
   . TestBackend b m ctx
-  ⇒ GenericQuery b m s
-      ( date ∷ Col s Date, id ∷ Col s Int, name ∷ Col s String, salary ∷ Col s Int )
+  ⇒ GenericQuery b m
+      ( date ∷ Col Unit Date, id ∷ Col Unit Int, name ∷ Col Unit String, salary ∷ Col Unit Int )
       ( date ∷ Date, id ∷ Int, name ∷ String, salary ∷ Int )
-  ⇒ GenericQuery b m s
-      ( y ∷ Col s Int, m ∷ Col s Int, d ∷ Col s Int )
+  ⇒ GenericQuery b m
+      ( y ∷ Col Unit Int, m ∷ Col Unit Int, d ∷ Col Unit Int )
       ( y ∷ Int, m ∷ Int, d ∷ Int )
-  ⇒ GenericQuery b m s
-      ( end ∷ Col s Int )
+  ⇒ GenericQuery b m
+      ( end ∷ Col Unit Int )
       ( end ∷ Int )
-  ⇒ TestCtx b m s ctx
+  ⇒ TestCtx b m ctx
   → TestSuite
 testSuite ctx = do
   let

@@ -16,10 +16,10 @@ import Selda.Query.Type (FullQuery)
 import Selda.Query.Utils (RecordToArrayForeign(..))
 import Type.Proxy (Proxy)
 
-class GenericQuery b m s i o | i → o, b → m where
+class GenericQuery b m i o | i → o, b → m where
   genericQuery
     ∷ Proxy b
-    → FullQuery s { | i }
+    → FullQuery Unit { | i }
     → m (Array { | o })
 
 class GenericInsert b m t r | t → r, b → m where

@@ -30,23 +30,22 @@ import Test.Unit as Unit
 import Test.Unit.Assert (assert)
 import Type.Proxy (Proxy(..))
 
-type TestCtx b m s ctx =
+type TestCtx b m ctx =
   { b ∷ Proxy b
   , m ∷ FProxy m
-  , s ∷ Proxy s
   , ctx ∷ ctx
   }
 
 class TestBackend b m ctx | b m → ctx where
   testWith
-    ∷ ∀ s i o
-    . GenericQuery b m s i o
+    ∷ ∀ i o
+    . GenericQuery b m i o
     ⇒ GetCols i
-    ⇒ TestCtx b m s ctx
+    ⇒ TestCtx b m ctx
     → (Array { | o } → Array { | o } → Aff Unit)
     → String
     → Array { | o }
-    → FullQuery s { | i }
+    → FullQuery Unit { | i }
     → TestSuite
 
 instance testBackendPG
@@ -54,7 +53,7 @@ instance testBackendPG
         (ExceptT PGError (ReaderT Connection Aff))
         { conn ∷ Connection }
   where
-  testWith { b, m, s, ctx: { conn } } assertFn  = do
+  testWith { b, m, ctx: { conn } } assertFn  = do
     testWith_ assertFn (showPG >>> _.strQuery) b (runPGSeldaAff conn)
 
 instance testBackendSQLite3
@@ -62,12 +61,12 @@ instance testBackendSQLite3
         (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
         { conn ∷ DBConnection }
   where
-  testWith { b, m, s, ctx: { conn } } assertFn = do
+  testWith { b, m, ctx: { conn } } assertFn = do
     testWith_ assertFn (showSQLite3 >>> _.strQuery) b (runSQLite3SeldaAff conn)
 
 testWith_
-  ∷ ∀ m s i o b
-  . GenericQuery b m s i o
+  ∷ ∀ m i o b
+  . GenericQuery b m i o
   ⇒ GetCols i
   ⇒ (Array { | o } → Array { | o } → Aff Unit)
   → (ShowM → String)
@@ -75,32 +74,30 @@ testWith_
   → (m ~> Aff)
   → String
   → Array { | o }
-  → FullQuery s { | i }
+  → FullQuery Unit { | i }
   → TestSuite
 testWith_ assertFn showB b runM  = 
   testQueryWith_ (\q → runM $ genericQuery b q) assertFn (showQuery >>> showB)
 
 testWithPG
-  ∷ ∀ a s
+  ∷ ∀ a
   . Connection
-  → (TestCtx BackendPGClass PGSelda s { conn ∷ Connection } → a)
+  → (TestCtx BackendPGClass PGSelda { conn ∷ Connection } → a)
   → a
-testWithPG conn k = k { b, m, s, ctx: { conn } } 
+testWithPG conn k = k { b, m, ctx: { conn } } 
   where
     b = (Proxy ∷ Proxy BackendPGClass)
     m = (FProxy ∷ FProxy PGSelda)
-    s = (Proxy ∷ Proxy s)
 
 testWithSQLite3
-  ∷ ∀ a s
+  ∷ ∀ a
   . DBConnection
-  → (TestCtx BackendSQLite3Class SQLite3Selda s { conn ∷ DBConnection } → a)
+  → (TestCtx BackendSQLite3Class SQLite3Selda { conn ∷ DBConnection } → a)
   → a
-testWithSQLite3 conn k = k { b, m, s, ctx: { conn } } 
+testWithSQLite3 conn k = k { b, m, ctx: { conn } } 
   where
     b = (Proxy ∷ Proxy BackendSQLite3Class)
     m = (FProxy ∷ FProxy SQLite3Selda)
-    s = (Proxy ∷ Proxy s)
 
 testQueryWith_
   ∷ ∀ expected query queryResult

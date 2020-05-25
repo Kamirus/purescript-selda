@@ -12,9 +12,9 @@ import Selda.SQLite3.Class as S
 import Simple.JSON (class ReadForeign, E)
 
 query
-  ∷ ∀ s i o
+  ∷ ∀ i o
   . GetCols i
   ⇒ MapR UnCol_ i o
   ⇒ ReadForeign { | o }
-  ⇒ DBConnection → FullQuery s { | i } → Aff (E (Array { | o }))
+  ⇒ DBConnection → FullQuery Unit { | i } → Aff (E (Array { | o }))
 query conn q = runSelda conn $ S.query q

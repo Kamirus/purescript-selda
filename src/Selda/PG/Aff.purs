@@ -49,11 +49,11 @@ insert1
 insert1 conn t r = runSelda conn $ S.insert1 t r
 
 query
-  ∷ ∀ o i tup s
-  . ColsToPGHandler s i tup o
+  ∷ ∀ o i tup
+  . ColsToPGHandler Unit i tup o
   ⇒ GetCols i
   ⇒ FromSQLRow tup
-  ⇒ Connection → FullQuery s (Record i) → Aff (Either PGError (Array { | o }))
+  ⇒ Connection → FullQuery Unit (Record i) → Aff (Either PGError (Array { | o }))
 query conn q = runSelda conn $ S.query q
 
 deleteFrom

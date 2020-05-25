@@ -39,17 +39,17 @@ instance monadSeldaSQLite3Instance
   ⇒ MonadSeldaSQLite3 m
 
 query
-  ∷ ∀ m s i o
-  . GenericQuery BackendSQLite3Class m s i o
-  ⇒ FullQuery s { | i } → m (Array { | o })
+  ∷ ∀ m i o
+  . GenericQuery BackendSQLite3Class m i o
+  ⇒ FullQuery Unit { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendSQLite3Class)
 
 instance genericQuerySQLite3
-    ∷ ( GetCols i
-      , MapR UnCol_ i o
+    ∷ ( MonadSeldaSQLite3 m
       , ReadForeign { | o }
-      , MonadSeldaSQLite3 m
-      ) ⇒ GenericQuery BackendSQLite3Class m s i o
+      , MapR UnCol_ i o
+      , GetCols i
+      ) ⇒ GenericQuery BackendSQLite3Class m i o
   where
   genericQuery _ q = do
     rows ← execSQLite3 # showSQLite3_ (showQuery q)
