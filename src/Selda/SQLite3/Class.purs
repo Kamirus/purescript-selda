@@ -1,6 +1,7 @@
 module Selda.SQLite3.Class
   ( class MonadSeldaSQLite3
   , query
+  , query1
   , insert_
   , deleteFrom
   , update
@@ -11,8 +12,10 @@ import Prelude
 
 import Control.Monad.Reader (ask)
 import Data.Array (null)
+import Data.Array as Array
 import Data.Either (either)
 import Data.List.Types (NonEmptyList)
+import Data.Maybe (Maybe)
 import Effect.Aff (throwError)
 import Effect.Aff.Class (liftAff)
 import Foreign (Foreign, ForeignError, MultipleErrors)
@@ -43,6 +46,12 @@ query
   . GenericQuery BackendSQLite3Class m i o
   ⇒ FullQuery Unit { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendSQLite3Class)
+
+query1
+  ∷ ∀ m i o
+  . GenericQuery BackendSQLite3Class m i o
+  ⇒ FullQuery Unit { | i } → m (Maybe { | o })
+query1 q = query q <#> Array.head
 
 instance genericQuerySQLite3
     ∷ ( MonadSeldaSQLite3 m

@@ -16,27 +16,27 @@ import Selda.Query.Type (FullQuery)
 import Selda.Query.Utils (RecordToArrayForeign(..))
 import Type.Proxy (Proxy)
 
-class GenericQuery b m i o | i → o, b → m where
+class Monad m <= GenericQuery b m i o | i → o, b → m where
   genericQuery
     ∷ Proxy b
     → FullQuery Unit { | i }
     → m (Array { | o })
 
-class GenericInsert b m t r | t → r, b → m where
+class Monad m <= GenericInsert b m t r | t → r, b → m where
   genericInsert
     ∷ Proxy b
     → Table t
     → Array { | r }
     → m Unit
 
-class GenericDelete b m s t r | t → r, b → m where
+class Monad m <= GenericDelete b m s t r | t → r, b → m where
   genericDelete
     ∷ Proxy b
     → Table t
     → ({ | r } → Col s Boolean)
     → m Unit
 
-class GenericUpdate b m s t r | t → r, b → m where
+class Monad m <= GenericUpdate b m s t r | t → r, b → m where
   genericUpdate
     ∷ Proxy b 
     → Table t

@@ -7,6 +7,8 @@ module Selda.PG.Class
   , insert1
   , insert1_
   , query
+  , query1
+  , query1_
   , deleteFrom
   , update
   , BackendPGClass
@@ -14,12 +16,15 @@ module Selda.PG.Class
 
 import Prelude
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ask)
 import Data.Array (concat, null)
+import Data.Array as Array
 import Data.Array.Partial (head)
+import Data.Maybe (Maybe, maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, toSQLValue)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError(..), toSQLValue)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
 import Foreign (Foreign)
@@ -151,6 +156,21 @@ query
   . GenericQuery BackendPGClass m i o
   ⇒ FullQuery Unit { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendPGClass)
+
+query1
+  ∷ ∀ o i m
+  . GenericQuery BackendPGClass m i o
+  ⇒ FullQuery Unit { | i } → m (Maybe { | o })
+query1 q = query q <#> Array.head
+
+-- | Throws `ConversionError ∷ PGError` is case of no results.
+query1_
+  ∷ ∀ o i m
+  . GenericQuery BackendPGClass m i o
+  ⇒ MonadSeldaPG m
+  ⇒ FullQuery Unit { | i } → m { | o }
+query1_ = query1 >=> maybe (throwError err) pure
+  where err = ConversionError "Cannot execute `query1_`: result array is empty"
 
 instance genericQueryPG
     ∷ ( ColsToPGHandler Unit i tup o
