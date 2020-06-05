@@ -12,7 +12,7 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
-import Selda (Col, Table(..), lit, not_, restrict, selectFrom, (.==), (.>))
+import Selda (Col, Table(..), lit, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, litPG)
 import Selda.PG.Class (deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Query.Class (class GenericQuery)
@@ -70,7 +70,7 @@ testSuite ctx = do
     -- , { id: 3, name: "E3", salary: 500, date: date 2000 12 22 }
     ]
     $ selectFrom employees \r → do
-        restrict $ not_ $ r.date .> (litPG $ date 2000 11 21)
+        restrict $ not $ r.date .> (litPG $ date 2000 11 21)
         pure r
 
   testWith ctx unordered "extract month from employees"

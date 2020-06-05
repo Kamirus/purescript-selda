@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<=), (.==), (.>), (.||))
+import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<=), (.==), (.>))
 import Selda.PG (litPG)
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
@@ -242,7 +242,7 @@ legacySuite ctx = do
     $ aggregate $ selectFrom people \p → do
         b ← leftJoin bankAccounts \{ personId } → p.id .== personId
         pid ← groupBy p.id
-        restrict $ p.id .== lit 1 .|| p.id .== lit 2
+        restrict $ p.id .== lit 1 || p.id .== lit 2
         pure { pid, sum: sum_ b.balance}
 
   testWith ctx unordered "return only not null values"
@@ -262,7 +262,7 @@ legacySuite ctx = do
   testWith ctx unordered "not inArray"
     [ { id: 2, name: "name2", age: Just 22 } ]
     $ selectFrom people \r → do
-        restrict $ not_ $ r.id `inArray` [ lit 1, lit 3 ]
+        restrict $ not $ r.id `inArray` [ lit 1, lit 3 ]
         pure r
 
   testWith ctx unordered "select distinct personId from bankAccounts"
@@ -278,7 +278,7 @@ legacySuite ctx = do
     ]
     $ selectFrom people \r → do
         b ← leftJoin bankAccounts
-          (\b → r.id .== b.personId .&& b.balance .> lit 100)
+          (\b → r.id .== b.personId && b.balance .> lit 100)
         _ ← notNull b.id 
         pure { pid: r.id }
 

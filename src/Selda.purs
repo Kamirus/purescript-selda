@@ -34,12 +34,14 @@ import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as Show
 import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
- 
-expAnd ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
-expAnd = binOp (And identity identity)
 
+-- | Deprecated: use `&&`
+expAnd ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
+expAnd = (&&)
+
+-- | Deprecated: use `||`
 expOr ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
-expOr = binOp (Or identity identity)
+expOr = (||)
 
 expGt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
 expGt = binOp (Gt identity)
@@ -86,13 +88,13 @@ asc = Asc
 desc ∷ Order
 desc = Desc
 
--- instance colHeytingAlgebra ∷ HeytingAlgebra (Col s Boolean) where
-
 -- infixl 4 `like`
 infixl 4 expEq as .==
 infixl 4 expGt as .>
 infixl 4 expLt as .<
 infixl 4 expGe as .>=
 infixl 4 expLe as .<=
+-- | Deprecated: use `&&`
 infixr 3 expAnd as .&&
+-- | Deprecated: use `||`
 infixr 2 expOr as .||

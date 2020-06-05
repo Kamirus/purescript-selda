@@ -4,6 +4,7 @@ module Selda.Aggr
   , UnAggr(..)
   ) where
 
+import Data.HeytingAlgebra (class HeytingAlgebra, ff, implies, not, tt, (&&), (||))
 import Data.Symbol (SProxy)
 import Heterogeneous.Mapping (class Mapping, class MappingWithIndex)
 import Prim.TypeError (class Fail, Text, Beside)
@@ -11,6 +12,14 @@ import Selda.Col (Col)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype Aggr s a = Aggr (Col s a)
+
+instance heytingAlgebraAggr ∷ HeytingAlgebra (Aggr s Boolean) where
+  ff = Aggr ff
+  tt = Aggr tt
+  implies (Aggr a) (Aggr b) = Aggr (a `implies` b)
+  conj (Aggr a) (Aggr b) = Aggr (a && b)
+  disj (Aggr a) (Aggr b) = Aggr (a || b)
+  not (Aggr e) = Aggr (not e)
 
 data WrapWithAggr = WrapWithAggr
 instance wrapWithAggrInstance

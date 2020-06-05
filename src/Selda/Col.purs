@@ -10,12 +10,20 @@ import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
-import Selda.Expr (Expr(..), Literal(..), None(..), Some(..), ShowM, showExpr)
+import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), None(..), ShowM, Some(..), UnExp(..), UnOp(..), showExpr)
 import Selda.Table (Alias, Column)
 import Type.Proxy (Proxy)
 
 newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
+
+instance heytingAlgebraCol ∷ HeytingAlgebra (Col s Boolean) where
+  ff = lit false
+  tt = lit true
+  implies a b = not a || b
+  conj = binOp (And identity identity)
+  disj = binOp (Or identity identity)
+  not (Col e) = Col $ EUnOp $ mkExists $ UnExp (Not identity identity) e
 
 showCol ∷ ∀ s a. Col s a → ShowM
 showCol = unwrap >>> showExpr
@@ -82,3 +90,6 @@ instance extractcols
   where
   foldingWithIndex ExtractCols sym acc (Col e) = 
     Tuple (reflectSymbol (SProxy ∷ SProxy sym)) (mkExists e) : acc
+
+binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
+binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
