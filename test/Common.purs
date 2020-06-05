@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, not_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.&&), (.<=), (.==), (.>), (.||))
-import Selda.PG (litF)
+import Selda.PG (litPG)
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
@@ -76,7 +76,7 @@ legacySuite ctx = do
     , { id: 3, personId: 3, balance: 300, accountType: Personal }
     ]
     $ selectFrom bankAccounts \r@{ accountType } → do
-        restrict $ accountType .== litF Personal
+        restrict $ accountType .== litPG Personal
         pure r
 
   testWith ctx unordered "cross product with restrict"
@@ -350,6 +350,6 @@ legacySuite ctx = do
     let 
       subQ = selectFrom people \r → do
         limit 1
-        restrict $ r.id .== litF 1
+        restrict $ r.id .== lit 1
         pure { id: r.id }
     in subQ `union` subQ $ pure

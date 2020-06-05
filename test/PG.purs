@@ -13,7 +13,7 @@ import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), lit, not_, restrict, selectFrom, (.==), (.>))
-import Selda.PG (extract, litF)
+import Selda.PG (extract, litPG)
 import Selda.PG.Class (deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Query.Class (class GenericQuery)
 import Selda.Table.Constraint (Auto, Default)
@@ -70,7 +70,7 @@ testSuite ctx = do
     -- , { id: 3, name: "E3", salary: 500, date: date 2000 12 22 }
     ]
     $ selectFrom employees \r → do
-        restrict $ not_ $ r.date .> (litF $ date 2000 11 21)
+        restrict $ not_ $ r.date .> (litPG $ date 2000 11 21)
         pure r
 
   testWith ctx unordered "extract month from employees"
@@ -183,7 +183,7 @@ main cont = do
 
         update employees
           (\r → r.name .== lit "E3")
-          (\r → r { date = litF $ date 2000 12 22 })
+          (\r → r { date = litPG $ date 2000 12 22 })
 
       -- test a table with SQL keyword as a column name
       runSeldaAff conn do

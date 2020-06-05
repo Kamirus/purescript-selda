@@ -13,8 +13,12 @@ import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy)
 
-litF ∷ ∀ s a. ToSQLValue a ⇒ a → Col s a
-litF = Col <<< EForeign <<< toSQLValue
+-- | Lift a value `a` to a column expression `Col s a` using `ToSQLValue a`.
+-- | Please note that the value will be passed as a query parameter meaning it
+-- | won't appear in the SQL query string as a serialized string, but as a
+-- | placeholder with an index corresponding to the array of foreign parameters.
+litPG ∷ ∀ s a. ToSQLValue a ⇒ a → Col s a
+litPG = Col <<< EForeign <<< toSQLValue
 
 showPG
   ∷ ShowM

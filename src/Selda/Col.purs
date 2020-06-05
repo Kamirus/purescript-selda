@@ -20,6 +20,9 @@ derive instance newtypeCol ∷ Newtype (Col s a) _
 showCol ∷ ∀ s a. Col s a → ShowM
 showCol = unwrap >>> showExpr
 
+-- | Lift a value `a` to a column expression `Col s a` using `Lit a` typeclass.
+-- | Defined only for basic literals: Boolean, String, Int and Maybe.
+-- | To handle more cases refer to the function `litPG`.
 lit ∷ ∀ s a. Lit a ⇒ a → Col s a
 lit = Col <<< ELit <<< literal
 

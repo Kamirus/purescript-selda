@@ -17,6 +17,29 @@ import Data.Tuple (Tuple(..))
 import Foreign (Foreign)
 import Selda.Table (Column, showColumn)
 
+-- | AST for SQL expressions:
+-- | 
+-- | - EColumn: column values from tables or sub queries 
+-- | - ELit: simple literals like String, Int, Boolean
+-- | - EBinOp: binary operations
+-- | - EUnOp: unary operations
+-- | - EFn: SQL functions, e.g. aggregate functions: max, sum, count
+-- | - EInArray: represents a boolean expression that `e` is in `array`
+-- | - EForeign: raw foreign value to be passed as a query parameter
+-- | - Any: generic expression represented as a string in the `ShowM` monad
+data Expr o
+  = EColumn (Column o)
+  | ELit (Literal o)
+  | EBinOp (Exists (BinExp o))
+  | EUnOp (Exists (UnExp o))
+  | EFn (Exists (Fn o))
+  | EInArray (Exists (InArray o)) 
+  | EForeign Foreign
+  | Any ShowM
+
+-- | Datatype for literal values - extensibility is provided with a use of
+-- | `EForeign` to pass the value as `Foreign` that is expected in the desired
+-- | database backend.
 data Literal a
   = LBoolean Boolean (Boolean ~ a)
   | LString String (String ~ a)
@@ -41,16 +64,6 @@ data UnOp i o
   = IsNotNull (Boolean ~ o)
   | IsNull (Boolean ~ o)
   | Not (Boolean ~ i) (Boolean ~ o)
-
-data Expr o
-  = EColumn (Column o)
-  | ELit (Literal o)
-  | EBinOp (Exists (BinExp o))
-  | EUnOp (Exists (UnExp o))
-  | EFn (Exists (Fn o))
-  | EInArray (Exists (InArray o)) 
-  | EForeign Foreign
-  | Any ShowM
 
 data BinExp o i = BinExp (BinOp i o) (Expr i) (Expr i)
 
