@@ -4,6 +4,7 @@ module Selda
   , module ShowStatement
   , module Query
   , module Table
+  , S
   , (.==), expEq
   , (.>), expGt
   , (.<), expLt
@@ -11,6 +12,7 @@ module Selda
   , (.<=), expLe
   , (.&&), expAnd
   , (.||), expOr
+  , class CoerceBinExpr, onCoerceBinExpr
   , count
   , max_
   , sum_
@@ -26,46 +28,41 @@ import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Selda.Aggr (Aggr(..))
-import Selda.Col (Col(..), lit, class Lit) as Col
 import Selda.Col (Col(..))
-import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
+import Selda.Col (Col(..), lit, class Lit) as Col
+import Selda.Expr (Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
+import Selda.Expr.Ord (class ExprOrd)
+import Selda.Expr.Ord as Ord
 import Selda.Query (crossJoin, crossJoin_, innerJoin, innerJoin_, restrict, notNull, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
 import Selda.Query.Type (Order(..))
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
 
--- | Deprecated: use `&&`
-expAnd ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
-expAnd = (&&)
+-- | Top-level scope of a query
+type S = Unit
 
--- | Deprecated: use `||`
-expOr ∷ ∀ s. Col s Boolean → Col s Boolean → Col s Boolean
-expOr = (||)
+asc ∷ Order
+asc = Asc
 
-expGt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expGt = binOp (Gt identity)
+desc ∷ Order
+desc = Desc
 
-expGe ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expGe = binOp (Ge identity)
-
-expLt ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expLt = binOp (Lt identity)
-
-expLe ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expLe = binOp (Le identity)
-
-expEq ∷ ∀ s a. Col s a → Col s a → Col s Boolean
-expEq = binOp (Eq identity)
-
-binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
-binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
+-- infixl 4 `like`
+infix 4 expEq as .==
+infix 4 expNeq as ./=
+infix 4 expGt as .>
+infix 4 expLt as .<
+infix 4 expGe as .>=
+infix 4 expLe as .<=
+infixr 3 expAnd as .&&
+infixr 2 expOr as .||
 
 -- | returns String because the value might not fit in the underlying js float
 count ∷ ∀ s a. Col s a → Aggr s Int
 count (Col e) = Aggr $ Col $ EFn $ mkExists $ FnCount e identity
 
--- | returns Maybe in case of empty set aggregation
+-- | returns `Nothing` in case of empty set aggregation
 max_ ∷ ∀ s a. Col s a → Aggr s (Maybe a)
 max_ (Col e) = Aggr $ Col $ EFn $ mkExists $ FnMax e identity
 
@@ -82,19 +79,70 @@ inArray (Col e) cols = Col $ EInArray $ mkExists $ InArray e exprs identity
 isNull ∷ ∀ s a. Col s (Maybe a) → Col s Boolean
 isNull (Col e) = Col $ EUnOp $ mkExists $ UnExp (IsNull identity) e
 
-asc ∷ Order
-asc = Asc
+expAnd
+  ∷ ∀ col1 col2 col s
+  . CoerceBinExpr col1 col2 col
+  ⇒ HeytingAlgebra (col s Boolean)
+  ⇒ (col1 s Boolean) → (col2 s Boolean) → col s Boolean
+expAnd = onCoerceBinExpr (&&)
 
-desc ∷ Order
-desc = Desc
+expOr
+  ∷ ∀ col1 col2 col s
+  . CoerceBinExpr col1 col2 col
+  ⇒ HeytingAlgebra (col s Boolean)
+  ⇒ (col1 s Boolean) → (col2 s Boolean) → col s Boolean
+expOr = onCoerceBinExpr (||)
 
--- infixl 4 `like`
-infixl 4 expEq as .==
-infixl 4 expGt as .>
-infixl 4 expLt as .<
-infixl 4 expGe as .>=
-infixl 4 expLe as .<=
--- | Deprecated: use `&&`
-infixr 3 expAnd as .&&
--- | Deprecated: use `||`
-infixr 2 expOr as .||
+type CoercedOrderingExpr = 
+  ∀ col1 col2 col s a
+  . CoerceBinExpr col1 col2 col
+  ⇒ ExprOrd (col s)
+  ⇒ (col1 s a) → (col2 s a) → col s Boolean
+
+expGt ∷ CoercedOrderingExpr
+expGt = onCoerceBinExpr Ord.(.>)
+
+expGe ∷ CoercedOrderingExpr
+expGe = onCoerceBinExpr Ord.(.>=)
+
+expLt ∷ CoercedOrderingExpr
+expLt = onCoerceBinExpr Ord.(.<)
+
+expLe ∷ CoercedOrderingExpr
+expLe = onCoerceBinExpr Ord.(.<=)
+
+expEq ∷ CoercedOrderingExpr
+expEq = onCoerceBinExpr Ord.(.==)
+
+expNeq
+  ∷ ∀ col1 col2 col s a
+  . CoerceBinExpr col1 col2 col
+  ⇒ ExprOrd (col s)
+  ⇒ HeytingAlgebra (col s Boolean)
+  ⇒ (col1 s a) → (col2 s a) → col s Boolean
+expNeq a b = not $ a .== b
+
+-- | Allows writing binary expression with different types `e1` and `e2`
+-- | coerible to a common expression type `e`.
+-- |
+-- | Used to mix `Aggr` and `Col` types in expressions.
+-- |
+-- | Implicit coercion is desired here, because explicit use of `Aggr`
+-- | is discouraged as it can break safety when used in other contexts
+-- | (like returning a column that is not in the `GROUP BY` clause)
+class CoerceBinExpr e1 e2 e | e1 e2 → e where
+  onCoerceBinExpr
+    ∷ ∀ s a r
+    . (e s a → e s a → r)
+    → e1 s a
+    → e2 s a
+    → r
+
+instance cbeColToCol ∷ CoerceBinExpr Col Col Col where
+  onCoerceBinExpr f a b = f a b
+instance cbeColToAggrL ∷ CoerceBinExpr Col Aggr Aggr where
+  onCoerceBinExpr f a b = f (Aggr a) b
+instance cbeColToAggrR ∷ CoerceBinExpr Aggr Col Aggr where
+  onCoerceBinExpr f a b = f a (Aggr b)
+instance cbeAggrToAggr ∷ CoerceBinExpr Aggr Aggr Aggr where
+  onCoerceBinExpr f a b = f a b
