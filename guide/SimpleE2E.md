@@ -1,5 +1,19 @@
 # Simple End-to-End Example
 
+- [Simple End-to-End Example](#simple-end-to-end-example)
+  - [Preface](#preface)
+  - [Setup](#setup)
+    - [Table definition](#table-definition)
+      - [Constraints - wrappers: `Auto` and `Default`](#constraints---wrappers-auto-and-default)
+  - [First Query](#first-query)
+      - [Query vs. FullQuery](#query-vs-fullquery)
+  - [Nested Query](#nested-query)
+  - [Aggregation](#aggregation)
+  - [Type Errors](#type-errors)
+  - [Execution](#execution)
+      - [Query Pretty Printing](#query-pretty-printing)
+      - [Execution](#execution-1)
+
 ## Preface
 
 This guide is a literate PureScript file, which is designed to be a standalone runnable example (executed before the actual test suite).
@@ -64,7 +78,7 @@ exampleTable = Table { name: "example_table" }
 ```
 
 We will use the `postgresql-client` to create some tables in our database.
-To do so we define an auxiliary function `execute` that takes the SQL string literal, executes it and if something went wrong throws an error.
+To do so we define an auxiliary function `execute` that takes the SQL string literal, executes it and if something goes wrong it throws an error.
 
 ```purescript
 execute ∷ String → PostgreSQL.Connection → Aff Unit
