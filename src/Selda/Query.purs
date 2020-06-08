@@ -78,6 +78,9 @@ selectFrom_ iq k = FullQuery do
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = modify_ \st → st { restricts = e : st.restricts }
 
+having ∷ ∀ s. Aggr s Boolean → Query s Unit
+having (Aggr (Col e)) = modify_ \st → st { havings = e : st.havings }
+
 -- | `nutNull col` adds to the WHERE clause that col is not null
 -- | and returns the coerced column.
 notNull ∷ ∀ s a. Col s (Maybe a) → Query s (Col s a)
@@ -87,6 +90,14 @@ notNull col@(Col e) = do
     fromMaybeCol = (unsafeCoerce ∷ Col s (Maybe a) → Col s a)
   restrict notNullCol
   pure $ fromMaybeCol col
+
+notNull_ ∷ ∀ s a. Aggr s (Maybe a) → Query s (Aggr s a)
+notNull_ aggr@(Aggr (Col e)) = do 
+  let
+    notNullAggr = Aggr $ Col $ EUnOp $ mkExists $ UnExp (IsNotNull identity) e
+    fromMaybeAggr = (unsafeCoerce ∷ Aggr s (Maybe a) → Aggr s a)
+  having notNullAggr
+  pure $ fromMaybeAggr aggr
 
 -- | `crossJoin table predicate` is equivalent to `CROSS JOIN <table> ON <predicate>`.
 -- | Returns the columns from the joined table.

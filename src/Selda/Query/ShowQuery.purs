@@ -32,6 +32,9 @@ showCols distinct = showXS s ", " showAliasedCol
 showRestricts ∷ Array (Expr Boolean) → ShowM
 showRestricts = showXS " WHERE " " AND " showExpr
 
+showHavings ∷ Array (Expr Boolean) → ShowM
+showHavings = showXS " HAVING " " AND " showExpr
+
 showGrouping ∷ Array (Exists Expr) → ShowM
 showGrouping = showXS " GROUP BY " ", " $ runExists showExpr
 

@@ -8,7 +8,7 @@ import Control.Monad.State (State)
 import Data.Newtype (unwrap)
 import Foreign (Foreign)
 import Selda.Expr (QueryParams, ShowMCtx, showExpr, showM)
-import Selda.Query.ShowQuery (showCols, showCompoundOp, showGrouping, showLimit, showOrdering, showRestricts)
+import Selda.Query.ShowQuery (showCols, showCompoundOp, showGrouping, showHavings, showLimit, showOrdering, showRestricts)
 import Selda.Query.Type (GenState_, JoinType(..), SQL(..), Source(..))
 import Text.Pretty (Doc, line, nest, render, text)
 
@@ -22,11 +22,12 @@ prettyM
 prettyM ph i m = showM ph i $ render 0 <$> m
 
 ppState ∷ GenState_ → PrettyM
-ppState { cols, source, restricts, aggr, order, limit, distinct } =
+ppState { cols, source, restricts, havings, aggr, order, limit, distinct } =
   (text <$> (<>) " " <$> showCols distinct cols)
     `appDoc` ((<>) (text " FROM ") <$> ppSource source)
     `appTxt` showRestricts restricts
     `appTxt` showGrouping aggr
+    `appTxt` showHavings havings
     `appTxt` showOrdering order
     `appTxt` (showLimit >>> pure) limit
     where

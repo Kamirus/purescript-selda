@@ -42,6 +42,7 @@ data QBinOp
 type GenState_ = 
   { source ∷ Source
   , restricts ∷ Array (Expr Boolean)
+  , havings ∷ Array (Expr Boolean)
   , nextId ∷ Int
   , cols ∷ Array (Tuple Alias (Exists Expr))
   , aggr ∷ Array (Exists Expr)
@@ -79,6 +80,7 @@ initState ∷ GenState
 initState = GenState
   { source: (unsafeCoerce unit ∷ Source)
   , restricts: []
+  , havings: []
   , nextId: 0
   , cols: []
   , aggr: []
