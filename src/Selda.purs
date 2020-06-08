@@ -79,25 +79,35 @@ inArray (Col e) cols = Col $ EInArray $ mkExists $ InArray e exprs identity
 isNull ∷ ∀ s a. Col s (Maybe a) → Col s Boolean
 isNull (Col e) = Col $ EUnOp $ mkExists $ UnExp (IsNull identity) e
 
+-- | `(&&)` on `Col` or `Aggr` expressions. Possible monomorphic types:
+-- |
+-- | `Col s Bool → Col s Bool → Col s Bool`
+-- |
+-- | `Col s Bool → Aggr s Bool → Aggr s Bool`
+-- |
+-- | `Aggr s Bool → Col s Bool → Aggr s Bool`
+-- |
+-- | `Aggr s Bool → Aggr s Bool → Aggr s Bool`
+-- |
 expAnd
   ∷ ∀ col1 col2 col s
   . CoerceBinExpr col1 col2 col
   ⇒ HeytingAlgebra (col s Boolean)
-  ⇒ (col1 s Boolean) → (col2 s Boolean) → col s Boolean
+  ⇒ col1 s Boolean → col2 s Boolean → col s Boolean
 expAnd = onCoerceBinExpr (&&)
 
 expOr
   ∷ ∀ col1 col2 col s
   . CoerceBinExpr col1 col2 col
   ⇒ HeytingAlgebra (col s Boolean)
-  ⇒ (col1 s Boolean) → (col2 s Boolean) → col s Boolean
+  ⇒ col1 s Boolean → col2 s Boolean → col s Boolean
 expOr = onCoerceBinExpr (||)
 
 type CoercedOrderingExpr = 
   ∀ col1 col2 col s a
   . CoerceBinExpr col1 col2 col
   ⇒ ExprOrd (col s)
-  ⇒ (col1 s a) → (col2 s a) → col s Boolean
+  ⇒ col1 s a → col2 s a → col s Boolean
 
 expGt ∷ CoercedOrderingExpr
 expGt = onCoerceBinExpr Ord.(.>)
@@ -119,7 +129,7 @@ expNeq
   . CoerceBinExpr col1 col2 col
   ⇒ ExprOrd (col s)
   ⇒ HeytingAlgebra (col s Boolean)
-  ⇒ (col1 s a) → (col2 s a) → col s Boolean
+  ⇒ col1 s a → col2 s a → col s Boolean
 expNeq a b = not $ a .== b
 
 -- | Allows writing binary expression with different types `e1` and `e2`
