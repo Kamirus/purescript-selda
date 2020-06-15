@@ -4,13 +4,12 @@ import Prelude
 
 import Data.Array ((:))
 import Data.Exists (Exists, mkExists)
-import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
-import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), None(..), ShowM, Some(..), UnExp(..), UnOp(..), showExpr)
+import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), ShowM, UnExp(..), UnOp(..), showExpr)
 import Selda.Table (Alias, Column)
 import Type.Proxy (Proxy)
 
@@ -18,8 +17,8 @@ newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
 
 instance heytingAlgebraCol ∷ HeytingAlgebra (Col s Boolean) where
-  ff = lit false
-  tt = lit true
+  ff = Col $ ELit $ LBoolean false identity
+  tt = Col $ ELit $ LBoolean true identity
   implies a b = not a || b
   conj = binOp (And identity identity)
   disj = binOp (Or identity identity)
@@ -27,29 +26,6 @@ instance heytingAlgebraCol ∷ HeytingAlgebra (Col s Boolean) where
 
 showCol ∷ ∀ s a. Col s a → ShowM
 showCol = unwrap >>> showExpr
-
--- | Lift a value `a` to a column expression `Col s a` using `Lit a` typeclass.
--- | Defined only for basic literals: Boolean, String, Int and Maybe.
--- | To handle more cases refer to the function `litPG`.
-lit ∷ ∀ s a. Lit a ⇒ a → Col s a
-lit = Col <<< ELit <<< literal
-
-class Lit a where
-  literal ∷ a → Literal a
-
-instance litBoolean ∷ Lit Boolean where
-  literal x = LBoolean x identity
-
-instance litString ∷ Lit String where
-  literal x = LString x identity
-
-instance litInt ∷ Lit Int where
-  literal x = LInt x identity
-
-instance litMaybe ∷ Lit a ⇒ Lit (Maybe a) where
-  literal = case _ of
-    Nothing → LNull $ mkExists $ None identity
-    Just l → LJust $ mkExists $ Some (literal l) identity
 
 -- | ```purescript
 -- | { name ∷ Column String, id ∷ Column Int }
