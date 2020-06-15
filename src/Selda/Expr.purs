@@ -170,11 +170,11 @@ showUnExp (UnExp op e) = do
 showFn ∷ ∀ o i. Fn o i → ShowM
 showFn fn = 
   let ret op e = (\s → op <> "(" <> s <> ")") <$> showExpr e in
-  let castToString s = "CAST(" <> s <> " AS INTEGER)" in
+  let castToInt s = "CAST(" <> s <> " AS INTEGER)" in
   case fn of
     FnMax e _ → ret "MAX" e
-    FnCount e _ → castToString <$> ret "COUNT" e
-    FnSum e _ → castToString <$> ret "SUM" e
+    FnCount e _ → castToInt <$> ret "COUNT" e
+    FnSum e _ → castToInt <$> ret "SUM" e
 
 showInArray ∷ ∀ o i. InArray o i → ShowM
 showInArray (InArray x xs _) = do
