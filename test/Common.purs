@@ -3,9 +3,8 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), S, aggregate, asc, count, crossJoin, desc, distinct, groupBy, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<=), (.==), (.>))
+import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<=), (.==), (.>))
 import Selda.PG (litPG)
-import Selda.Query (having, notNull_)
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
@@ -364,11 +363,3 @@ legacySuite ctx = do
         restrict $ r.id .== lit 1
         pure { id: r.id }
     in subQ `union` subQ $ pure
-
-aggregateMaxHavingCount ∷ FullQuery S { c ∷ Col S Int, m ∷ Col S Int, pid ∷ Col S Int }
-aggregateMaxHavingCount = aggregate $ selectFrom bankAccounts \{ personId, balance } → do
-  pid ← groupBy personId
-  m ← notNull_ $ max_ balance
-  let c = count personId
-  having $ c .> lit 1
-  pure { pid, m, c }

@@ -27,7 +27,7 @@ import Selda.SQLite3 (showSQLite3)
 import Selda.SQLite3.Class (BackendSQLite3Class)
 import Test.Unit (TestSuite)
 import Test.Unit as Unit
-import Test.Unit.Assert (assert)
+import Test.Unit.Assert (assert, expectFailure)
 import Type.Proxy (Proxy(..))
 
 type TestCtx b m ctx =
@@ -36,10 +36,10 @@ type TestCtx b m ctx =
   , ctx ∷ ctx
   }
 
-class TestBackend b m ctx | b m → ctx where
-  testWith
-    ∷ ∀ i o
-    . GenericQuery b m i o
+testWith
+    ∷ ∀ b m ctx i o
+    . TestBackend b m ctx
+    ⇒ GenericQuery b m i o
     ⇒ GetCols i
     ⇒ TestCtx b m ctx
     → (Array { | o } → Array { | o } → Aff Unit)
@@ -47,13 +47,41 @@ class TestBackend b m ctx | b m → ctx where
     → Array { | o }
     → FullQuery Unit { | i }
     → TestSuite
+testWith ctx assertFn msg expected q = Unit.test msg
+  $ testWith' ctx assertFn expected q
+
+testFailingWith
+    ∷ ∀ b m ctx i o
+    . TestBackend b m ctx
+    ⇒ GenericQuery b m i o
+    ⇒ GetCols i
+    ⇒ TestCtx b m ctx
+    → String
+    → FullQuery Unit { | i }
+    → TestSuite
+testFailingWith ctx msg q = Unit.test msg
+  $ expectFailure "failure msg"
+  $ testWith' ctx (\_ _ → pure unit) [] q
+
+class TestBackend b m ctx | b m → ctx where
+  testWith'
+    ∷ ∀ i o
+    . GenericQuery b m i o
+    ⇒ GetCols i
+    ⇒ TestCtx b m ctx
+    → (Array { | o } → Array { | o } → Aff Unit)
+    → Array { | o }
+    → FullQuery Unit { | i }
+    → Aff Unit
+
+-- testFailingWith ctx = testWith' ctx unordered "failing: aggr & having"
 
 instance testBackendPG
     ∷ TestBackend BackendPGClass
         (ExceptT PGError (ReaderT Connection Aff))
         { conn ∷ Connection }
   where
-  testWith { b, m, ctx: { conn } } assertFn  = do
+  testWith' { b, m, ctx: { conn } } assertFn =
     testWith_ assertFn (showPG >>> _.strQuery) b (runPGSeldaAff conn)
 
 instance testBackendSQLite3
@@ -61,7 +89,7 @@ instance testBackendSQLite3
         (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
         { conn ∷ DBConnection }
   where
-  testWith { b, m, ctx: { conn } } assertFn = do
+  testWith' { b, m, ctx: { conn } } assertFn =
     testWith_ assertFn (showSQLite3 >>> _.strQuery) b (runSQLite3SeldaAff conn)
 
 testWith_
@@ -72,11 +100,10 @@ testWith_
   → (ShowM → String)
   → Proxy b
   → (m ~> Aff)
-  → String
   → Array { | o }
   → FullQuery Unit { | i }
-  → TestSuite
-testWith_ assertFn showB b runM  = 
+  → Aff Unit
+testWith_ assertFn showB b runM = 
   testQueryWith_ (\q → runM $ genericQuery b q) assertFn (showQuery >>> showB)
 
 testWithPG
@@ -104,16 +131,14 @@ testQueryWith_
   . (query → Aff queryResult)
   → (expected → queryResult → Aff Unit)
   → (query → String)
-  → String
   → expected
   → query
-  → TestSuite
-testQueryWith_ run assertFunc showQ msg expected query =
-  Unit.test msg do
-    run query >>= assertFunc expected # catchError $ \e → do
-      log "Error occured - Printing the query below"
-      log $ showQ query
-      throwError e
+  → Aff Unit
+testQueryWith_ run assertFunc showQ expected query =
+  run query >>= assertFunc expected # catchError $ \e → do
+    log "Error occured - Printing the query below"
+    log $ showQ query
+    throwError e
 
 withRollback_
   ∷ ∀ err a
