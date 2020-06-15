@@ -2,6 +2,7 @@ module Selda.Aggr
   ( Aggr(..)
   , WrapWithAggr(..)
   , UnAggr(..)
+  , class Coerce, unsafeFromCol
   ) where
 
 import Data.HeytingAlgebra (class HeytingAlgebra, ff, implies, not, tt, (&&), (||))
@@ -20,6 +21,17 @@ instance heytingAlgebraAggr ∷ HeytingAlgebra (Aggr s Boolean) where
   conj (Aggr a) (Aggr b) = Aggr (a && b)
   disj (Aggr a) (Aggr b) = Aggr (a || b)
   not (Aggr e) = Aggr (not e)
+
+-- | Overloading utility for common operations on `Col` and `Aggr`
+class Coerce col where
+  -- | Either an identity or `Aggr` constructor.
+  -- | Can be used when it's safe to operate on both `Col` and `Aggr`.
+  -- | Not every `Col` can be safely coerced to `Aggr`.
+  unsafeFromCol ∷ ∀ s a. Col s a → col s a
+
+instance coerceCol ∷ Coerce Col where unsafeFromCol x = x
+
+instance coerceAggr ∷ Coerce Aggr where unsafeFromCol = Aggr
 
 data WrapWithAggr = WrapWithAggr
 instance wrapWithAggrInstance

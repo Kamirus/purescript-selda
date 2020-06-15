@@ -78,6 +78,8 @@ selectFrom_ iq k = FullQuery do
 restrict ∷ ∀ s. Col s Boolean → Query s Unit
 restrict (Col e) = modify_ \st → st { restricts = e : st.restricts }
 
+-- | `having condition` adds the `condition` to the SQL `HAVING` clause.
+-- | Multiple `having` operations are joined with `AND`
 having ∷ ∀ s. Aggr s Boolean → Query s Unit
 having (Aggr (Col e)) = modify_ \st → st { havings = e : st.havings }
 
@@ -91,6 +93,8 @@ notNull col@(Col e) = do
   restrict notNullCol
   pure $ fromMaybeCol col
 
+-- | `nutNull_ aggr` adds to the HAVING clause that aggregate expression `aggr`
+-- | is not null and returns the coerced column.
 notNull_ ∷ ∀ s a. Aggr s (Maybe a) → Query s (Aggr s a)
 notNull_ aggr@(Aggr (Col e)) = do 
   let

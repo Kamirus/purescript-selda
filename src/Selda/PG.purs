@@ -6,6 +6,7 @@ import Data.Array as Array
 import Data.String (joinWith)
 import Database.PostgreSQL (class ToSQLValue, toSQLValue)
 import Foreign (Foreign)
+import Selda.Aggr (class Coerce, unsafeFromCol)
 import Selda.Col (Col(..), showCol)
 import Selda.Expr (Expr(..), ShowM, showM)
 import Selda.Query.Utils (class RowListLength, rowListLength)
@@ -13,12 +14,12 @@ import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy)
 
--- | Lift a value `a` to a column expression `Col s a` using `ToSQLValue a`.
+-- | Lift a value `a` to a column expression using `ToSQLValue a`.
 -- | Please note that the value will be passed as a query parameter meaning it
 -- | won't appear in the SQL query string as a serialized string, but as a
 -- | placeholder with an index corresponding to the array of foreign parameters.
-litPG ∷ ∀ s a. ToSQLValue a ⇒ a → Col s a
-litPG = Col <<< EForeign <<< toSQLValue
+litPG ∷ ∀ col s a. ToSQLValue a ⇒ Coerce col ⇒ a → col s a
+litPG = unsafeFromCol <<< Col <<< EForeign <<< toSQLValue
 
 showPG
   ∷ ShowM

@@ -4,14 +4,15 @@ import Prelude
 
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe(..))
+import Selda.Aggr (class Coerce, unsafeFromCol)
 import Selda.Col (Col(..))
 import Selda.Expr (Expr(..), Literal(..), None(..), Some(..))
 
--- | Lift a value `a` to a column expression `Col s a` using `Lit a` typeclass.
+-- | Lift a value `a` to a column expression using `Lit a` typeclass.
 -- | Defined only for basic literals: Boolean, String, Int and Maybe.
 -- | To handle more cases refer to the function `litPG`.
-lit ∷ ∀ s a. Lit a ⇒ a → Col s a
-lit = Col <<< ELit <<< literal
+lit ∷ ∀ col s a. Lit a ⇒ Coerce col ⇒ a → col s a
+lit = unsafeFromCol <<< Col <<< ELit <<< literal
 
 class Lit a where
   literal ∷ a → Literal a

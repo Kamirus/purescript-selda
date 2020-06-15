@@ -1,7 +1,19 @@
 module Selda.SQLite3 where
 
+import Prelude
+
 import Foreign (Foreign)
-import Selda.Expr (ShowM, showM)
+import Selda (Col(..))
+import Selda.Aggr (class Coerce, unsafeFromCol)
+import Selda.Expr (Expr(..), ShowM, showM)
+import Simple.JSON (class WriteForeign, write)
+
+-- | Lift a value `a` to a column expression using `WriteForeign a`.
+-- | Please note that the value will be passed as a query parameter meaning it
+-- | won't appear in the SQL query string as a serialized string, but as a
+-- | placeholder with an index corresponding to the array of foreign parameters.
+litSQLite3 ∷ ∀ col s a. WriteForeign a ⇒ Coerce col ⇒ a → col s a
+litSQLite3 = unsafeFromCol <<< Col <<< EForeign <<< write
 
 showSQLite3
   ∷ ShowM
