@@ -5,8 +5,12 @@
   - [Before](#before)
   - [New Custom Type](#new-custom-type)
     - [Table Definition](#table-definition)
+    - [`FromSQLValue`](#fromsqlvalue)
+      - [`litPG` vs `lit`](#litpg-vs-lit)
+    - [`ToSQLValue`](#tosqlvalue)
   - [Instances](#instances)
     - [Main Execution](#main-execution)
+      - [Output](#output)
 
 ## Preface
 
@@ -126,6 +130,8 @@ error specific to the `purescript-postgresql-client`.
 It uses two type classes (`ToSQLValue` and `FromSQLValue`) to
 handle serialization and deserialization.
 
+### `FromSQLValue`
+
 `FromSQLValue` is used to parse `Foreign` value into `AccountType` in this case
 There are already provided instances for common data types, but we need to
 write our own to handle querying `AccountType` 
@@ -147,10 +153,14 @@ Previously we used `lit` to do that but it is restricted to simple data types.
 Here we need to use PostgreSQL specific function `litPG` that can create
 a column expression `Col s a` provided that there's an instance of `ToSQLValue a`
 
+#### `litPG` vs `lit`
+
 > Side note: One could use `litPG` exclusively and don't bother with dilemma when to use `lit` and when to use `litPG`.
 > But then every query becomes PG specific and might break when executed by another (e.g. SQLite3) backend.
 > Another difference between `lit` and `litPG` is that `lit` serializes a value to a string so it is visible in the printed query.
 > `litPG` on the other hand makes a query parameter - it serializes a value to `Foreign` and inserts a placeholder where `lit` might write a string.
+
+### `ToSQLValue`
 
 ```purescript
 selectAdultAccounts
@@ -248,7 +258,8 @@ logQuery q = do
   log ""
 ```
 
-Output (may be outdated):
+#### Output
+(may be outdated)
   ```
  SELECT people_0.name AS name, people_0.id AS id, people_0.age AS age
  FROM people people_0
