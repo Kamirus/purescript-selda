@@ -6,8 +6,8 @@
   - [New Custom Type](#new-custom-type)
     - [Table Definition](#table-definition)
     - [`FromSQLValue`](#fromsqlvalue)
-      - [`litPG` vs `lit`](#litpg-vs-lit)
     - [`ToSQLValue`](#tosqlvalue)
+      - [`litPG` vs `lit`](#litpg-vs-lit)
   - [Instances](#instances)
     - [Main Execution](#main-execution)
       - [Output](#output)
@@ -145,6 +145,8 @@ queryAccountTypesOf
 queryAccountTypesOf = PG.query $ selectAccountTypesOf "John Smith"
 ```
 
+### `ToSQLValue`
+
 Similarly we would like to write queries with `AccountType` values.
 For example we could restrict a query to personal accounts only.
 Thus we want a function of type `AccountType → Col s AccountType` that could
@@ -159,8 +161,6 @@ a column expression `Col s a` provided that there's an instance of `ToSQLValue a
 > But then every query becomes PG specific and might break when executed by another (e.g. SQLite3) backend.
 > Another difference between `lit` and `litPG` is that `lit` serializes a value to a string so it is visible in the printed query.
 > `litPG` on the other hand makes a query parameter - it serializes a value to `Foreign` and inserts a placeholder where `lit` might write a string.
-
-### `ToSQLValue`
 
 ```purescript
 selectAdultAccounts
