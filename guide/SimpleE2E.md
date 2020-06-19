@@ -34,6 +34,7 @@ import Database.PostgreSQL (PGError)
 import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
+import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log, logShow)
 import Selda (Col, FullQuery, Table(..), aggregate, max_, count, groupBy, leftJoin, lit, notNull, restrict, selectFrom, selectFrom_, showQuery, (.==), (.>))
@@ -438,22 +439,26 @@ We start by preparing a connection to the database.
 
 ```purescript
 main ∷ Effect Unit
-main = do
+main = launchWithConnectionPG \conn → do
+```
+When we've got the connection we can create the database tables and then run our monad stack.
+```purescript
+  createPeople conn
+  createBankAccounts conn
+  runApp { conn, other: "other" } app >>= either logShow pure
+
+launchWithConnectionPG ∷ (PostgreSQL.Connection → Aff Unit) → Effect Unit
+launchWithConnectionPG m = do
   pool ← PostgreSQL.newPool dbconfig
   launchAff_ do
     PostgreSQL.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)
       Right conn → do
 ```
-When we've got the connection we can create the database tables and then run our monad stack.
 We are going to wrap everything in a transaction and do a rollback at the end because it is only for testing purposes.
 ```purescript
         execute "BEGIN TRANSACTION" conn
-
-        createPeople conn
-        createBankAccounts conn
-
-        runApp { conn, other: "other" } app >>= either logShow pure
-
+        res ← Aff.try $ m conn
         execute "ROLLBACK TRANSACTION" conn
+        either throwError pure res
 ```
