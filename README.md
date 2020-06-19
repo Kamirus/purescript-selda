@@ -51,8 +51,7 @@ Install [postgresql-client's dependencies](https://github.com/rightfold/purescri
 ## Info
 
 - **Guide**: [Introductory End-to-End example that shows how to setup, write queries, use aggregation, deal with type errors and execute queries and inserts.](guide/SimpleE2E.md)
-- **Cook Book**:
-  - [Custom Types](guide/CustomTypes.md)
+  - [Advanced: Custom Types and Expressions (`litPG`, `Any`, `EForeign`, unsafe escape hatches)](guide/Custom.md)
 - **Test Suite**: For information about features, examples, usage, etc. refer to the test suite in `test/Main.purs`.
 - **Documentation**: [Pursuit docs](https://pursuit.purescript.org/packages/purescript-selda/)
 - [**My thesis**](./selda.pdf)

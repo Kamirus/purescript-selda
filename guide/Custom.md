@@ -9,6 +9,11 @@
     - [`ToSQLValue`](#tosqlvalue)
       - [`litPG` vs `lit`](#litpg-vs-lit)
   - [Instances](#instances)
+  - [Unsafe Escape Hatch](#unsafe-escape-hatch)
+    - [`litPG` and `EForeign`](#litpg-and-eforeign)
+    - [Any](#any)
+      - [Custom PG function](#custom-pg-function)
+  - [Summary](#summary)
     - [Main Execution](#main-execution)
       - [Output](#output)
 
@@ -19,7 +24,7 @@ This cook book recipe is a literate PureScript file, which is designed to be a s
 This guide describes how to handle custom data types *as-types-of-columns* in selda - how to define tables with them, query values of these types and write queries with these values as parameters.
 
 ```purescript
-module CookBook.CustomTypes where
+module Guide.Custom where
 
 import Prelude
 
@@ -197,6 +202,46 @@ showAccountType Business = "business"
 showAccountType Personal = "personal"
 ```
 
+## Unsafe Escape Hatch
+
+Sometimes we want to make unsafe extensions and expose them via safe interface.
+One of such extensions would be to write a piece of SQL in a string and integrate it with selda expressions.
+
+Selda has fixed ADT that represent expressions (e.g. literals, some binary operations, some aggregate functions) - but it has two escape hatches that allow a user to make extensions.
+
+Firstly, user can provide a `Foreign` value (which is utilised by `litPG`).
+
+Secondly, user can provide an SQL in a string (covered below - [Any](#any))
+
+### `litPG` and `EForeign`
+
+It is worth knowing the implementation of `litPG`.
+
+  ```purescript
+  litPG ∷ ∀ col s a. ToSQLValue a ⇒ Coerce col ⇒ a → col s a
+  litPG = unsafeFromCol <<< Col <<< EForeign <<< toSQLValue
+  ```
+
+- `toSQLValue` serializes a value to `Foreign`
+- `Col <<< EForeign` is an escape hatch - it creates a `Col s a` for any `Foreign` value, thus it is worth to use it carefully and always provide a type annotation
+- `unsafeFromCol` is a method from the `Coerce` class
+
+> `class Coerce` : 
+> allows overloading for values that can be both `Col s a` and `Aggr s a`.
+> 
+> For example: columns from a table need to be in the `GROUP BY` clause to be safely coerced to `Aggr`, while constants can be safely used in both contexts.
+> Hence we can use `litPG` for writing `restrict` (`Col s Boolean`) and `having` (`Aggr s Boolean`) conditions.
+
+### Any
+
+TODO
+
+#### Custom PG function
+
+TODO
+
+## Summary
+
 To sum up - to handle custom data types all we need to do is write appriopriate instances for the backend we chose.
 For pgclient they are: `ToSQLValue` and `FromSQLValue`.
 
@@ -205,8 +250,7 @@ We will use some functionality from the [Guide](SimpleE2E.md).
 
 To execute the main function below plese run following commands:
   ```
-  npm run-script lit
-  spago run -m CookBook.CustomTypes
+  npm run-script lit && spago run -m Guide.Custom
   ```
 
 ### Main Execution
