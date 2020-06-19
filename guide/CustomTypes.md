@@ -1,3 +1,19 @@
+# Custom Types
+
+- [Custom Types](#custom-types)
+  - [Preface](#preface)
+  - [Before](#before)
+  - [New Custom Type](#new-custom-type)
+    - [Table Definition](#table-definition)
+  - [Instances](#instances)
+    - [Main Execution](#main-execution)
+
+## Preface
+
+This cook book recipe is a literate PureScript file, which is designed to be a standalone runnable example.
+
+This guide describes how to handle custom data types *as-types-of-columns* in selda - how to define tables with them, query values of these types and write queries with these values as parameters.
+
 ```purescript
 module CookBook.CustomTypes where
 
@@ -23,9 +39,10 @@ import Selda.PG.Class (insert_)
 import Selda.PG.Class as PG
 import Selda.Query.Class (runSelda)
 ```
+## Before
 
 Selda supports simple data types like String, Int, Maybe on its own.
-we can simply declare a table definition using these types.
+We can simply declare a table definition using these types.
 
 *(Remember that selda does not modify the database schema -
 a table definition is like a type annotation for already created table)*
@@ -55,6 +72,8 @@ queryAdults
 queryAdults = PG.query selectAdults
 ```
 
+## New Custom Type
+
 But we sometimes want to use other data types.
 Say we want to define another table called `bankAccounts` with a column
 called `accountType` that is an enum with possible values:
@@ -71,6 +90,8 @@ derive instance genericAccountType ∷ Generic AccountType _
 instance showAccountTyp ∷ Show AccountType where
   show = genericShow
 ```
+
+### Table Definition
 
 We use `AccountType` to annotate a column `accountType` in the following table definition
 
@@ -145,6 +166,8 @@ selectAdultAccounts = selectFrom bankAccounts \r@{balance} → do
   pure { id: adult.id, balance }
 ```
 
+## Instances
+
 Now to discharge these constraints we need instances of `FromSQLValue` and `ToSQLValue` for `AccountType`.
 
 ```purescript
@@ -175,6 +198,8 @@ To execute the main function below plese run following commands:
   npm run-script lit
   spago run -m CookBook.CustomTypes
   ```
+
+### Main Execution
 
 ```purescript
 main ∷ Effect Unit
