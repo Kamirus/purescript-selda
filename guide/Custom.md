@@ -13,6 +13,10 @@
     - [`litPG` and `EForeign`](#litpg-and-eforeign)
     - [Any](#any)
       - [Custom PG function](#custom-pg-function)
+    - [Table](#table)
+      - [Table-like Source](#table-like-source)
+        - [DB Schema - qualified table names](#db-schema---qualified-table-names)
+        - [generate_series](#generate_series)
   - [Summary](#summary)
     - [Main Execution](#main-execution)
       - [Output](#output)
@@ -41,8 +45,9 @@ import Effect.Class.Console (log, logShow)
 import Foreign (readString, unsafeToForeign)
 import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide
-import Selda (Col, FullQuery, Table(..), distinct, innerJoin, innerJoin_, lit, notNull, restrict, selectFrom, showQuery, (.==), (.>=))
-import Selda.Col (class GetCols)
+import Selda (Col(..), FullQuery, Table(..), distinct, innerJoin, innerJoin_, lit, notNull, restrict, selectFrom, showQuery, (.==), (.>=))
+import Selda.Col (class GetCols, showCol)
+import Selda.Expr (Expr(..))
 import Selda.PG (litPG, showPG)
 import Selda.PG.Class (insert_)
 import Selda.PG.Class as PG
@@ -234,9 +239,65 @@ It is worth knowing the implementation of `litPG`.
 
 ### Any
 
-TODO
+Second use case: user can provide any SQL string as an expression.
+It is possible with the following function
+
+  ```purescript
+  (Col <<< Any) ∷ ∀ s a. ShowM → Col s a
+  ```
+
+It is best to think of `ShowM` as an abstract monad `m String` that additionally supports `showCol ∷ ∀ s a. Col s a → ShowM`.
+
+To simply provide an SQL string use `(Col <<< Any <<< pure) ∷ ∀ s a. String → Col s a`
+
+But it is usually not enough to use raw Strings.
+Some expressions depend on others.
+Consider the following PG specific function [`EXTRACT`](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT) that retrieves subfields from date/time values.
+
+We would like to encode it in selda.
+Its type would be `extract ∷ ∀ a s. String → Col s a → Col s Int`.
+
+*Please note it is possibe to write a more type-safe variant either by restricting `a` to a date type, or not allowing arbitrary strings as its first argument.
+But we want to keep it simple.*
+
+Let's implement it:
+
+```purescript
+extract ∷ ∀ a s. String → Col s a → Col s Int
+extract field col = Col $ Any do
+  s ← showCol col
+  pure $ "extract(" <> field <> " from " <> s <> ")"
+```
+
+- `field` could be one of `["day", "month", "year"]` 
+- `extract` depends on another expression `Col s a` so we need to turn in into a string using `showCol` function in order to use `Any`
+- In the last line we build a raw SQL string for the whole expression
+- We annotated it to return `Col s Int` because we know that it would match the foreign value returned one the query is executed - We could annotate it differently and maybe provide our own custom data type and handle \[de\]serialization ourselves with `From/ToSQLValue` instances.
+
+> **SQL expressions vs. SQL statements**
+> 
+> One could think that now we can write any query as a raw SQL string since we have `Any`, but it is not that simple.
+> We can only use it to represent expressions whereas query is a `SELECT` statement, though there are expressions that depend on statements e.g. `IN` takes an expression and a query and returns a bool so it is expressible using `Any` (see: `in_` function).
+>
+> Though it is possible to encode more than just expressions - please see [Table-like Source](#table-like-source)
 
 #### Custom PG function
+
+TODO
+
+### Table
+
+TODO
+
+#### Table-like Source
+
+TODO
+
+##### DB Schema - qualified table names 
+
+TODO
+
+##### generate_series
 
 TODO
 
