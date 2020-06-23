@@ -3,6 +3,7 @@ module Selda.PG where
 import Prelude
 
 import Data.Array as Array
+import Data.Maybe (maybe)
 import Data.String (joinWith)
 import Database.PostgreSQL (class ToSQLValue, toSQLValue)
 import Foreign (Foreign)
@@ -10,7 +11,7 @@ import Selda.Aggr (class Coerce, unsafeFromCol)
 import Selda.Col (Col(..), showCol)
 import Selda.Expr (Expr(..), ShowM, showM)
 import Selda.Query.Utils (class RowListLength, rowListLength)
-import Selda.Table (class TableColumnNames, Table, tableColumnNames, tableName)
+import Selda.Table (class TableColumnNames, Table(..), tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy)
 
@@ -52,3 +53,10 @@ extract ∷ ∀ a s. String → Col s a → Col s Int
 extract field srcCol = Col $ Any do
   s ← showCol srcCol
   pure $ "extract(" <> field <> " from " <> s <> ")"
+
+-- | **PG specific** `generate_series(start, stop)` set returning	function
+-- | modeled as a Table-like source. It should be used only for querying.
+generateSeries ∷ Int → Int → Table ( i ∷ Int )
+generateSeries start stop = Source "gs" \maybeAlias →
+  let alias = maybe "" identity maybeAlias in
+  "generate_series(" <> show start <> ", " <> show stop <> ") " <> alias <> " (i)"

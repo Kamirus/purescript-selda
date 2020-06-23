@@ -5,22 +5,21 @@ import Prelude
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
-import Data.Maybe (Maybe(..), fromJust, isJust)
-import Database.PostgreSQL (PoolConfiguration, defaultPoolConfiguration)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Database.PostgreSQL (Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
-import Selda (Col, Table(..), lit, restrict, selectFrom, (.==), (.>))
-import Selda.PG (extract, litPG)
-import Selda.PG.Class (deleteFrom, insert, insert1, insert1_, insert_, update)
-import Selda.Query.Class (class GenericQuery)
+import Selda (Col, Table(..), S, lit, restrict, selectFrom, (.==), (.>))
+import Selda.PG (extract, generateSeries, litPG)
+import Selda.PG.Class (BackendPGClass, deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
-import Test.Utils (class TestBackend, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
+import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
 
 employees ∷ Table
   ( id ∷ Auto Int
@@ -40,23 +39,16 @@ pgKeywordTable = Table { name: "pg_keyword_table" }
 pgKeywordTable_quote ∷ Table ( "\"end\"" ∷ Int )
 pgKeywordTable_quote = Table { name: "pg_keyword_table" }
 
+qualifiedTableWithSchema ∷ Table ( id ∷ Auto Int, name ∷ String )
+qualifiedTableWithSchema = Source "tablename"
+  \alias → "qualified.tablename" <> maybe "" (" " <> _) alias
+
 date ∷ Int → Int → Int → Date
 date y m d = unsafePartial $ fromJust $
   canonicalDate <$> toEnum y <*> toEnum m <*> toEnum d
 
 testSuite
-  ∷ ∀ b m ctx
-  . TestBackend b m ctx
-  ⇒ GenericQuery b m
-      ( date ∷ Col Unit Date, id ∷ Col Unit Int, name ∷ Col Unit String, salary ∷ Col Unit Int )
-      ( date ∷ Date, id ∷ Int, name ∷ String, salary ∷ Int )
-  ⇒ GenericQuery b m
-      ( y ∷ Col Unit Int, m ∷ Col Unit Int, d ∷ Col Unit Int )
-      ( y ∷ Int, m ∷ Int, d ∷ Int )
-  ⇒ GenericQuery b m
-      ( end ∷ Col Unit Int )
-      ( end ∷ Int )
-  ⇒ TestCtx b m ctx
+  ∷ TestCtx BackendPGClass PGSelda { conn ∷ Connection }
   → TestSuite
 testSuite ctx = do
   let
@@ -78,7 +70,7 @@ testSuite ctx = do
     , { y: 2000, m: 12, d: 22 }
     ]
     $ selectFrom employees \r → do
-        let y = extract "year" r.date
+        let (y ∷ Col S _) = extract "year" r.date
         let m = extract "month" r.date
         let d = extract "day" r.date
         pure { y, m, d }
@@ -87,7 +79,18 @@ testSuite ctx = do
     ([] ∷ Array ({ end ∷ Int }))
     $ selectFrom pgKeywordTable pure
 
-main ∷ (TestSuite → Aff Unit) → Aff Unit
+  testWith ctx unordered "select * from qualifiedTableWithSchema"
+    [{ id: 2, name: "s2" }]
+    $ selectFrom qualifiedTableWithSchema pure
+
+  testWith ctx unordered "generate_series(3,5)"
+    [ { i: 3 }
+    , { i: 4 }
+    , { i: 5 }
+    ]
+    $ selectFrom (generateSeries 3 5) pure
+
+main ∷ (TestSuite → Aff S) → Aff S
 main cont = do
   pool ← liftEffect $ PostgreSQL.newPool dbconfig
   PostgreSQL.withConnection pool case _ of
@@ -142,6 +145,14 @@ main cont = do
           salary INTEGER DEFAULT 500,
           date DATE NOT NULL DEFAULT '2000-10-20'
         );
+
+        DROP TABLE IF EXISTS qualified.tablename;
+        DROP SCHEMA IF EXISTS qualified;
+        CREATE SCHEMA qualified;
+        CREATE TABLE qualified.tablename (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL
+        );
       """) PostgreSQL.Row0
       when (isJust createdb) $
         failure ("PostgreSQL createdb error: " <> unsafeStringify createdb)
@@ -166,6 +177,16 @@ main cont = do
         insert_ employees [{ name: "E1", salary: 123 }]
         insert1_ employees { name: "E2", date: date 2000 11 21 }
         insert1_ employees { name: "E3" }
+
+        insert_ qualifiedTableWithSchema
+          [ { name: "s1" }
+          , { name: "s2" }
+          ]
+        update qualifiedTableWithSchema
+          (\r → r.id .== lit 1)
+          (\r → r { name = lit "s" })
+        deleteFrom qualifiedTableWithSchema
+          (\r → r.name .== lit "s")
 
       -- simple test delete
       runSeldaAff conn do
