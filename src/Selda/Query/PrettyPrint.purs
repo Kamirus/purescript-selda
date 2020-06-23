@@ -67,7 +67,7 @@ ppSource = case _ of
 
 ppSQL ∷ SQL → PrettyM
 ppSQL = case _ of
-  FromTable t → pure $ text $ t.name <> " " <> t.alias
+  FromTable t → pure $ text t.body
   SubQuery alias state → do
     s ← ppState $ unwrap state
     pure $ nest 2 $ line <> text "(" <> nest 1 (s <> text (" ) " <> alias))

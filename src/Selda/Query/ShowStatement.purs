@@ -15,7 +15,7 @@ import Selda.Expr (ShowM, showExpr)
 import Selda.Query.PrettyPrint (PrettyM, ppState)
 import Selda.Query.Type (FullQuery, GenState(..), runFullQuery)
 import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
-import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
+import Selda.Table (class TableColumnNames, Table, tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Text.Pretty (render)
 import Type.Data.RowList (RLProxy(..))
@@ -34,17 +34,17 @@ showDeleteFrom
   ∷ ∀ t s r
   . TableToColsWithoutAlias s t r
   ⇒ Table t → ({ | r } → Col s Boolean) → ShowM
-showDeleteFrom table@(Table { name }) pred = do
+showDeleteFrom table pred = do
   let recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
   pred_str ← showCol $ pred recordWithCols
-  pure $ "DELETE FROM " <> name <> " WHERE " <> pred_str
+  pure $ "DELETE FROM " <> tableName table <> " WHERE " <> pred_str
 
 showUpdate
   ∷ ∀ t s r
   . TableToColsWithoutAlias s t r
   ⇒ GetCols r
   ⇒ Table t → ({ | r } → Col s Boolean) → ({ | r } → { | r }) → ShowM
-showUpdate table@(Table { name }) pred up = do
+showUpdate table pred up = do
   let
     recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
     f (Tuple n e) = do 
@@ -52,7 +52,7 @@ showUpdate table@(Table { name }) pred up = do
       pure $ n <> " = " <> s 
   pred_str ← showCol $ pred recordWithCols
   vals ← joinWith ", " <$> (traverse f $ getCols $ up recordWithCols)
-  pure $ "UPDATE " <> name <> " SET " <> vals <> " WHERE " <> pred_str
+  pure $ "UPDATE " <> tableName table <> " SET " <> vals <> " WHERE " <> pred_str
 
 -- | typeclass-alias for `genericShowInsert` constraints
 class GenericShowInsert t r where
@@ -70,13 +70,13 @@ instance genericShowInsertImpl
       , RowListLength rl
       ) ⇒ GenericShowInsert t r
   where
-  genericShowInsert { ph } (Table { name }) rs =
+  genericShowInsert { ph } table rs =
     let
       cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
       len = rowListLength (RLProxy ∷ RLProxy rl)
       placeholders = mkPlaceholders ph 1 len $ Array.length rs
     in
-      ["INSERT INTO ", name, " (", cols, ") VALUES ", placeholders, ";"]
+      ["INSERT INTO ", tableName table, " (", cols, ") VALUES ", placeholders, ";"]
         # joinWith ""
 
 mkPlaceholders ∷ String → Int → Int → Int → String

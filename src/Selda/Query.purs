@@ -271,13 +271,19 @@ instance tableToColsI
       )
     ⇒ FromTable s t c
   where
-  fromTable t@(Table { name }) = do
-    id ← freshId
-    let
-      aliased = { name, alias: name <> "_" <> show id }
-      i = tableColumns aliased (RLProxy ∷ RLProxy tl)
-      res = toCols (Proxy ∷ Proxy s) i
-    pure $ { res, sql: FromTable aliased }
+  fromTable = case _ of
+    Table { name } → 
+      go name \alias → { body: name <> " " <> alias, alias }
+    Source aliasPrefix aliasToBody →
+      go aliasPrefix \alias → { body: aliasToBody $ Just alias, alias }
+    where
+    go aliasPrefix aliasToAliased = do
+      id ← freshId
+      let
+        aliased = aliasToAliased $ aliasPrefix <> "_" <> show id
+        i = tableColumns aliased (RLProxy ∷ RLProxy tl)
+        res = toCols (Proxy ∷ Proxy s) i
+      pure $ { res, sql: FromTable aliased }
 
 data WrapWithMaybe = WrapWithMaybe
 instance wrapWithMaybeLeaveMaybe

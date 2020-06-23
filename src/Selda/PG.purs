@@ -10,7 +10,7 @@ import Selda.Aggr (class Coerce, unsafeFromCol)
 import Selda.Col (Col(..), showCol)
 import Selda.Expr (Expr(..), ShowM, showM)
 import Selda.Query.Utils (class RowListLength, rowListLength)
-import Selda.Table (class TableColumnNames, Table(..), tableColumnNames)
+import Selda.Table (class TableColumnNames, Table, tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy)
 
@@ -33,7 +33,7 @@ showInsert1
   ⇒ TableColumnNames retRLcols
   ⇒ RowListLength insRLcols
   ⇒ Table t → RLProxy insRLcols → RLProxy retRLcols → String
-showInsert1 (Table { name }) colsToinsert colsToRet =
+showInsert1 table colsToinsert colsToRet =
   let
     cols = joinWith ", " $ tableColumnNames colsToinsert
     rets = joinWith ", " $ tableColumnNames colsToRet
@@ -41,7 +41,7 @@ showInsert1 (Table { name }) colsToinsert colsToRet =
     placeholders =
       Array.range 1 len # map (\i → "$" <> show i) # joinWith ", "
   in
-  "INSERT INTO " <> name <> " (" <> cols <> ") " 
+  "INSERT INTO " <> tableName table <> " (" <> cols <> ") " 
     <> "VALUES " <> "(" <> placeholders <> ") "
     <> "RETURNING " <> rets
 

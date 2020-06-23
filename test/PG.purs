@@ -38,8 +38,7 @@ pgKeywordTable = Table { name: "pg_keyword_table" }
 -- | with manually escaped column name.
 -- | Use for insert/update/delete. Not safe for querying though.
 pgKeywordTable_quote ∷ Table ( "\"end\"" ∷ Int )
-pgKeywordTable_quote = Table t
-  where (Table t) = pgKeywordTable
+pgKeywordTable_quote = Table { name: "pg_keyword_table" }
 
 date ∷ Int → Int → Int → Date
 date y m d = unsafePartial $ fromJust $

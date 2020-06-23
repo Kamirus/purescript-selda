@@ -133,10 +133,9 @@ instance tableToColsI
       )
     ⇒ TableToColsWithoutAlias s r o
   where
-  tableToColsWithoutAlias _ (Table { name }) = recordWithCols
+  tableToColsWithoutAlias _ _ = recordWithCols
     where
-    aliased = { name, alias: "" }
-    recordWithColumns = tableColumns aliased (RLProxy ∷ RLProxy rl)
+    recordWithColumns = tableColumns { alias: "" } (RLProxy ∷ RLProxy rl)
     recordWithCols = toCols (Proxy ∷ Proxy s) recordWithColumns
 
 infixl 4 type Beside as <:>
