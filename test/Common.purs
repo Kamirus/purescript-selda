@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<=), (.==), (.>))
+import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, in_, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<), (.<=), (.==), (.>))
 import Selda.PG (litPG)
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
@@ -363,3 +363,11 @@ legacySuite ctx = do
         restrict $ r.id .== lit 1
         pure { id: r.id }
     in subQ `union` subQ $ pure
+
+  testWith ctx unordered "people with bank accounts using IN"
+    [ { id: 1 } ]
+    $ selectFrom people \{ id } → do
+        restrict $ id .< lit 2
+        restrict $ id `in_` (selectFrom bankAccounts \r -> pure { x: r.personId })
+        restrict $ id .> lit 0
+        pure { id }

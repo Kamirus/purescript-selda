@@ -7,6 +7,7 @@ module Selda
   , module Table
   , S
   , module Expr.Ord
+  , in_
   , count
   , max_
   , sum_
@@ -22,16 +23,18 @@ import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Selda.Aggr (Aggr(..))
-import Selda.Col (Col(..))
 import Selda.Col (Col(..)) as Col
-import Selda.Lit (lit, class Lit) as Lit
+import Selda.Col (Col(..), showCol)
 import Selda.Expr (Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
 import Selda.Expr.Ord ((.==), (./=), (.>), (.>=), (.<), (.<=)) as Expr.Ord
+import Selda.Lit (lit, class Lit) as Lit
 import Selda.Query (crossJoin, crossJoin_, innerJoin, innerJoin_, restrict, having, notNull, notNull_, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
+import Selda.Query.ShowStatement (ppQuery)
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
-import Selda.Query.Type (Order(..))
+import Selda.Query.Type (Order(..), FullQuery)
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
+import Text.Pretty as PP
 
 -- | Top-level scope of a query
 type S = Unit
@@ -45,6 +48,19 @@ desc = Desc
 -- infixl 4 `like`
 infixr 3 expAnd as .&&
 infixr 2 expOr as .||
+
+-- | SQL `IN` expression - tests whether a given column expression `Col s a`
+-- | is present in the result set of the given sub query.
+in_
+  ∷ ∀ s a
+  . Col s a
+  → (∀ z. FullQuery z { x ∷ Col z a })
+  → Col s Boolean
+in_ col subQ = Col $ Any do
+  c ← showCol col
+  doc ← ppQuery subQ
+  let q = PP.render 0 $ PP.nest 2 $ PP.line <> doc <> PP.line
+  pure $ c <> " IN (" <> q <> ")"
 
 count ∷ ∀ s a. Col s a → Aggr s Int
 count (Col e) = Aggr $ Col $ EFn $ mkExists $ FnCount e identity
