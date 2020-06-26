@@ -1,5 +1,5 @@
 module Selda.Table
-  ( Column(..), showColumn
+  ( Column(..)
   , AliasedTable
   , Alias
   , StringSQL
@@ -53,12 +53,6 @@ type StringSQL = String
 type AliasedTable = { body ∷ String, alias ∷ Alias }
 
 newtype Column a = Column { namespace ∷ Alias, name ∷ String }
-
-showColumn ∷ ∀ a. Column a → String
-showColumn (Column { namespace, name }) =
-  if namespace == ""
-    then name
-    else namespace <> "." <> name
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
 class TableColumns (rl ∷ RowList) (r ∷ # Type) | rl → r where

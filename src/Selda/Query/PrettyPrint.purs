@@ -1,4 +1,8 @@
-module Selda.Query.PrettyPrint where
+module Selda.Query.PrettyPrint
+  ( PrettyM
+  , prettyM
+  , ppState
+  ) where
 
 import Prelude
 
@@ -8,7 +12,7 @@ import Control.Monad.State (State)
 import Data.Newtype (unwrap)
 import Foreign (Foreign)
 import Selda.Expr (QueryParams, ShowMCtx, showExpr, showM)
-import Selda.Query.ShowQuery (showCols, showCompoundOp, showGrouping, showHavings, showLimit, showOrdering, showRestricts)
+import Selda.Query.ShowQuery (ishowCols, ishowCompoundOp, ishowGrouping, ishowHavings, ishowLimit, ishowOrdering, ishowRestricts)
 import Selda.Query.Type (GenState_, JoinType(..), SQL(..), Source(..))
 import Text.Pretty (Doc, line, nest, render, text)
 
@@ -23,13 +27,13 @@ prettyM ph i m = showM ph i $ render 0 <$> m
 
 ppState ∷ GenState_ → PrettyM
 ppState { cols, source, restricts, havings, aggr, order, limit, distinct } =
-  (text <$> (<>) " " <$> showCols distinct cols)
+  (text <$> (<>) " " <$> ishowCols distinct cols)
     `appDoc` ((<>) (text " FROM ") <$> ppSource source)
-    `appTxt` showRestricts restricts
-    `appTxt` showGrouping aggr
-    `appTxt` showHavings havings
-    `appTxt` showOrdering order
-    `appTxt` (showLimit >>> pure) limit
+    `appTxt` ishowRestricts restricts
+    `appTxt` ishowGrouping aggr
+    `appTxt` ishowHavings havings
+    `appTxt` ishowOrdering order
+    `appTxt` (ishowLimit >>> pure) limit
     where
       appDoc = lift2 \a b → a <> line <> b
       appTxt = lift2 appendNonEmptyText
@@ -61,7 +65,7 @@ ppSource = case _ of
         <> text ") combined_sub_query"
     pure $ nest 2 $ line
       <> text "(" <> nest 1 (ppCombinedSubQuery s1) <> line
-      <> text (showCompoundOp op) <> line
+      <> text (ishowCompoundOp op) <> line
       <> text " " <> nest 1 (ppCombinedSubQuery s2) <> line
       <> text (") " <> alias)
 

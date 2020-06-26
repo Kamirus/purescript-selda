@@ -11,50 +11,50 @@ import Selda.Expr (Expr, ShowM, showExpr)
 import Selda.Query.Type (Order(..), QBinOp(..))
 import Selda.Table (Alias)
 
-showCompoundOp ∷ QBinOp → String
-showCompoundOp = case _ of
+ishowCompoundOp ∷ QBinOp → String
+ishowCompoundOp = case _ of
   Union → " UNION "
   UnionAll → " UNION ALL "
   Intersect → " INTERSECT "
   Except → " EXCEPT "
 
-showXS ∷ ∀ a m. Monad m ⇒ String → String → (a → m String) → Array a → m String
-showXS clause sep f = case _ of
+ishowXS ∷ ∀ a m. Monad m ⇒ String → String → (a → m String) → Array a → m String
+ishowXS clause sep f = case _ of
   [] → pure ""
   xs → do
     ss ← traverse f xs
     pure $ clause <> joinWith sep ss
 
-showCols ∷ Boolean → Array (Tuple Alias (Exists Expr)) → ShowM
-showCols distinct = showXS s ", " showAliasedCol
+ishowCols ∷ Boolean → Array (Tuple Alias (Exists Expr)) → ShowM
+ishowCols distinct = ishowXS s ", " ishowAliasedCol
   where s = "SELECT " <> if distinct then "DISTINCT " else ""
 
-showRestricts ∷ Array (Expr Boolean) → ShowM
-showRestricts = showXS " WHERE " " AND " showExpr
+ishowRestricts ∷ Array (Expr Boolean) → ShowM
+ishowRestricts = ishowXS " WHERE " " AND " showExpr
 
-showHavings ∷ Array (Expr Boolean) → ShowM
-showHavings = showXS " HAVING " " AND " showExpr
+ishowHavings ∷ Array (Expr Boolean) → ShowM
+ishowHavings = ishowXS " HAVING " " AND " showExpr
 
-showGrouping ∷ Array (Exists Expr) → ShowM
-showGrouping = showXS " GROUP BY " ", " $ runExists showExpr
+ishowGrouping ∷ Array (Exists Expr) → ShowM
+ishowGrouping = ishowXS " GROUP BY " ", " $ runExists showExpr
 
-showOrdering ∷ Array (Tuple Order (Exists Expr)) → ShowM
-showOrdering = showXS " ORDER BY " ", " showOrder
+ishowOrdering ∷ Array (Tuple Order (Exists Expr)) → ShowM
+ishowOrdering = ishowXS " ORDER BY " ", " ishowOrder
 
-showOrder ∷ Tuple Order (Exists Expr) → ShowM
-showOrder (Tuple order e) = do
+ishowOrder ∷ Tuple Order (Exists Expr) → ShowM
+ishowOrder (Tuple order e) = do
   s ← runExists showExpr e
   pure $ s <> " "
     <> case order of
       Asc → "ASC"
       Desc → "DESC"
 
-showLimit ∷ Maybe Int → String
-showLimit = case _ of
+ishowLimit ∷ Maybe Int → String
+ishowLimit = case _ of
   Nothing → ""
   Just i → " LIMIT " <> (show $ max 0 i)
 
-showAliasedCol ∷ Tuple Alias (Exists Expr) → ShowM
-showAliasedCol (Tuple alias ee) = do
+ishowAliasedCol ∷ Tuple Alias (Exists Expr) → ShowM
+ishowAliasedCol (Tuple alias ee) = do
   s ← runExists showExpr ee
   pure $ s <> " AS " <> alias

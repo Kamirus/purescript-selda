@@ -1,4 +1,24 @@
-module Selda.Expr where
+module Selda.Expr
+  ( showExpr
+
+  -- internal AST for expressions
+  , Expr(..)
+  , Literal(..)
+  , Some(..)
+  , None(..)
+  , BinOp(..)
+  , UnOp(..)
+  , BinExp(..)
+  , UnExp(..)
+  , Fn(..)
+  , InArray(..)
+
+  -- ShowM monad for handling serialization of Col's
+  , showM
+  , ShowM
+  , ShowMCtx
+  , QueryParams
+  ) where
 
 import Prelude
 
@@ -15,7 +35,7 @@ import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign)
-import Selda.Table (Column, showColumn)
+import Selda.Table (Column(..))
 
 -- | AST for SQL expressions:
 -- | 
@@ -121,6 +141,11 @@ showForeign x = do
   s ← get
   put $ s { nextIndex = 1 + s.nextIndex, invertedParams = x : s.invertedParams }
   pure $ mkPlaceholder s.nextIndex
+
+showColumn ∷ ∀ a. Column a → String
+showColumn (Column { namespace, name })
+  | namespace == "" = name
+  | otherwise = namespace <> "." <> name
 
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
