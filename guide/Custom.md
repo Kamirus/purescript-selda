@@ -37,7 +37,7 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either(..), either)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Database.PostgreSQL (class FromSQLValue, class ToSQLValue)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
@@ -250,15 +250,20 @@ It is best to think of `ShowM` as an abstract monad `m String` that additionally
 
 To simply provide an SQL string use `(Col <<< Any <<< pure) ∷ ∀ s a. String → Col s a`
 
+#### Custom PG function
+
 But it is usually not enough to use raw Strings.
-Some expressions depend on others.
-Consider the following PG specific function [`EXTRACT`](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT) that retrieves subfields from date/time values.
+Some expressions depend on others, meaning we would have to serialize each of them to a string, but some are `Foreign` query parameters not meant to be *stringified*.
+Thus we need the `ShowM` monad and `showCol` function (or any `showX` function returning `ShowM`) to make proper string representations for every `Col` expression *(returning a placeholder (e.g. "$7") and accumulating parameters in case of `Foreign` query parameter)*
+
+Consider the following PG-specific function [`EXTRACT`](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT) that retrieves subfields from date/time values.
 
 We would like to encode it in selda.
-Its type would be `extract ∷ ∀ a s. String → Col s a → Col s Int`.
+Say we want its type to be `extract ∷ ∀ a s. String → Col s a → Col s Int`.
 
-*Please note it is possibe to write a more type-safe variant either by restricting `a` to a date type, or not allowing arbitrary strings as its first argument.
-But we want to keep it simple.*
+***Please note** it is possibe to write a **more type-safe variant** either by restricting `a` to a date type or not allowing arbitrary strings as its first argument.
+But we want to keep it simple.
+User can write a safer alternative by wrapping the function `extract` defined below.*
 
 Let's implement it:
 
@@ -281,25 +286,72 @@ extract field col = Col $ Any do
 >
 > Though it is possible to encode more than just expressions - please see [Table-like Source](#table-like-source)
 
-#### Custom PG function
-
-TODO
-
 ### Table
 
-TODO
+To represent database tables we normally use `Table` constructor to provide the table name as well as column names with their corresponding types.
+
+Say we have a table named `"users"` with columns `( name ∷ String, id ∷ Int )`.
+When we generate SQL for a query involving `users` each column is prefixed with an alias for its *source* (here the *source* is the table `users`).
+
+Aliases are created using the table/source name and a unique number.
+- Meaning instead of `name` in a generated SQL there is `users_7.name`.
+- and after `FROM` (or `JOIN` ...) we see `... FROM users users_7 ...`
+
+These are the only two uses for `Table` data type during SQL generation:
+1. get an alias so column names can be qualified
+2. get its representation - a string that should appear after `FROM` (or `JOIN` ...)
+
+**Problem:**
+- tables created in different database schemas are not definable with the `Table` constructor (for a table `"myschema.users"` it produces incorrect qualified column names like `"myschema.users_3.name"`)
+- set returning database functions (like [`generate_series`](https://www.postgresql.org/docs/current/functions-srf.html)) that could be treated like a read-only tables yield a similar problem with aliases
 
 #### Table-like Source
 
-TODO
+To retain readable aliases and fix problems above (and open more possibilities) there's another constructor called `Source` for the `Table` data type.
+
+`Source ∷ ∀ r. Alias → (Maybe Alias → StringSQL) → Table r`
+
+`Alias` and `StringSQL` are just aliases for `String`.
+So to create an arbitrary table-like source we need:
+- an alias - a prefix of the full alias used to qualify column names (a unique number will be provided during SQL generation)
+- a way to create its string-representation given a full alias (with a unique number already concatenated)
+  - in case of `INSERT`/`UPDATE`/`DELETE` there's no alias hence there's `Maybe`
 
 ##### DB Schema - qualified table names 
 
-TODO
+To represent tables with schema-qualified names we use the `Source` constructor.
+
+**Example**: Given a table called `"myschema.users"` we create a table definition for it in a following way.
+
+```purescript
+myschemaUsers ∷ Table ( name ∷ String, id ∷ Int )
+myschemaUsers = Source "users" $ case _ of
+  Nothing    → "myschema.users"
+  Just alias → "myschema.users" <> " " <> alias
+```
+
+Notice that the type-level part is the same as for the `Table` constructor - meaning we define columns the same way as before.
 
 ##### generate_series
 
-TODO
+Similarly we utilise the `Source` constructor to represent set returning functions that can be treated like read-only tables, but aren't really tables.
+
+```purescript
+generateSeries ∷ Int → Int → Table ( i ∷ Int )
+generateSeries start stop = Source "gs" \maybeAlias →
+  let alias = maybe "" identity maybeAlias in
+  "generate_series(" <> show start <> ", " <> show stop <> ") " <> alias <> " (i)"
+```
+
+- We ignore alias being `Nothing` (it will break when we attempt to call insert/update/delete on it).
+- The string returned by the function in `Source` is tied to the type-level information - name of the column `i` is provided in the string as well as in the type row
+
+Executing a query `selectFrom (generateSeries 3 5) pure` the following SQL is generated
+
+  ```SQL
+  SELECT gs_0.i AS i
+  FROM generate_series(3, 5) gs_0 (i)
+  ```
 
 ## Summary
 
