@@ -4,7 +4,6 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, in_, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<), (.<=), (.==), (.>))
-import Selda.PG (litPG)
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
@@ -26,7 +25,7 @@ testSelectEscapedString
   ∷ ∀ b m ctx
   . TestBackend b m ctx
   ⇒ GenericQuery b m
-      ( val ∷ Col Unit String )
+      ( val ∷ Col b String )
       ( val ∷ String )
   ⇒ TestCtx b m ctx
   → TestSuite
@@ -35,7 +34,7 @@ testSelectEscapedString ctx = do
     [ { val: "'abc' \' \"def\"" } ]
     $ aux
   where
-    aux ∷ FullQuery Unit { val ∷ Col Unit String }
+    aux ∷ FullQuery b { val ∷ Col b String }
     aux = selectFrom people \r → do
       restrict $ r.id .== lit 1
       pure { val: lit "'abc' \' \"def\"" }
@@ -76,7 +75,7 @@ legacySuite ctx = do
     , { id: 3, personId: 3, balance: 300, accountType: Personal }
     ]
     $ selectFrom bankAccounts \r@{ accountType } → do
-        restrict $ accountType .== litPG Personal
+        restrict $ accountType .== lit Personal
         pure r
 
   testWith ctx unordered "cross product with restrict"

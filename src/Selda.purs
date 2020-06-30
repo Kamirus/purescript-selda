@@ -5,7 +5,6 @@ module Selda
   , module ShowStatement
   , module Query
   , module Table
-  , S
   , module Expr.Ord
   , in_
   , count
@@ -35,9 +34,6 @@ import Selda.Query.Type (Order(..), FullQuery)
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
 import Text.Pretty as PP
-
--- | Top-level scope of a query
-type S = Unit
 
 asc ∷ Order
 asc = Asc

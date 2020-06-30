@@ -10,7 +10,8 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Foreign (Foreign)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
-import Selda (Col, Table)
+import Selda.Col (Col)
+import Selda.Table (Table)
 import Selda.Query.ShowStatement (class GenericShowInsert, genericShowInsert)
 import Selda.Query.Type (FullQuery)
 import Selda.Query.Utils (RecordToArrayForeign(..))
@@ -19,7 +20,7 @@ import Type.Proxy (Proxy)
 class Monad m <= GenericQuery b m i o | i → o, b → m where
   genericQuery
     ∷ Proxy b
-    → FullQuery Unit { | i }
+    → FullQuery b { | i }
     → m (Array { | o })
 
 class Monad m <= GenericInsert b m t r | t → r, b → m where
@@ -29,18 +30,18 @@ class Monad m <= GenericInsert b m t r | t → r, b → m where
     → Array { | r }
     → m Unit
 
-class Monad m <= GenericDelete b m s t r | t → r, b → m where
+class Monad m <= GenericDelete b m t r | t → r, b → m where
   genericDelete
     ∷ Proxy b
     → Table t
-    → ({ | r } → Col s Boolean)
+    → ({ | r } → Col b Boolean)
     → m Unit
 
-class Monad m <= GenericUpdate b m s t r | t → r, b → m where
+class Monad m <= GenericUpdate b m t r | t → r, b → m where
   genericUpdate
     ∷ Proxy b 
     → Table t
-    → ({ | r } → Col s Boolean)
+    → ({ | r } → Col b Boolean)
     → ({ | r } → { | r })
     → m Unit
 

@@ -3,7 +3,7 @@ module Selda.SQLite3 where
 import Prelude
 
 import Foreign (Foreign)
-import Selda (Col(..))
+import Selda.Col (Col(..))
 import Selda.Aggr (class Coerce, unsafeFromCol)
 import Selda.Expr (Expr(..), ShowM, showM)
 import Simple.JSON (class WriteForeign, write)

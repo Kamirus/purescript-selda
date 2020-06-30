@@ -12,7 +12,7 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
-import Selda (Col, Table(..), S, lit, restrict, selectFrom, (.==), (.>))
+import Selda (Col, Table(..), lit, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, generateSeries, litPG)
 import Selda.PG.Class (BackendPGClass, deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Table.Constraint (Auto, Default)
@@ -70,7 +70,7 @@ testSuite ctx = do
     , { y: 2000, m: 12, d: 22 }
     ]
     $ selectFrom employees \r → do
-        let (y ∷ Col S _) = extract "year" r.date
+        let (y ∷ Col BackendPGClass _) = extract "year" r.date
         let m = extract "month" r.date
         let d = extract "day" r.date
         pure { y, m, d }
@@ -90,7 +90,7 @@ testSuite ctx = do
     ]
     $ selectFrom (generateSeries 3 5) pure
 
-main ∷ (TestSuite → Aff S) → Aff S
+main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do
   pool ← liftEffect $ PostgreSQL.newPool dbconfig
   PostgreSQL.withConnection pool case _ of
@@ -203,7 +203,7 @@ main cont = do
 
         update employees
           (\r → r.name .== lit "E3")
-          (\r → r { date = litPG $ date 2000 12 22 })
+          (\r → r { date = lit $ date 2000 12 22 })
 
       -- test a table with SQL keyword as a column name
       runSeldaAff conn do

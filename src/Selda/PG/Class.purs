@@ -43,6 +43,8 @@ import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 
+type B = BackendPGClass
+
 data BackendPGClass
 
 class MonadSelda m PGError Connection <= MonadSeldaPG m
@@ -154,13 +156,13 @@ instance genericInsertPGClass
 query
   ∷ ∀ o i m
   . GenericQuery BackendPGClass m i o
-  ⇒ FullQuery Unit { | i } → m (Array { | o })
+  ⇒ FullQuery B { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendPGClass)
 
 query1
   ∷ ∀ o i m
   . GenericQuery BackendPGClass m i o
-  ⇒ FullQuery Unit { | i } → m (Maybe { | o })
+  ⇒ FullQuery B { | i } → m (Maybe { | o })
 query1 q = query q <#> Array.head
 
 -- | Throws `ConversionError ∷ PGError` is case of no results.
@@ -168,12 +170,12 @@ query1_
   ∷ ∀ o i m
   . GenericQuery BackendPGClass m i o
   ⇒ MonadSeldaPG m
-  ⇒ FullQuery Unit { | i } → m { | o }
+  ⇒ FullQuery B { | i } → m { | o }
 query1_ = query1 >=> maybe (throwError err) pure
   where err = ConversionError "Cannot execute `query1_`: result array is empty"
 
 instance genericQueryPG
-    ∷ ( ColsToPGHandler Unit i tup o
+    ∷ ( ColsToPGHandler B i tup o
       , GetCols i
       , FromSQLRow tup
       , MonadSeldaPG m
@@ -184,31 +186,31 @@ instance genericQueryPG
       (Tuple res _) = runFullQuery q
       { strQuery, params } = showPG $ showQuery q
     rows ← pgQuery (PostgreSQL.Query strQuery) params
-    pure $ map (colsToPGHandler (Proxy ∷ Proxy Unit) res) rows
+    pure $ map (colsToPGHandler (Proxy ∷ Proxy BackendPGClass) res) rows
 
 deleteFrom
-  ∷ ∀ t s r m
-  . GenericDelete BackendPGClass m s t r
-  ⇒ Table t → ({ | r } → Col s Boolean) → m Unit
+  ∷ ∀ t r m
+  . GenericDelete BackendPGClass m t r
+  ⇒ Table t → ({ | r } → Col B Boolean) → m Unit
 deleteFrom = genericDelete (Proxy ∷ Proxy BackendPGClass)
 
 instance genericDeletePG
-    ∷ ( TableToColsWithoutAlias s t r
+    ∷ ( TableToColsWithoutAlias B t r
       , MonadSeldaPG m
-      ) ⇒ GenericDelete BackendPGClass m s t r
+      ) ⇒ GenericDelete BackendPGClass m t r
   where
   genericDelete _ table pred = pgExecute $ showDeleteFrom table pred
 
 update
-  ∷ ∀ t s r m
-  . GenericUpdate BackendPGClass m s t r
-  ⇒ Table t → ({ | r } → Col s Boolean) → ({ | r } → { | r }) → m Unit
+  ∷ ∀ t r m
+  . GenericUpdate BackendPGClass m t r
+  ⇒ Table t → ({ | r } → Col B Boolean) → ({ | r } → { | r }) → m Unit
 update = genericUpdate (Proxy ∷ Proxy BackendPGClass)
 
 instance genericUpdatePG
-    ∷ ( TableToColsWithoutAlias s t r
+    ∷ ( TableToColsWithoutAlias B t r
       , GetCols r
       , MonadSeldaPG m
-      ) ⇒ GenericUpdate BackendPGClass m s t r
+      ) ⇒ GenericUpdate BackendPGClass m t r
   where
   genericUpdate _ table pred up = pgExecute $ showUpdate table pred up

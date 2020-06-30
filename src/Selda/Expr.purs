@@ -4,7 +4,6 @@ module Selda.Expr
   -- internal AST for expressions
   , Expr(..)
   , Literal(..)
-  , Some(..)
   , None(..)
   , BinOp(..)
   , UnOp(..)
@@ -65,9 +64,6 @@ data Literal a
   | LString String (String ~ a)
   | LInt Int (Int ~ a)
   | LNull (Exists (None a))
-  | LJust (Exists (Some a))
-
-data Some a b = Some (Literal b) (Maybe b ~ a)
 
 data None a b = None (Maybe b ~ a)
 
@@ -153,7 +149,6 @@ showLiteral = case _ of
   LString s _ → "'" <> primPGEscape s <> "'"
   LInt i _ → show i
   LNull _ → "null"
-  LJust x → runExists (\(Some l _) → showLiteral l) x
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
