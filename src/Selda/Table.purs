@@ -3,6 +3,8 @@ module Selda.Table
   , AliasedTable
   , Alias
   , StringSQL
+  , showColumn
+  , showColumnName
   , Table(..)
   , tableName
   , class TableColumns, tableColumns
@@ -12,6 +14,7 @@ module Selda.Table
 import Prelude
 
 import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..), Replacement(..), replace) as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
@@ -74,7 +77,10 @@ instance tableColumnsCons
     let
       _sym = (SProxy ∷ SProxy sym)
       res' = tableColumns table (RLProxy ∷ RLProxy tail)
-      col = Column { namespace: table.alias, name: reflectSymbol _sym }
+      col = Column
+        { namespace: table.alias
+        , name: showColumnName $ reflectSymbol _sym
+        }
     in
     Record.insert _sym col res'
 
@@ -86,7 +92,21 @@ else instance tableColumnNamesCons
     ∷ ( IsSymbol sym , TableColumnNames tail )
     ⇒ TableColumnNames (RL.Cons sym t tail)
   where
-  tableColumnNames _ = tableColumnNames _tail <> [reflectSymbol _sym]
+  tableColumnNames _
+    = tableColumnNames _tail
+    <> [ showColumnName $ reflectSymbol _sym ]
     where
     _tail = (RLProxy ∷ RLProxy tail)
     _sym = (SProxy ∷ SProxy sym)
+
+showColumnName ∷ String → String
+showColumnName name = "\"" <> name <> "\""
+
+showColumn ∷ ∀ a. Column a → String
+showColumn (Column { namespace, name })
+  | namespace == "" = name
+  | otherwise = namespace <> "." <> name
+
+-- | Escape double quotes in an SQL identifier.
+escapeQuotes :: String -> String
+escapeQuotes = String.replace (String.Pattern "\"") (String.Replacement "\"\"")

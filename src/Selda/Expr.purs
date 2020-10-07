@@ -29,12 +29,13 @@ import Data.Leibniz (type (~))
 import Data.List (List, (:))
 import Data.List as List
 import Data.Maybe (Maybe)
+import Data.String (Pattern(..), Replacement(..), replace) as String
 import Data.String (joinWith)
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign)
-import Selda.Table (Column(..))
+import Selda.Table (Column(..), showColumn)
 
 -- | AST for SQL expressions:
 -- | 
@@ -137,11 +138,6 @@ showForeign x = do
   s ← get
   put $ s { nextIndex = 1 + s.nextIndex, invertedParams = x : s.invertedParams }
   pure $ mkPlaceholder s.nextIndex
-
-showColumn ∷ ∀ a. Column a → String
-showColumn (Column { namespace, name })
-  | namespace == "" = name
-  | otherwise = namespace <> "." <> name
 
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of

@@ -9,13 +9,14 @@ import Data.Exists (runExists)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Global.Unsafe (unsafeStringify)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
 import Selda.Query.PrettyPrint (PrettyM, ppState)
 import Selda.Query.Type (FullQuery, GenState(..), runFullQuery)
 import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
-import Selda.Table (class TableColumnNames, Table, tableColumnNames, tableName)
+import Selda.Table (class TableColumnNames, Table, showColumnName, tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Text.Pretty (render)
 import Type.Data.RowList (RLProxy(..))
@@ -49,7 +50,7 @@ showUpdate table pred up = do
     recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
     f (Tuple n e) = do 
       s ← runExists showExpr e
-      pure $ n <> " = " <> s 
+      pure $ showColumnName n <> " = " <> s
   pred_str ← showCol $ pred recordWithCols
   vals ← joinWith ", " <$> (traverse f $ getCols $ up recordWithCols)
   pure $ "UPDATE " <> tableName table <> " SET " <> vals <> " WHERE " <> pred_str

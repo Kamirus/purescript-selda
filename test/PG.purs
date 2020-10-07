@@ -36,7 +36,7 @@ pgKeywordTable = Table { name: "pg_keyword_table" }
 -- | Table with a problematic column name in Postgresql
 -- | with manually escaped column name.
 -- | Use for insert/update/delete. Not safe for querying though.
-pgKeywordTable_quote ∷ Table ( "\"end\"" ∷ Int )
+pgKeywordTable_quote ∷ Table ( "end" ∷ Int )
 pgKeywordTable_quote = Table { name: "pg_keyword_table" }
 
 qualifiedTableWithSchema ∷ Table ( id ∷ Auto Int, name ∷ String )
@@ -117,9 +117,9 @@ main cont = do
         DROP TABLE IF EXISTS bank_accounts;
         CREATE TABLE bank_accounts (
           id INTEGER PRIMARY KEY,
-          personId INTEGER NOT NULL,
+          "personId" INTEGER NOT NULL,
           balance INTEGER NOT NULL,
-          accountType ACCOUNT_TYPE NOT NULL
+          "accountType" ACCOUNT_TYPE NOT NULL
         );
 
         DROP TABLE IF EXISTS descriptions;
@@ -207,12 +207,12 @@ main cont = do
 
       -- test a table with SQL keyword as a column name
       runSeldaAff conn do
-        insert1_ pgKeywordTable_quote { "\"end\"": 1 }
+        insert1_ pgKeywordTable_quote { "end": 1 }
         update pgKeywordTable_quote
-          (\r → r."\"end\"" .== lit 1)
-          (\r → r { "\"end\"" = lit 2} )
+          (\r → r."end" .== lit 1)
+          (\r → r { "end" = lit 2} )
         deleteFrom pgKeywordTable_quote
-          (\r → r."\"end\"" .== lit 2)
+          (\r → r."end" .== lit 2)
 
       runSeldaAff conn do
         _ ← insert people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })
@@ -228,3 +228,4 @@ dbconfig = (defaultPoolConfiguration "purspg")
   , password = Just $ "qwerty"
   , idleTimeoutMillis = Just $ 1000
   }
+

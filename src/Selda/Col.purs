@@ -69,3 +69,5 @@ instance extractcols
 
 binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
+
+
