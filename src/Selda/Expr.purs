@@ -29,13 +29,12 @@ import Data.Leibniz (type (~))
 import Data.List (List, (:))
 import Data.List as List
 import Data.Maybe (Maybe)
-import Data.String (Pattern(..), Replacement(..), replace) as String
 import Data.String (joinWith)
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign)
-import Selda.Table (Column(..), showColumn)
+import Selda.Table (Column, showColumn)
 
 -- | AST for SQL expressions:
 -- | 

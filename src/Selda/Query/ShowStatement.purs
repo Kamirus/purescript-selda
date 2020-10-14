@@ -9,7 +9,6 @@ import Data.Exists (runExists)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Global.Unsafe (unsafeStringify)
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
