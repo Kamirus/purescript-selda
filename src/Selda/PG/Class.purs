@@ -8,7 +8,6 @@ module Selda.PG.Class
   , insert1_
   , query
   , query1
-  , query1_
   , deleteFrom
   , update
   , BackendPGClass
@@ -21,7 +20,7 @@ import Control.Monad.Reader (ask)
 import Data.Array (concat, null)
 import Data.Array as Array
 import Data.Array.Partial (head)
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError(..), toSQLValue)
@@ -159,19 +158,13 @@ query
   ⇒ FullQuery B { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendPGClass)
 
-query1
-  ∷ ∀ o i m
-  . GenericQuery BackendPGClass m i o
-  ⇒ FullQuery B { | i } → m (Maybe { | o })
-query1 q = query q <#> Array.head
-
 -- | Throws `ConversionError ∷ PGError` is case of no results.
-query1_
+query1
   ∷ ∀ o i m
   . GenericQuery BackendPGClass m i o
   ⇒ MonadSeldaPG m
   ⇒ FullQuery B { | i } → m { | o }
-query1_ = query1 >=> maybe (throwError err) pure
+query1 = query >=> Array.head >>> maybe (throwError err) pure
   where err = ConversionError "Cannot execute `query1_`: result array is empty"
 
 instance genericQueryPG

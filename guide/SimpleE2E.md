@@ -43,24 +43,9 @@ import Selda.Col (class GetCols)
 import Selda.PG (showPG)
 import Selda.PG.Class (insert_, query)
 import Selda.Table.Constraint (Auto, Default)
+import Test.Selda.PG.Config (load) as Config
 ```
 ## Setup
-
-First we have to setup the database. Make sure that:
-- a database named `purspg` exists
-- a user called `init` with password `qwerty` has been created
-
-We include this information in a record below.
-We will need it later to execute our queries.
-
-```purescript
-dbconfig ∷ PostgreSQL.PoolConfiguration
-dbconfig = (PostgreSQL.defaultPoolConfiguration "purspg")
-  { user = Just "init"
-  , password = Just $ "qwerty"
-  , idleTimeoutMillis = Just $ 1000
-  }
-```
 
 ### Table definition
 
@@ -435,7 +420,9 @@ We can also get SQL string literal from a query using the `str` helper function.
 ```
 
 Now we will finally write the `main` that will interpret our `app`.
-We start by preparing a connection to the database.
+We start by preparing a connection to the database (We use here predefined test `Config.load` helper
+which reads the environment (or `.env` file) for pg connection info and builds a pool for us).
+
 
 ```purescript
 main ∷ Effect Unit
@@ -449,8 +436,8 @@ When we've got the connection we can create the database tables and then run our
 
 launchWithConnectionPG ∷ (PostgreSQL.Connection → Aff Unit) → Effect Unit
 launchWithConnectionPG m = do
-  pool ← PostgreSQL.newPool dbconfig
   launchAff_ do
+    pool ← Config.load
     PostgreSQL.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)
       Right conn → do
