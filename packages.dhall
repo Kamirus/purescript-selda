@@ -112,7 +112,7 @@ let mkPackage =
       https://raw.githubusercontent.com/purescript/package-sets/psc-0.13.2-20190725/src/mkPackage.dhall sha256:0b197efa1d397ace6eb46b243ff2d73a3da5638d8d0ac8473e8e4a8fc528cf57
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.3-20190920/packages.dhall sha256:53873cf2fc4a343a41f335ee47c1706ecf755ac7c5a336e8eb03ad23165dfd28
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200911-2/packages.dhall sha256:872c06349ed9c8210be43982dc6466c2ca7c5c441129826bcb9bf3672938f16e
 
 let overrides = {=}
 
@@ -127,6 +127,59 @@ let prettyprinter =
   , repo =
       "https://github.com/Kamirus/purescript-prettyprinter.git"
   , version = 
+      "master"
+  }
+
+let polyform =
+  { dependencies =
+    [ "debug"
+      , "foreign"
+      , "foreign-object"
+      , "generics-rep"
+      , "invariant"
+      , "newtype"
+      , "ordered-collections"
+      , "parsing"
+      , "psci-support"
+      , "profunctor"
+      , "quickcheck-laws"
+      , "run"
+      , "test-unit"
+      , "transformers"
+      , "validation"
+      , "variant"
+      ]
+  , repo =
+      "https://github.com/purescript-polyform/polyform.git"
+  , version =
+      "master"
+  }
+
+let polyform-batteries =
+  { dependencies =
+    [ "affjax"
+    , "argonaut"
+    , "debug"
+    , "decimals"
+    , "filterable"
+    , "numbers"
+    , "polyform"
+    , "prelude"
+    , "record-extra"
+    , "test-unit"
+    ]
+  , repo =
+      "https://github.com/purescript-polyform/batteries.git"
+  , version =
+      "master"
+  }
+
+let polyform-batteries-env =
+  { dependencies =
+    [ "polyform-batteries" ]
+  , repo =
+      "https://github.com/purescript-polyform/batteries-env.git"
+  , version =
       "master"
   }
 
@@ -162,6 +215,9 @@ let postgresql-client =
 
 let additions =
   { postgresql-client = postgresql-client
+  , polyform = polyform
+  , polyform-batteries = polyform-batteries
+  , polyform-batteries-env = polyform-batteries-env
   , prettyprinter = prettyprinter
   }
 

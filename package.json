@@ -16,7 +16,7 @@
   "dependencies": {
     "decimal.js": "^10.0.1",
     "pg": "^7.6.0",
-    "sqlite3": "^4.1.0"
+    "sqlite3": "^4.2.0"
   },
   "devDependencies": {
     "paluh-litps": "^0.1.4"

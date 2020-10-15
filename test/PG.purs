@@ -5,18 +5,26 @@ import Prelude
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
+import Data.Map (fromFoldable) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Newtype (un)
+import Data.Validation.Semigroup (V(..))
 import Database.PostgreSQL (Connection, PoolConfiguration, defaultPoolConfiguration)
 import Database.PostgreSQL as PostgreSQL
+import Dotenv (loadFile) as DotEnv
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
+import Foreign.Object (toUnfoldable) as Object
 import Global.Unsafe (unsafeStringify)
+import Node.Process (getEnv)
 import Partial.Unsafe (unsafePartial)
+import Polyform.Validator (runValidator)
 import Selda (Col, Table(..), lit, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, generateSeries, litPG)
 import Selda.PG.Class (BackendPGClass, deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
+import Test.Selda.PG.Config (load, pool) as Config
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
 import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
@@ -92,7 +100,7 @@ testSuite ctx = do
 
 main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do
-  pool ← liftEffect $ PostgreSQL.newPool dbconfig
+  pool ← Config.load
   PostgreSQL.withConnection pool case _ of
     Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
     Right conn → do
@@ -221,11 +229,4 @@ main cont = do
       cont do
         suite "PG" $ testWithPG conn legacySuite
         suite "PG.Specific" $ testWithPG conn testSuite
-
-dbconfig ∷ PoolConfiguration
-dbconfig = (defaultPoolConfiguration "purspg")
-  { user = Just "init"
-  , password = Just $ "qwerty"
-  , idleTimeoutMillis = Just $ 1000
-  }
 
