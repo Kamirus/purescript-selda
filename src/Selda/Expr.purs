@@ -164,7 +164,7 @@ showExpr = case _ of
   EFn fn → runExists showFn fn
   EInArray e → runExists showInArray e
   EForeign x → showForeign x
-  Any m → primPGEscape <$> m
+  Any m → m
 
 showBinExp ∷ ∀ o i. BinExp o i → ShowM
 showBinExp (BinExp op e1 e2) = do

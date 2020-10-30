@@ -15,15 +15,14 @@ module Selda.PG.Class
 
 import Prelude
 
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ask)
 import Data.Array (concat, null)
 import Data.Array as Array
 import Data.Array.Partial (head)
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError(..), toSQLValue)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, toSQLValue)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
 import Foreign (Foreign)
@@ -33,9 +32,10 @@ import Prim.RowList as RL
 import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
+import Selda.Query (limit)
 import Selda.Query.Class (class GenericDelete, class GenericInsert, class GenericQuery, class GenericUpdate, class MonadSelda, genericDelete, genericInsert, genericInsert_, genericQuery, genericUpdate)
 import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
-import Selda.Query.Type (FullQuery, runFullQuery)
+import Selda.Query.Type (FullQuery(..), runFullQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
@@ -158,14 +158,11 @@ query
   ⇒ FullQuery B { | i } → m (Array { | o })
 query = genericQuery (Proxy ∷ Proxy BackendPGClass)
 
--- | Throws `ConversionError ∷ PGError` is case of no results.
 query1
   ∷ ∀ o i m
   . GenericQuery BackendPGClass m i o
-  ⇒ MonadSeldaPG m
-  ⇒ FullQuery B { | i } → m { | o }
-query1 = query >=> Array.head >>> maybe (throwError err) pure
-  where err = ConversionError "Cannot execute `query1_`: result array is empty"
+  ⇒ FullQuery B { | i } → m (Maybe { | o })
+query1 (FullQuery q) = query (FullQuery (limit 1 >>= \_ → q)) <#> Array.head
 
 instance genericQueryPG
     ∷ ( ColsToPGHandler B i tup o
