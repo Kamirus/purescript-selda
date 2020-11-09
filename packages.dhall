@@ -204,13 +204,14 @@ let postgresql-client =
       , "newtype"
       , "nullable"
       , "prelude"
+      , "string-parsers"
       , "transformers"
       , "tuples"
       ]
   , repo =
       "https://github.com/rightfold/purescript-postgresql-client.git"
   , version =
-      "v3.0.0"
+      "v3.1.0"
   }
 
 let additions =
