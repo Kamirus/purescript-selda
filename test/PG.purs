@@ -7,6 +7,7 @@ import Data.Enum (toEnum)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Database.PostgreSQL (Connection)
 import Database.PostgreSQL as PostgreSQL
+import Database.PostgreSQL.Aff as PostgreSQL
 import Effect.Aff (Aff)
 import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)

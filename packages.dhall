@@ -211,7 +211,7 @@ let postgresql-client =
   , repo =
       "https://github.com/rightfold/purescript-postgresql-client.git"
   , version =
-      "v3.1.0"
+      "pool-query"
   }
 
 let additions =

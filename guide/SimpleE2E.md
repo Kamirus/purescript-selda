@@ -32,6 +32,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Variant (SProxy(..), Variant, inj)
 import Database.PostgreSQL (PGError)
 import Database.PostgreSQL as PostgreSQL
+import Database.PostgreSQL.Aff as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
 import Effect.Aff as Aff

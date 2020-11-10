@@ -61,9 +61,9 @@ query conn q = runSelda conn $ Selda.PG.query q
 deleteFrom
   ∷ ∀ r r'
   . TableToColsWithoutAlias B r r'
-  ⇒ Connection 
-  → Table r 
-  → ({ | r' } → Col B Boolean) 
+  ⇒ Connection
+  → Table r
+  → ({ | r' } → Col B Boolean)
   → Aff (Either PGError Unit)
 deleteFrom conn table pred = runSelda conn $ Selda.PG.deleteFrom table pred
 
@@ -71,9 +71,9 @@ update
   ∷ ∀ r r'
   . TableToColsWithoutAlias B r r'
   ⇒ GetCols r'
-  ⇒ Connection 
-  → Table r 
-  → ({ | r' } → Col B Boolean) 
+  ⇒ Connection
+  → Table r
+  → ({ | r' } → Col B Boolean)
   → ({ | r' } → { | r' })
   → Aff (Either PGError Unit)
 update conn table pred up = runSelda conn $ Selda.PG.update table pred up

@@ -74,7 +74,7 @@ hoistSeldaWith fe fr m = do
   runReaderT (runExceptT m) conn # liftAff
     >>= either (throwError <<< fe) pure
 
-class 
+class
   ( MonadAff m
   , MonadError e m
   , MonadReader r m
