@@ -39,7 +39,7 @@ class Monad m <= GenericDelete b m t r | t → r, b → m where
 
 class Monad m <= GenericUpdate b m t r | t → r, b → m where
   genericUpdate
-    ∷ Proxy b 
+    ∷ Proxy b
     → Table t
     → ({ | r } → Col b Boolean)
     → ({ | r } → { | r })

@@ -4,6 +4,8 @@ module Selda.PG.Aff
   , insert1
   , insert1_
   , query
+  , query1
+  , PGSelda
   , deleteFrom
   , update
   ) where
@@ -12,14 +14,18 @@ import Prelude
 
 import Control.Monad.Except (ExceptT)
 import Control.Monad.Reader (ReaderT)
+import Data.Array (head) as Array
 import Data.Either (Either)
+import Data.Maybe (Maybe)
 import Database.PostgreSQL (class FromSQLRow, Connection, PGError)
 import Effect.Aff (Aff)
-import Selda (Col, FullQuery, Table)
+import Selda (Col, Table)
 import Selda.Col (class GetCols)
 import Selda.PG.Class (class InsertRecordIntoTableReturning, BackendPGClass)
 import Selda.PG.Class as Selda.PG
+import Selda.Query (limit)
 import Selda.Query.Class (class GenericInsert, runSelda)
+import Selda.Query.Type (FullQuery(..))
 import Selda.Query.Utils (class ColsToPGHandler, class TableToColsWithoutAlias)
 
 type PGSelda = ExceptT PGError (ReaderT Connection Aff)
@@ -57,6 +63,16 @@ query
   ⇒ FromSQLRow tup
   ⇒ Connection → FullQuery B (Record i) → Aff (Either PGError (Array { | o }))
 query conn q = runSelda conn $ Selda.PG.query q
+
+query1
+  ∷ ∀ o i tup
+  . ColsToPGHandler B i tup o
+  ⇒ GetCols i
+  ⇒ FromSQLRow tup
+  ⇒ Connection
+  → FullQuery B (Record i)
+  → Aff (Either PGError (Maybe { | o }))
+query1 conn (FullQuery q) = query conn (FullQuery (limit 1 >>= \_ → q)) <#> map Array.head
 
 deleteFrom
   ∷ ∀ r r'
