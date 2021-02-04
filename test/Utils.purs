@@ -137,8 +137,9 @@ testQueryWith_
 testQueryWith_ run assertFunc showQ expected query =
   run query >>= assertFunc expected # catchError $ \e → do
     log "Error occured - Printing the query below"
-    log $ showQ query
+    logQuery
     throwError e
+  where logQuery = log "" *> log (showQ query)
 
 withRollback_
   ∷ ∀ err a
