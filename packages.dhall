@@ -112,114 +112,114 @@ let mkPackage =
       https://raw.githubusercontent.com/purescript/package-sets/psc-0.13.2-20190725/src/mkPackage.dhall sha256:0b197efa1d397ace6eb46b243ff2d73a3da5638d8d0ac8473e8e4a8fc528cf57
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200911-2/packages.dhall sha256:872c06349ed9c8210be43982dc6466c2ca7c5c441129826bcb9bf3672938f16e
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20210118/packages.dhall sha256:a59c5c93a68d5d066f3815a89f398bcf00e130a51cb185b2da29b20e2d8ae115
 
 let overrides = {=}
 
-let prettyprinter = 
-  { dependencies = 
-      [ "prelude"
-      , "unfoldable"
-      , "random"
-      , "ansi"
-      , "console"
-      ]
-  , repo =
-      "https://github.com/Kamirus/purescript-prettyprinter.git"
-  , version = 
-      "master"
-  }
+let prettyprinter =
+      { dependencies =
+          [ "prelude", "unfoldable", "random", "ansi", "console" ]
+      , repo =
+          "https://github.com/Kamirus/purescript-prettyprinter.git"
+      , version =
+          "master"
+      }
 
 let polyform =
-  { dependencies =
-    [ "debug"
-      , "foreign"
-      , "foreign-object"
-      , "generics-rep"
-      , "invariant"
-      , "newtype"
-      , "ordered-collections"
-      , "parsing"
-      , "psci-support"
-      , "profunctor"
-      , "quickcheck-laws"
-      , "run"
-      , "test-unit"
-      , "transformers"
-      , "validation"
-      , "variant"
-      ]
-  , repo =
-      "https://github.com/purescript-polyform/polyform.git"
-  , version =
-      "master"
-  }
+      { dependencies =
+          [ "debug"
+          , "foreign"
+          , "foreign-object"
+          , "generics-rep"
+          , "invariant"
+          , "newtype"
+          , "ordered-collections"
+          , "parsing"
+          , "psci-support"
+          , "profunctor"
+          , "quickcheck-laws"
+          , "run"
+          , "test-unit"
+          , "transformers"
+          , "validation"
+          , "variant"
+          ]
+      , repo =
+          "https://github.com/purescript-polyform/polyform.git"
+      , version =
+          "master"
+      }
 
 let polyform-batteries =
-  { dependencies =
-    [ "affjax"
-    , "argonaut"
-    , "debug"
-    , "decimals"
-    , "filterable"
-    , "numbers"
-    , "polyform"
-    , "prelude"
-    , "record-extra"
-    , "test-unit"
-    ]
-  , repo =
-      "https://github.com/purescript-polyform/batteries.git"
-  , version =
-      "master"
-  }
+      { dependencies =
+          [ "affjax"
+          , "argonaut"
+          , "debug"
+          , "decimals"
+          , "filterable"
+          , "numbers"
+          , "polyform"
+          , "prelude"
+          , "record-extra"
+          , "test-unit"
+          ]
+      , repo =
+          "https://github.com/purescript-polyform/batteries.git"
+      , version =
+          "master"
+      }
 
 let polyform-batteries-env =
-  { dependencies =
-    [ "polyform-batteries" ]
-  , repo =
-      "https://github.com/purescript-polyform/batteries-env.git"
-  , version =
-      "master"
-  }
+      { dependencies =
+          [ "polyform-batteries" ]
+      , repo =
+          "https://github.com/purescript-polyform/batteries-env.git"
+      , version =
+          "master"
+      }
 
 let postgresql-client =
-  { dependencies =
-      [ "aff"
-      , "arrays"
-      , "bifunctors"
-      , "bytestrings"
-      , "datetime"
-      , "decimals"
-      , "effect"
-      , "either"
-      , "exceptions"
-      , "foldable-traversable"
-      , "foreign"
-      , "foreign-generic"
-      , "foreign-object"
-      , "js-date"
-      , "lists"
-      , "maybe"
-      , "newtype"
-      , "nullable"
-      , "prelude"
-      , "string-parsers"
-      , "transformers"
-      , "tuples"
-      ]
-  , repo =
-      "https://github.com/rightfold/purescript-postgresql-client.git"
-  , version =
-      "pool-query"
-  }
+      { dependencies =
+          [ "aff"
+          , "arrays"
+          , "bifunctors"
+          , "bytestrings"
+          , "datetime"
+          , "decimals"
+          , "effect"
+          , "either"
+          , "exceptions"
+          , "foldable-traversable"
+          , "foreign"
+          , "foreign-generic"
+          , "foreign-object"
+          , "js-date"
+          , "lists"
+          , "maybe"
+          , "newtype"
+          , "nullable"
+          , "prelude"
+          , "string-parsers"
+          , "transformers"
+          , "tuples"
+          ]
+      , repo =
+          "https://github.com/rightfold/purescript-postgresql-client.git"
+      , version =
+          "pool-query"
+      }
 
 let additions =
-  { postgresql-client = postgresql-client
-  , polyform = polyform
-  , polyform-batteries = polyform-batteries
-  , polyform-batteries-env = polyform-batteries-env
-  , prettyprinter = prettyprinter
-  }
+      { postgresql-client =
+          postgresql-client
+      , polyform =
+          polyform
+      , polyform-batteries =
+          polyform-batteries
+      , polyform-batteries-env =
+          polyform-batteries-env
+      , prettyprinter =
+          prettyprinter
+      }
 
 in  upstream // overrides // additions
