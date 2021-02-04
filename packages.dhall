@@ -116,15 +116,6 @@ let upstream =
 
 let overrides = {=}
 
-let prettyprinter =
-      { dependencies =
-          [ "prelude", "unfoldable", "random", "ansi", "console" ]
-      , repo =
-          "https://github.com/Kamirus/purescript-prettyprinter.git"
-      , version =
-          "master"
-      }
-
 let polyform =
       { dependencies =
           [ "debug"
@@ -218,8 +209,6 @@ let additions =
           polyform-batteries
       , polyform-batteries-env =
           polyform-batteries-env
-      , prettyprinter =
-          prettyprinter
       }
 
 in  upstream // overrides // additions
