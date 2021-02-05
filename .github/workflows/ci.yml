@@ -2,22 +2,17 @@ name: CI
 
 on:
   push:
-    # branches: master
-    branches: ci
+    branches: master
   pull_request:
     branches: master
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
 
       - uses: actions/setup-node@v1
-
-      - uses: purescript-contrib/setup-purescript@main
-        with:
-          purescript: "0.13.8"
 
       - name: Cache PureScript dependencies
         uses: actions/cache@v2
@@ -30,4 +25,6 @@ jobs:
       - run: npm install
       - run: npm run-script lit
       - run: npm run-script build
+      - name: Start postgres db for PG test
+        run: docker-compose up -d
       - run: npm run-script test
