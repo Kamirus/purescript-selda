@@ -22,9 +22,10 @@ jobs:
             .spago
             output
 
+      - name: Start postgres db for PG test
+        run: docker-compose up -d
+
       - run: npm install
       - run: npm run-script lit
       - run: npm run-script build
-      - name: Start postgres db for PG test
-        run: docker-compose up -d
       - run: npm run-script test

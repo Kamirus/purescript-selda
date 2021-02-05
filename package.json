@@ -15,7 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "decimal.js": "^10.0.1",
-    "pg": "^7.6.0",
+    "pg": "^8.5.1",
     "sqlite3": "^4.1.0"
   },
   "devDependencies": {
