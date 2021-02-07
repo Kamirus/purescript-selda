@@ -1,5 +1,7 @@
 # purescript-selda
 
+[![CI](https://github.com/Kamirus/purescript-selda/workflows/CI/badge.svg)](https://github.com/Kamirus/purescript-selda/actions)
+
 ## About
 
 **purescript-selda** is an **SQL library** (*eDSL*) which allows a user to write **type-safe queries**.
