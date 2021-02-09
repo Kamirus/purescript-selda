@@ -31,8 +31,8 @@ import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Variant (SProxy(..), Variant, inj)
 import Database.PostgreSQL (PGError)
-import Database.PostgreSQL as PostgreSQL
-import Database.PostgreSQL.Aff as PostgreSQL
+import Database.PostgreSQL (Row0(..)) as PostgreSQL
+import Database.PostgreSQL.Aff (Connection, Query(..), execute, withConnection) as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
 import Effect.Aff as Aff
