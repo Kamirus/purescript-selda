@@ -1,0 +1,11 @@
+version: "3"
+
+services:
+  db:
+    image: postgres:12.5
+    environment:
+      POSTGRES_DB: purspg
+      POSTGRES_USER: init
+      POSTGRES_PASSWORD: qwerty
+    ports:
+      - 5432:5432

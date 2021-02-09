@@ -1,5 +1,7 @@
 # purescript-selda
 
+[![CI](https://github.com/Kamirus/purescript-selda/workflows/CI/badge.svg)](https://github.com/Kamirus/purescript-selda/actions)
+
 ## About
 
 **purescript-selda** is an **SQL library** (*eDSL*) which allows a user to write **type-safe queries**.
@@ -52,7 +54,7 @@ Install [postgresql-client's dependencies](https://github.com/rightfold/purescri
 
 - [**Introductory Guide**](guide/SimpleE2E.md): End-to-End example: how to setup, write queries, use aggregation, deal with type errors and execute queries and inserts.
 - [**Advanced Guide**](guide/Custom.md): Custom Types and Expressions (`litPG`, `Any`, `EForeign`, custom PG functions), more flexible table definitions (`Source`, db schemas, set-returning functions) - unsafe escape hatches
-- **Test Suite**: For information about features, examples, usage, etc. refer to the test suite: [`Test.Common`](test/Common.purs), [`Test.PG`](test/PG.purs), [`Test.SQLite3`](test/SQLite3.purs).
+- **Test Suite**: For information about features, examples, usage, etc. refer to the test suite: [`Test.Common`](test/Common.purs), [`Test.PG`](test/PG.purs), [`Test.SQLite3`](test/SQLite3.purs). To run the tests, `docker-compose up -d` helps to prepare postgres database.
 - **Documentation**: [Pursuit docs](https://pursuit.purescript.org/packages/purescript-selda/)
 - [**My thesis**](./selda.pdf)
 

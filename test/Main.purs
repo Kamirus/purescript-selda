@@ -6,8 +6,6 @@ import Control.Monad.Cont (ContT(..), runContT)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
-import Guide.Custom as Guide.Custom
-import Guide.SimpleE2E as Guide.SimpleE2E
 import Test.PG as PG
 import Test.SQLite3 as SQLIte3
 import Test.Unit (suite)
@@ -16,10 +14,6 @@ import Test.UnitTests as Unit
 
 main ∷ Effect Unit
 main = do
-  -- run literate guides
-  Guide.SimpleE2E.main
-  Guide.Custom.main
-
   -- integration tests
   launchAff_ $ flip runContT pure do
     pg ← ContT PG.main
