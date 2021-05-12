@@ -10,7 +10,6 @@ import Database.PostgreSQL (Connection, PoolConfiguration, defaultPoolConfigurat
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), S, lit, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, generateSeries, litPG)
@@ -19,7 +18,7 @@ import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
-import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
+import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG, unsafeStringify)
 
 employees ∷ Table
   ( id ∷ Auto Int
