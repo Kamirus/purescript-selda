@@ -55,8 +55,8 @@ type AliasedTable = { body ∷ String, alias ∷ Alias }
 newtype Column a = Column { namespace ∷ Alias, name ∷ String }
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
-class TableColumns (rl ∷ RowList) (r ∷ # Type) | rl → r where
-  tableColumns ∷ ∀ t. { alias ∷ Alias | t } → RLProxy rl → Record r
+class TableColumns (rl ∷ RowList Type) (r ∷ # Type) | rl → r where
+  tableColumns ∷ ∀ t proxy. { alias ∷ Alias | t } → proxy rl → Record r
 
 instance tableColumnsNil ∷ TableColumns RL.Nil () where
   tableColumns _ _ = {}
@@ -79,7 +79,7 @@ instance tableColumnsCons
     Record.insert _sym col res'
 
 class TableColumnNames rl where
-  tableColumnNames ∷ RLProxy rl → Array String
+  tableColumnNames ∷ forall proxy. proxy rl → Array String
 instance tableColumnNamesHead ∷ TableColumnNames RL.Nil where
   tableColumnNames _ = []
 else instance tableColumnNamesCons

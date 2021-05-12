@@ -28,12 +28,12 @@ showPG
 showPG = showM "$" 1
 
 showInsert1
-  ∷ ∀ t insRLcols retRLcols
+  ∷ ∀ t insRLcols retRLcols proxy1 proxy2
   . CanInsertColumnsIntoTable insRLcols t
   ⇒ TableColumnNames insRLcols
   ⇒ TableColumnNames retRLcols
   ⇒ RowListLength insRLcols
-  ⇒ Table t → RLProxy insRLcols → RLProxy retRLcols → String
+  ⇒ Table t → proxy1 insRLcols → proxy2 retRLcols → String
 showInsert1 table colsToinsert colsToRet =
   let
     cols = joinWith ", " $ tableColumnNames colsToinsert

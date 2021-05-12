@@ -47,7 +47,7 @@ instance unColRL ∷ UnCol a b ⇒ MappingRL UnCol_ a b
 -- |   \Tuple int (Tuple string1 string2) 
 -- |     → { id: int, n1: string1, n2: string2 }
 class ColsToPGHandler s i tup o | s i → tup o where
-  colsToPGHandler ∷ Proxy s → { | i } → (tup → { | o })
+  colsToPGHandler ∷ forall proxy. proxy s → { | i } → (tup → { | o })
 instance colsToPGHandlerI
     ∷ ( RL.RowToList i il
       , ValidateSInCols s il
@@ -95,7 +95,7 @@ instance rToArrForeign
   folding (RecordToArrayForeign b) acc a = [toForeign b a] <> acc
 
 class ToForeign b a where
-  toForeign ∷ Proxy b → a → Foreign
+  toForeign ∷ forall proxy. proxy b → a → Foreign
 
 class TupleRev t1 acc t2 | t1 acc → t2 where
   tupleRev ∷ t1 → acc → t2
@@ -124,7 +124,7 @@ else instance rowListLengthCons ∷ RowListLength t ⇒ RowListLength (RL.Cons s
 -- | { a1 ∷ Col s A1, a2 ∷ Col s A2 ... }
 -- | ```
 class TableToColsWithoutAlias s r o | r → o where
-  tableToColsWithoutAlias ∷ Proxy s → Table r → { | o }
+  tableToColsWithoutAlias ∷ forall proxy. proxy s → Table r → { | o }
 
 instance tableToColsI
     ∷ ( RL.RowToList r rl

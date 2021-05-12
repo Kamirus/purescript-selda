@@ -33,7 +33,7 @@ showCol = unwrap >>> showExpr
 -- | { name ∷ Col s String, id ∷ Col s Int }
 -- | ```
 class ToCols s i o | s i → o where
-  toCols ∷ Proxy s → { | i } → { | o }
+  toCols ∷ forall proxy. proxy s → { | i } → { | o }
 
 instance toColsI ∷ HMap (ToCols_ s) { | i } { | o } ⇒ ToCols s i o where
   toCols _ = hmap (ToCols_ ∷ ToCols_ s)
