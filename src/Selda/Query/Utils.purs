@@ -21,7 +21,7 @@ infixr 0 type App as :=>
 
 class MappingRL f a b | f a → b
 
-class MapRL f (i ∷ RowList) (o ∷ RowList) | f i → o
+class MapRL f (i ∷ RowList Type) (o ∷ RowList Type) | f i → o
 instance mapRLNil ∷ MapRL f RL.Nil RL.Nil
 instance mapRLCons
   ∷ ( MappingRL f a a'
@@ -29,7 +29,7 @@ instance mapRLCons
     )
   ⇒ MapRL f (RL.Cons sym a tail) (RL.Cons sym a' tail')
 
-class MapR f (i ∷ #Type) (o ∷ #Type) | f i → o
+class MapR f (i ∷ Row Type) (o ∷ Row Type) | f i → o
 instance mapR
   ∷ ( RL.RowToList i il
     , MapRL f il ol
@@ -57,7 +57,7 @@ instance colsToPGHandlerI
   colsToPGHandler _ i = hfoldlWithIndex TupleToRecordFunc f i
     where f = (const {} ∷ Unit → {})
 
-class ValidateSInCols s (il ∷ RowList)
+class ValidateSInCols s (il ∷ RowList Type)
 instance rLUnColNil ∷ ValidateSInCols s RL.Nil
 else instance rLUnColCons
   ∷ ValidateSInCols s tail

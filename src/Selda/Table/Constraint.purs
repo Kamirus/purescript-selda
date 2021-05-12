@@ -15,7 +15,7 @@ instance eraseAuto ∷ EraseConstraint (Auto col) col
 else instance eraseDefault ∷ EraseConstraint (Default col) col
 else instance nothingToErase ∷ EraseConstraint col col
 
-class MaxColumnsToInsert (t ∷ # Type) (maxCols ∷ RL.RowList) | t → maxCols
+class MaxColumnsToInsert (t ∷ # Type) (maxCols ∷ RL.RowList Type) | t → maxCols
 instance maxColumnsToInsert
   ∷ ( RL.RowToList t tl
     , FilterOutConstraintColumns tl simpleCols
@@ -24,7 +24,7 @@ instance maxColumnsToInsert
     )
   ⇒ MaxColumnsToInsert t maxCols
 
-class MinColumnsToInsert (t ∷ # Type) (minCols ∷ RL.RowList) | t → minCols
+class MinColumnsToInsert (t ∷ # Type) (minCols ∷ RL.RowList Type) | t → minCols
 instance minColumnsToInsert
   ∷ ( RL.RowToList t tl
     , FilterOutConstraintColumns tl minCols
@@ -32,7 +32,7 @@ instance minColumnsToInsert
   ⇒ MinColumnsToInsert t minCols
 
 -- | Removes `Auto` and `Default` columns from `i`
-class FilterOutConstraintColumns (i ∷ RL.RowList) (o ∷ RL.RowList) | i → o
+class FilterOutConstraintColumns (i ∷ RL.RowList Type) (o ∷ RL.RowList Type) | i → o
 instance filterOutConstraintColumnsNil ∷ FilterOutConstraintColumns RL.Nil RL.Nil
 else instance filterOutConstraintColumnsAuto
   ∷ FilterOutConstraintColumns tail rl
@@ -45,7 +45,7 @@ else instance filterOutConstraintColumnsCons
   ⇒ FilterOutConstraintColumns (RL.Cons sym t tail) (RL.Cons sym t rl)
 
 -- | Returns only `Default` columns with erased `Default` wrapper
-class FilterDefaultColumns (i ∷ RL.RowList) (o ∷ RL.RowList) | i → o
+class FilterDefaultColumns (i ∷ RL.RowList Type) (o ∷ RL.RowList Type) | i → o
 instance filterDefaultColumnsNil ∷ FilterDefaultColumns RL.Nil RL.Nil
 else instance filterDefaultColumnsConsDefault
   ∷ FilterDefaultColumns tail rl
@@ -54,7 +54,7 @@ else instance filterDefaultColumnsSkip
   ∷ FilterDefaultColumns tail rl
   ⇒ FilterDefaultColumns (RL.Cons sym t tail) rl
 
-class IsSubRowList (lhs ∷ RL.RowList) (rhs ∷ RL.RowList)
+class IsSubRowList (lhs ∷ RL.RowList Type) (rhs ∷ RL.RowList Type)
 instance isSubRowList
   ∷ ( ListToRow rl1 r1
     , ListToRow rl2 r2
@@ -62,7 +62,7 @@ instance isSubRowList
     )
   ⇒ IsSubRowList rl1 rl2 
 
-class CanInsertColumnsIntoTable (cols ∷ RL.RowList) (t ∷ # Type)
+class CanInsertColumnsIntoTable (cols ∷ RL.RowList Type) (t ∷ # Type)
 instance canInsertColumnsIntoTable
   ∷ ( MaxColumnsToInsert t maxCols
     , MinColumnsToInsert t minCols
