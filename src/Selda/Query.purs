@@ -223,7 +223,7 @@ leftJoin_ on iq = do
   pure $ hmap WrapWithMaybe res
 
 type CombineQuery
-  = ∀ s r inner i o
+  = ∀ k (s :: k) r inner i o
   . FromSubQuery s inner i
   ⇒ HMapWithIndex SubQueryResult { | i } { | o }
   ⇒ FullQuery (Inner s) { | inner }
