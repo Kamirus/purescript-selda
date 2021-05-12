@@ -5,13 +5,13 @@ import Prelude
 import Data.Array ((:))
 import Data.Exists (Exists, mkExists)
 import Data.Newtype (class Newtype, unwrap)
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Tuple (Tuple(..))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Heterogeneous.Mapping (class HMap, class Mapping, hmap)
 import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), ShowM, UnExp(..), UnOp(..), showExpr)
 import Selda.Table (Alias, Column)
-import Type.Proxy (Proxy)
+import Type.Proxy (Proxy(..))
 
 newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
@@ -57,15 +57,15 @@ instance getcols
   getCols r = hfoldlWithIndex ExtractCols ([] ∷ Array (Tuple String (Exists Expr))) r
 
 data ExtractCols = ExtractCols
-instance extractcols 
-    ∷ IsSymbol sym 
-    ⇒ FoldingWithIndex ExtractCols (SProxy sym) 
+instance extractcols
+    ∷ IsSymbol sym
+    ⇒ FoldingWithIndex ExtractCols (Proxy sym)
       (Array (Tuple String (Exists Expr)))
       (Col s a) 
       (Array (Tuple String (Exists Expr)))
   where
-  foldingWithIndex ExtractCols sym acc (Col e) = 
-    Tuple (reflectSymbol (SProxy ∷ SProxy sym)) (mkExists e) : acc
+  foldingWithIndex ExtractCols sym acc (Col e) =
+    Tuple (reflectSymbol (Proxy ∷ Proxy sym)) (mkExists e) : acc
 
 binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2

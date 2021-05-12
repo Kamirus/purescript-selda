@@ -9,7 +9,6 @@ import Data.Either (either)
 import Data.Foldable (class Foldable, find, foldl, for_, length)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
-import Data.Variant.Internal (FProxy(..))
 import Database.PostgreSQL (Connection, PGError)
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Class.Console (log)
@@ -31,7 +30,7 @@ import Type.Proxy (Proxy(..))
 
 type TestCtx b m ctx =
   { b ∷ Proxy b
-  , m ∷ FProxy m
+  , m ∷ Proxy m
   , ctx ∷ ctx
   }
 
@@ -113,7 +112,7 @@ testWithPG
 testWithPG conn k = k { b, m, ctx: { conn } } 
   where
     b = (Proxy ∷ Proxy BackendPGClass)
-    m = (FProxy ∷ FProxy PGSelda)
+    m = (Proxy ∷ Proxy PGSelda)
 
 testWithSQLite3
   ∷ ∀ a
@@ -123,7 +122,7 @@ testWithSQLite3
 testWithSQLite3 conn k = k { b, m, ctx: { conn } } 
   where
     b = (Proxy ∷ Proxy BackendSQLite3Class)
-    m = (FProxy ∷ FProxy SQLite3Selda)
+    m = (Proxy ∷ Proxy SQLite3Selda)
 
 testQueryWith_
   ∷ ∀ expected query queryResult

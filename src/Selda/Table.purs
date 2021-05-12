@@ -12,13 +12,13 @@ module Selda.Table
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Prim.Row as R
 import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Selda.Table.Constraint (class EraseConstraint)
-import Type.Data.RowList (RLProxy(..))
+import Type.Proxy (Proxy(..))
 
 -- | Represents table-like SQL sources.
 -- | 
@@ -72,8 +72,8 @@ instance tableColumnsCons
   where
   tableColumns table _ = 
     let
-      _sym = (SProxy ∷ SProxy sym)
-      res' = tableColumns table (RLProxy ∷ RLProxy tail)
+      _sym = (Proxy ∷ Proxy sym)
+      res' = tableColumns table (Proxy ∷ Proxy tail)
       col = Column { namespace: table.alias, name: reflectSymbol _sym }
     in
     Record.insert _sym col res'
@@ -88,5 +88,5 @@ else instance tableColumnNamesCons
   where
   tableColumnNames _ = tableColumnNames _tail <> [reflectSymbol _sym]
     where
-    _tail = (RLProxy ∷ RLProxy tail)
-    _sym = (SProxy ∷ SProxy sym)
+    _tail = (Proxy ∷ Proxy tail)
+    _sym = (Proxy ∷ Proxy sym)

@@ -29,7 +29,7 @@ import Control.Monad.Except (class MonadError, ExceptT, runExceptT, throwError)
 import Control.Monad.Reader (class MonadReader, ReaderT, asks, runReaderT)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Variant (SProxy(..), Variant, inj)
+import Data.Variant (Variant, inj)
 import Database.PostgreSQL (PGError)
 import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
@@ -43,6 +43,7 @@ import Selda.Col (class GetCols)
 import Selda.PG (showPG)
 import Selda.PG.Class (insert_, query)
 import Selda.Table.Constraint (Auto, Default)
+import Type.Proxy (Proxy(..))
 ```
 ## Setup
 
@@ -335,7 +336,7 @@ type AppError = Variant
   ( pgError ∷ PGError
   , error ∷ String
   )
-_pgError = SProxy ∷ SProxy "pgError"
+_pgError = Proxy ∷ Proxy "pgError"
 type App = ReaderT Context (ExceptT AppError Aff)
 
 runApp ∷ ∀ a. Context → App a → Aff (Either AppError a)

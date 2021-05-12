@@ -2,7 +2,7 @@ module Selda.Query.Utils where
 
 import Prelude
 
-import Data.Symbol (class IsSymbol, SProxy(..))
+import Data.Symbol (class IsSymbol)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign)
 import Heterogeneous.Folding (class Folding, class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
@@ -13,7 +13,6 @@ import Prim.TypeError (class Fail, Text, Beside)
 import Record as Record
 import Selda.Col (class ToCols, Col, toCols)
 import Selda.Table (class TableColumns, Table, tableColumns)
-import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import Type.RowList (class ListToRow)
 
@@ -77,11 +76,11 @@ instance tupToRec
       , R.Cons sym a r r'
       , UnCol i a
       )
-    ⇒ FoldingWithIndex TupleToRecordFunc 
-      (SProxy sym) (tup → { | r }) i (Tuple a tup → { | r' })
+    ⇒ FoldingWithIndex TupleToRecordFunc
+      (Proxy sym) (tup → { | r }) i (Tuple a tup → { | r' })
   where
   foldingWithIndex TupleToRecordFunc sym f _ =
-    \(Tuple a tup) → Record.insert (SProxy ∷ SProxy sym) a $ f tup
+    \(Tuple a tup) → Record.insert (Proxy ∷ Proxy sym) a $ f tup
 
 data RecordToTuple = RecordToTuple
 instance rToTuple ∷ Folding RecordToTuple tail a (Tuple a tail) where
@@ -116,7 +115,7 @@ class RowListLength rl where
 instance rowListLengthNil ∷ RowListLength RL.Nil where
   rowListLength _ = 0
 else instance rowListLengthCons ∷ RowListLength t ⇒ RowListLength (RL.Cons s a t) where
-  rowListLength _ = rowListLength (RLProxy ∷ RLProxy t) + 1
+  rowListLength _ = rowListLength (Proxy ∷ Proxy t) + 1
 
 -- | ```purescript
 -- | Table ( a1 ∷ A1 , a2 ∷ A2 ... )
@@ -135,7 +134,7 @@ instance tableToColsI
   where
   tableToColsWithoutAlias _ _ = recordWithCols
     where
-    recordWithColumns = tableColumns { alias: "" } (RLProxy ∷ RLProxy rl)
+    recordWithColumns = tableColumns { alias: "" } (Proxy ∷ Proxy rl)
     recordWithCols = toCols (Proxy ∷ Proxy s) recordWithColumns
 
 infixl 4 type Beside as <:>

@@ -13,7 +13,6 @@ import Selda.Expr (Expr(..), ShowM, showM)
 import Selda.Query.Utils (class RowListLength, rowListLength)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
-import Type.Data.RowList (RLProxy)
 
 -- | Lift a value `a` to a column expression using `ToSQLValue a`.
 -- | Please note that the value will be passed as a query parameter meaning it

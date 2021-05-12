@@ -6,7 +6,7 @@ import Data.Array ((:))
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap)
-import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
 import Prim.RowList as RL
@@ -16,7 +16,6 @@ import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
 import Selda.Query.Type (FullQuery(..), GenState(..), JoinType(..), Order, QBinOp(..), Query, SQL(..), Source(..), freshId, modify_, runFullQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
-import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -281,7 +280,7 @@ instance tableToColsI
       id ← freshId
       let
         aliased = aliasToAliased $ aliasPrefix <> "_" <> show id
-        i = tableColumns aliased (RLProxy ∷ RLProxy tl)
+        i = tableColumns aliased (Proxy ∷ Proxy tl)
         res = toCols (Proxy ∷ Proxy s) i
       pure $ { res, sql: FromTable aliased }
 
@@ -344,7 +343,7 @@ createSubQueryResult = hmapWithIndex <<< SubQueryResult
 data SubQueryResult = SubQueryResult Alias
 instance subQueryResultInstance
     ∷ IsSymbol sym
-    ⇒ MappingWithIndex SubQueryResult (SProxy sym) (Col s a) (Col s a)
+    ⇒ MappingWithIndex SubQueryResult (Proxy sym) (Col s a) (Col s a)
   where
   mappingWithIndex (SubQueryResult namespace) sym (Col _) = 
     Col $ EColumn $ Column { namespace, name: reflectSymbol sym }
