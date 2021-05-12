@@ -111,7 +111,7 @@ instance rlen ∷ Folding RecordLength Int a Int where
   folding _ acc _ = acc + 1
 
 class RowListLength rl where
-  rowListLength ∷ RLProxy rl → Int
+  rowListLength ∷ forall proxy. proxy rl → Int
 instance rowListLengthNil ∷ RowListLength RL.Nil where
   rowListLength _ = 0
 else instance rowListLengthCons ∷ RowListLength t ⇒ RowListLength (RL.Cons s a t) where
