@@ -6,7 +6,7 @@ import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Database.PostgreSQL (Connection, PoolConfiguration, defaultPoolConfiguration)
+import Database.PostgreSQL (Connection, Configuration, defaultConfiguration)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -93,7 +93,7 @@ testSuite ctx = do
 
 main ∷ (TestSuite → Aff S) → Aff S
 main cont = do
-  pool ← liftEffect $ PostgreSQL.newPool dbconfig
+  pool ← liftEffect $ PostgreSQL.new dbconfig
   PostgreSQL.withConnection pool case _ of
     Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
     Right conn → do
@@ -223,8 +223,8 @@ main cont = do
         suite "PG" $ testWithPG conn legacySuite
         suite "PG.Specific" $ testWithPG conn testSuite
 
-dbconfig ∷ PoolConfiguration
-dbconfig = (defaultPoolConfiguration "purspg")
+dbconfig ∷ Configuration
+dbconfig = (defaultConfiguration "purspg")
   { user = Just "init"
   , password = Just $ "qwerty"
   , idleTimeoutMillis = Just $ 1000

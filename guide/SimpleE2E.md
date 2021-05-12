@@ -55,8 +55,8 @@ We include this information in a record below.
 We will need it later to execute our queries.
 
 ```purescript
-dbconfig ∷ PostgreSQL.PoolConfiguration
-dbconfig = (PostgreSQL.defaultPoolConfiguration "purspg")
+dbconfig ∷ PostgreSQL.Configuration
+dbconfig = (PostgreSQL.defaultConfiguration "purspg")
   { user = Just "init"
   , password = Just $ "qwerty"
   , idleTimeoutMillis = Just $ 1000
@@ -450,7 +450,7 @@ When we've got the connection we can create the database tables and then run our
 
 launchWithConnectionPG ∷ (PostgreSQL.Connection → Aff Unit) → Effect Unit
 launchWithConnectionPG m = do
-  pool ← PostgreSQL.newPool dbconfig
+  pool ← PostgreSQL.new dbconfig
   launchAff_ do
     PostgreSQL.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)
