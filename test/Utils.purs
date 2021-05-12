@@ -28,6 +28,7 @@ import Test.Unit as Unit
 import Test.Unit.Assert (assert, expectFailure)
 import Type.Proxy (Proxy(..))
 
+type TestCtx :: forall k1 k2. k1 -> k2 -> Type -> Type
 type TestCtx b m ctx =
   { b ∷ Proxy b
   , m ∷ Proxy m
@@ -61,6 +62,7 @@ testFailingWith ctx msg q = Unit.test msg
   $ expectFailure "failure msg"
   $ testWith' ctx (\_ _ → pure unit) [] q
 
+class TestBackend :: forall k. k -> (Type -> Type) -> Type -> Constraint
 class TestBackend b m ctx | b m → ctx where
   testWith'
     ∷ ∀ i o
@@ -79,7 +81,7 @@ instance testBackendPG
         (ExceptT PGError (ReaderT Connection Aff))
         { conn ∷ Connection }
   where
-  testWith' { b, m, ctx: { conn } } assertFn =
+  testWith' { b, ctx: { conn } } assertFn =
     testWith_ assertFn (showPG >>> _.strQuery) b (runPGSeldaAff conn)
 
 instance testBackendSQLite3
@@ -87,7 +89,7 @@ instance testBackendSQLite3
         (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
         { conn ∷ DBConnection }
   where
-  testWith' { b, m, ctx: { conn } } assertFn =
+  testWith' { b, ctx: { conn } } assertFn =
     testWith_ assertFn (showSQLite3 >>> _.strQuery) b (runSQLite3SeldaAff conn)
 
 testWith_

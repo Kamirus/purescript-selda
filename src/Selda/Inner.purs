@@ -10,6 +10,7 @@ import Selda.Col (Col(..))
 import Type.Proxy (Proxy)
 import Unsafe.Coerce (unsafeCoerce)
 
+data Inner :: forall k. k -> Type
 data Inner s
 
 data OuterCols = OuterCols

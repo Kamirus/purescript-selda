@@ -12,6 +12,7 @@ import Selda.Col (Col)
 import Type.Proxy (Proxy)
 import Unsafe.Coerce (unsafeCoerce)
 
+newtype Aggr :: forall k. k -> Type -> Type
 newtype Aggr s a = Aggr (Col s a)
 
 instance heytingAlgebraAggr ∷ HeytingAlgebra (Aggr s Boolean) where
@@ -23,6 +24,7 @@ instance heytingAlgebraAggr ∷ HeytingAlgebra (Aggr s Boolean) where
   not (Aggr e) = Aggr (not e)
 
 -- | Overloading utility for common operations on `Col` and `Aggr`
+class Coerce :: forall k. (k -> Type -> Type) -> Constraint
 class Coerce col where
   -- | Either an identity or `Aggr` constructor.
   -- | Can be used when it's safe to operate on both `Col` and `Aggr`.

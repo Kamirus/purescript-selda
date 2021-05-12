@@ -175,8 +175,8 @@ We can write the same query using `purescript-selda`.
 ```purescript
 qNamesWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s (Maybe Int) }
-qNamesWithBalance = 
-  selectFrom people \{ id, name, age } → do      -- FROM people
+qNamesWithBalance =
+  selectFrom people \{ id, name } → do           -- FROM people
     { balance } ← leftJoin bankAccounts          -- LEFT JOIN bank_accounts
                     \acc → id .== acc.personId   -- ON people.id = bank_accounts.personId
     restrict $ id .> lit 1                       -- WHERE people.id > 1 
@@ -248,7 +248,7 @@ qCountBankAccountOwners
   ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s Int }
 qCountBankAccountOwners = 
   aggregate $ selectFrom_
-    (aggregate $ selectFrom bankAccounts \{ id, personId } → do
+    (aggregate $ selectFrom bankAccounts \{ personId } → do
       pid ← groupBy personId
       pure { pid })
     \{ pid } → pure { numberOfOwners: count pid }

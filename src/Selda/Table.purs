@@ -14,7 +14,6 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Symbol (class IsSymbol, reflectSymbol)
 import Prim.Row as R
-import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Selda.Table.Constraint (class EraseConstraint)
@@ -34,7 +33,8 @@ import Type.Proxy (Proxy(..))
 -- | (which is used in the `FROM` or `JOIN` SQL clause)
 -- | with or without a full alias (which is a combination of an alias prefix
 -- | and a unique number supplied during query generation).
-data Table ( r ∷ # Type )
+data Table :: Row Type -> Type
+data Table r
   = Table { name ∷ String }
   | Source Alias (Maybe Alias → StringSQL)
 
@@ -52,10 +52,12 @@ type StringSQL = String
 -- | - alias (used as a namespace for columns of the Table-like source)
 type AliasedTable = { body ∷ String, alias ∷ Alias }
 
+newtype Column :: forall k. k -> Type
 newtype Column a = Column { namespace ∷ Alias, name ∷ String }
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
-class TableColumns (rl ∷ RowList Type) (r ∷ # Type) | rl → r where
+class TableColumns :: RL.RowList Type -> Row Type -> Constraint
+class TableColumns rl r | rl → r where
   tableColumns ∷ ∀ t proxy. { alias ∷ Alias | t } → proxy rl → Record r
 
 instance tableColumnsNil ∷ TableColumns RL.Nil () where
@@ -78,6 +80,7 @@ instance tableColumnsCons
     in
     Record.insert _sym col res'
 
+class TableColumnNames :: RL.RowList Type -> Constraint
 class TableColumnNames rl where
   tableColumnNames ∷ forall proxy. proxy rl → Array String
 instance tableColumnNamesHead ∷ TableColumnNames RL.Nil where

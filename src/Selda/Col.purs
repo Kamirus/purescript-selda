@@ -13,6 +13,7 @@ import Selda.Expr (BinExp(..), BinOp(..), Expr(..), Literal(..), ShowM, UnExp(..
 import Selda.Table (Alias, Column)
 import Type.Proxy (Proxy(..))
 
+newtype Col :: forall k. k -> Type -> Type
 newtype Col s a = Col (Expr a)
 derive instance newtypeCol ∷ Newtype (Col s a) _
 
@@ -32,12 +33,14 @@ showCol = unwrap >>> showExpr
 -- | → 
 -- | { name ∷ Col s String, id ∷ Col s Int }
 -- | ```
+class ToCols :: forall k. k -> Row Type -> Row Type -> Constraint
 class ToCols s i o | s i → o where
   toCols ∷ forall proxy. proxy s → { | i } → { | o }
 
 instance toColsI ∷ HMap (ToCols_ s) { | i } { | o } ⇒ ToCols s i o where
   toCols _ = hmap (ToCols_ ∷ ToCols_ s)
 
+data ToCols_ :: forall k. k -> Type
 data ToCols_ s = ToCols_
 instance toColsMapping ∷ Mapping (ToCols_ s) (Column a) (Col s a) where
   mapping _ col = Col $ EColumn col
@@ -64,7 +67,7 @@ instance extractcols
       (Col s a) 
       (Array (Tuple String (Exists Expr)))
   where
-  foldingWithIndex ExtractCols sym acc (Col e) =
+  foldingWithIndex ExtractCols _ acc (Col e) =
     Tuple (reflectSymbol (Proxy ∷ Proxy sym)) (mkExists e) : acc
 
 binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o

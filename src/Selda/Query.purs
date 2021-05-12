@@ -260,6 +260,7 @@ combineWith op q1 q2 k = FullQuery do
   -- records `r1.res` and `r2.res` are identical, so we use either
   k $ createSubQueryResult alias r1.res
 
+class FromTable :: forall k. k -> Row Type -> Row Type -> Constraint
 class FromTable s t c | s t → c where
   fromTable ∷ Table t → Query s { res ∷ { | c } , sql ∷ SQL }
 
@@ -299,6 +300,7 @@ subQueryAlias = do
   id ← freshId
   pure $ "sub_q" <> show id
 
+class FromSubQuery :: forall k. k -> Row Type -> Row Type -> Constraint
 class FromSubQuery s inner res | inner → s res where
   fromSubQuery
     ∷ FullQuery (Inner s) { | inner }
