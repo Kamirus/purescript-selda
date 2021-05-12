@@ -52,7 +52,9 @@ testSuite
 testSuite ctx = do
   let
     unordered = assertUnorderedSeqEq
-    ordered = assertSeqEq
+    -- Note: ordered is not being used. not sure if this is
+    -- an unfinished test or not, so commenting out for now
+    -- ordered = assertSeqEq
 
   testWith ctx unordered "employees inserted with default and without salary"
     [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
