@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "lit": "rm -rf guide/src/ && paluh-litps --input guide/ --output guide/src/",
+    "lit": "rm -rf guide/src/ && paluh-litps --input guide/ --output guide/src/ && cp guide/Custom.js guide/src/Custom.js",
     "build": "npm run-script lit && spago build",
     "test:guide:simpleE2E": "npm run-script lit && spago test --main Test.Guide.SimpleE2E",
     "test:guide:custom": "npm run-script lit && spago test --main Test.Guide.Custom",
