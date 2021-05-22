@@ -6,7 +6,7 @@ import Data.Array ((:))
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap)
-import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Tuple (Tuple(..), snd)
 import Heterogeneous.Mapping (class HMap, class HMapWithIndex, class Mapping, class MappingWithIndex, hmap, hmapWithIndex)
 import Prim.RowList as RL
@@ -16,7 +16,6 @@ import Selda.Expr (Expr(..), UnExp(..), UnOp(..))
 import Selda.Inner (Inner, OuterCols(..))
 import Selda.Query.Type (FullQuery(..), GenState(..), JoinType(..), Order, QBinOp(..), Query, SQL(..), Source(..), freshId, modify_, runFullQuery)
 import Selda.Table (class TableColumns, Alias, Column(..), Table(..), tableColumns)
-import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -224,7 +223,7 @@ leftJoin_ on iq = do
   pure $ hmap WrapWithMaybe res
 
 type CombineQuery
-  = ∀ s r inner i o
+  = ∀ k (s :: k) r inner i o
   . FromSubQuery s inner i
   ⇒ HMapWithIndex SubQueryResult { | i } { | o }
   ⇒ FullQuery (Inner s) { | inner }
@@ -261,6 +260,7 @@ combineWith op q1 q2 k = FullQuery do
   -- records `r1.res` and `r2.res` are identical, so we use either
   k $ createSubQueryResult alias r1.res
 
+class FromTable :: forall k. k -> Row Type -> Row Type -> Constraint
 class FromTable s t c | s t → c where
   fromTable ∷ Table t → Query s { res ∷ { | c } , sql ∷ SQL }
 
@@ -281,7 +281,7 @@ instance tableToColsI
       id ← freshId
       let
         aliased = aliasToAliased $ aliasPrefix <> "_" <> show id
-        i = tableColumns aliased (RLProxy ∷ RLProxy tl)
+        i = tableColumns aliased (Proxy ∷ Proxy tl)
         res = toCols (Proxy ∷ Proxy s) i
       pure $ { res, sql: FromTable aliased }
 
@@ -300,6 +300,7 @@ subQueryAlias = do
   id ← freshId
   pure $ "sub_q" <> show id
 
+class FromSubQuery :: forall k. k -> Row Type -> Row Type -> Constraint
 class FromSubQuery s inner res | inner → s res where
   fromSubQuery
     ∷ FullQuery (Inner s) { | inner }
@@ -344,7 +345,7 @@ createSubQueryResult = hmapWithIndex <<< SubQueryResult
 data SubQueryResult = SubQueryResult Alias
 instance subQueryResultInstance
     ∷ IsSymbol sym
-    ⇒ MappingWithIndex SubQueryResult (SProxy sym) (Col s a) (Col s a)
+    ⇒ MappingWithIndex SubQueryResult (Proxy sym) (Col s a) (Col s a)
   where
   mappingWithIndex (SubQueryResult namespace) sym (Col _) = 
     Col $ EColumn $ Column { namespace, name: reflectSymbol sym }

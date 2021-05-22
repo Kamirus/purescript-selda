@@ -18,7 +18,6 @@ import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, ro
 import Selda.Table (class TableColumnNames, Table, tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Text.Pretty (render)
-import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 
 ppQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s { | i } → PrettyM
@@ -72,8 +71,8 @@ instance genericShowInsertImpl
   where
   genericShowInsert { ph } table rs =
     let
-      cols = joinWith ", " $ tableColumnNames (RLProxy ∷ RLProxy rl)
-      len = rowListLength (RLProxy ∷ RLProxy rl)
+      cols = joinWith ", " $ tableColumnNames (Proxy ∷ Proxy rl)
+      len = rowListLength (Proxy ∷ Proxy rl)
       placeholders = mkPlaceholders ph 1 len $ Array.length rs
     in
       ["INSERT INTO ", tableName table, " (", cols, ") VALUES ", placeholders, ";"]

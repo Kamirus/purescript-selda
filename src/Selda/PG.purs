@@ -13,7 +13,6 @@ import Selda.Expr (Expr(..), ShowM, showM)
 import Selda.Query.Utils (class RowListLength, rowListLength)
 import Selda.Table (class TableColumnNames, Table(..), tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
-import Type.Data.RowList (RLProxy)
 
 -- | Lift a value `a` to a column expression using `ToSQLValue a`.
 -- | Please note that the value will be passed as a query parameter meaning it
@@ -28,12 +27,12 @@ showPG
 showPG = showM "$" 1
 
 showInsert1
-  ∷ ∀ t insRLcols retRLcols
+  ∷ ∀ t insRLcols retRLcols proxy1 proxy2
   . CanInsertColumnsIntoTable insRLcols t
   ⇒ TableColumnNames insRLcols
   ⇒ TableColumnNames retRLcols
   ⇒ RowListLength insRLcols
-  ⇒ Table t → RLProxy insRLcols → RLProxy retRLcols → String
+  ⇒ Table t → proxy1 insRLcols → proxy2 retRLcols → String
 showInsert1 table colsToinsert colsToRet =
   let
     cols = joinWith ", " $ tableColumnNames colsToinsert

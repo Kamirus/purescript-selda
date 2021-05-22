@@ -9,13 +9,11 @@ import Data.Either (either)
 import Data.Foldable (class Foldable, find, foldl, for_, length)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
-import Data.Variant.Internal (FProxy(..))
 import Database.PostgreSQL (Connection, PGError)
 import Effect.Aff (Aff, catchError, throwError)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign (ForeignError, MultipleErrors, renderForeignError)
-import Global.Unsafe (unsafeStringify)
 import SQLite3 (DBConnection)
 import Selda (FullQuery, showQuery)
 import Selda.Col (class GetCols)
@@ -30,9 +28,10 @@ import Test.Unit as Unit
 import Test.Unit.Assert (assert, expectFailure)
 import Type.Proxy (Proxy(..))
 
+type TestCtx :: forall k1 k2. k1 -> k2 -> Type -> Type
 type TestCtx b m ctx =
   { b ∷ Proxy b
-  , m ∷ FProxy m
+  , m ∷ Proxy m
   , ctx ∷ ctx
   }
 
@@ -63,6 +62,7 @@ testFailingWith ctx msg q = Unit.test msg
   $ expectFailure "failure msg"
   $ testWith' ctx (\_ _ → pure unit) [] q
 
+class TestBackend :: forall k. k -> (Type -> Type) -> Type -> Constraint
 class TestBackend b m ctx | b m → ctx where
   testWith'
     ∷ ∀ i o
@@ -81,7 +81,7 @@ instance testBackendPG
         (ExceptT PGError (ReaderT Connection Aff))
         { conn ∷ Connection }
   where
-  testWith' { b, m, ctx: { conn } } assertFn =
+  testWith' { b, ctx: { conn } } assertFn =
     testWith_ assertFn (showPG >>> _.strQuery) b (runPGSeldaAff conn)
 
 instance testBackendSQLite3
@@ -89,7 +89,7 @@ instance testBackendSQLite3
         (ExceptT (NonEmptyList ForeignError) (ReaderT DBConnection Aff))
         { conn ∷ DBConnection }
   where
-  testWith' { b, m, ctx: { conn } } assertFn =
+  testWith' { b, ctx: { conn } } assertFn =
     testWith_ assertFn (showSQLite3 >>> _.strQuery) b (runSQLite3SeldaAff conn)
 
 testWith_
@@ -114,7 +114,7 @@ testWithPG
 testWithPG conn k = k { b, m, ctx: { conn } } 
   where
     b = (Proxy ∷ Proxy BackendPGClass)
-    m = (FProxy ∷ FProxy PGSelda)
+    m = (Proxy ∷ Proxy PGSelda)
 
 testWithSQLite3
   ∷ ∀ a
@@ -124,7 +124,7 @@ testWithSQLite3
 testWithSQLite3 conn k = k { b, m, ctx: { conn } } 
   where
     b = (Proxy ∷ Proxy BackendSQLite3Class)
-    m = (FProxy ∷ FProxy SQLite3Selda)
+    m = (Proxy ∷ Proxy SQLite3Selda)
 
 testQueryWith_
   ∷ ∀ expected query queryResult
@@ -202,3 +202,5 @@ assertSeqEq l1 l2 = assert msg $ xs == ys
 assertEq ∷ ∀ a. Show a ⇒ Eq a ⇒ a → a → Aff Unit
 assertEq x y = assert msg $ x == y
   where msg = show x <> " != " <> show y
+
+foreign import unsafeStringify :: forall a. a -> String

@@ -29,7 +29,7 @@ import Control.Monad.Except (class MonadError, ExceptT, runExceptT, throwError)
 import Control.Monad.Reader (class MonadReader, ReaderT, asks, runReaderT)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Variant (SProxy(..), Variant, inj)
+import Data.Variant (Variant, inj)
 import Database.PostgreSQL (PGError)
 import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
@@ -43,6 +43,7 @@ import Selda.Col (class GetCols)
 import Selda.PG (showPG)
 import Selda.PG.Class (insert_, query)
 import Selda.Table.Constraint (Auto, Default)
+import Type.Proxy (Proxy(..))
 ```
 ## Setup
 
@@ -54,8 +55,8 @@ We include this information in a record below.
 We will need it later to execute our queries.
 
 ```purescript
-dbconfig ∷ PostgreSQL.PoolConfiguration
-dbconfig = (PostgreSQL.defaultPoolConfiguration "purspg")
+dbconfig ∷ PostgreSQL.Configuration
+dbconfig = (PostgreSQL.defaultConfiguration "purspg")
   { user = Just "init"
   , password = Just $ "qwerty"
   , idleTimeoutMillis = Just $ 1000
@@ -174,8 +175,8 @@ We can write the same query using `purescript-selda`.
 ```purescript
 qNamesWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s (Maybe Int) }
-qNamesWithBalance = 
-  selectFrom people \{ id, name, age } → do      -- FROM people
+qNamesWithBalance =
+  selectFrom people \{ id, name } → do           -- FROM people
     { balance } ← leftJoin bankAccounts          -- LEFT JOIN bank_accounts
                     \acc → id .== acc.personId   -- ON people.id = bank_accounts.personId
     restrict $ id .> lit 1                       -- WHERE people.id > 1 
@@ -247,7 +248,7 @@ qCountBankAccountOwners
   ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s Int }
 qCountBankAccountOwners = 
   aggregate $ selectFrom_
-    (aggregate $ selectFrom bankAccounts \{ id, personId } → do
+    (aggregate $ selectFrom bankAccounts \{ personId } → do
       pid ← groupBy personId
       pure { pid })
     \{ pid } → pure { numberOfOwners: count pid }
@@ -335,7 +336,7 @@ type AppError = Variant
   ( pgError ∷ PGError
   , error ∷ String
   )
-_pgError = SProxy ∷ SProxy "pgError"
+_pgError = Proxy ∷ Proxy "pgError"
 type App = ReaderT Context (ExceptT AppError Aff)
 
 runApp ∷ ∀ a. Context → App a → Aff (Either AppError a)
@@ -449,7 +450,7 @@ When we've got the connection we can create the database tables and then run our
 
 launchWithConnectionPG ∷ (PostgreSQL.Connection → Aff Unit) → Effect Unit
 launchWithConnectionPG m = do
-  pool ← PostgreSQL.newPool dbconfig
+  pool ← PostgreSQL.new dbconfig
   launchAff_ do
     PostgreSQL.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)

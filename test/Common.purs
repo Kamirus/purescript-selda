@@ -121,7 +121,7 @@ legacySuite ctx = do
     -- , { id: 2, balance: Nothing }
     , { id: 3, balance: 300, accountType: Personal }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { accountType, balance, personId } ← crossJoin bankAccounts
         restrict $ id .== personId
         pure { accountType, id, balance }
@@ -131,7 +131,7 @@ legacySuite ctx = do
     , { id: 1, balance: 150, accountType: Personal }
     , { id: 3, balance: 300, accountType: Personal }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { accountType, balance } ← innerJoin bankAccounts $ \b → id .== b.personId
         pure { accountType, id, balance }
 
@@ -141,7 +141,7 @@ legacySuite ctx = do
     , { id: 2, balance: Nothing }
     , { id: 3, balance: Just 300 }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { balance } ← leftJoin bankAccounts \b → id .== b.personId
         pure { id, balance }
 
@@ -151,7 +151,7 @@ legacySuite ctx = do
     , { id: 2, balance: Nothing }
     , { id: 3, balance: Just 300 }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { balance } ← leftJoin_ (\b → id .== b.personId) do
           selectFrom bankAccounts \b → do
             -- restrict $ id .== b.personId -- type error
@@ -162,7 +162,7 @@ legacySuite ctx = do
     [ { balance: Just 150, id: 1 }
     , { balance: Nothing, id: 2 }
     , { balance: Just 300, id: 3 }
-    ] $ selectFrom people \{ id, name, age } -> do
+    ] $ selectFrom people \{ id } -> do
           { balance } <- leftJoin_ (\b -> id .== b.personId) $
             aggregate $ selectFrom bankAccounts \b -> do
               personId <- groupBy b.personId
@@ -172,7 +172,7 @@ legacySuite ctx = do
 
   testWith ctx unordered "aggr: max people id"
     [ { maxId: Just 3 } ]
-    $ aggregate $ selectFrom people \{ id, name, age } → do
+    $ aggregate $ selectFrom people \{ id } → do
         pure { maxId: max_ id }
 
   testWith ctx unordered "aggr: max people id from bankAccounts with counts"
