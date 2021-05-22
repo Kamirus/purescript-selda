@@ -160,6 +160,13 @@ orderBy order (Col e) =
 limit ∷ ∀ s. Int → Query s Unit
 limit i = modify_ $ _ { limit = Just i }
 
+offset ∷ ∀ s. Int → Query s Unit
+offset i = modify_ \st → 
+  case st.limit of
+    -- sqlite requires `limit` when `offset` is provided
+    Nothing → st { offset = Just i, limit = top }
+    Just __ → st { offset = Just i }
+
 -- | `innerJoin table predicate` is equivalent to `JOIN <table> ON <predicate>`.
 -- | Returns the columns from the joined table.
 innerJoin

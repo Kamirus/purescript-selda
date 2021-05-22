@@ -13,11 +13,12 @@ import Control.Monad.State (State)
 import Data.Exists (Exists, runExists)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple, uncurry)
+import Data.Tuple.Nested ((/\))
 import Dodo (Doc, alignCurrentColumn, appendBreak, break, foldWithSeparator, indent, isEmpty, lines, plainText, print, text, twoSpaces)
 import Foreign (Foreign)
 import Selda.Expr (Expr, QueryParams, ShowMCtx, showExpr, showM)
-import Selda.Query.ShowQuery (ishowAliasedCol, ishowCompoundOp, ishowJoinType, ishowLimit, ishowOrder)
+import Selda.Query.ShowQuery (ishowAliasedCol, ishowCompoundOp, ishowJoinType, ishowLimitOffset, ishowOrder)
 import Selda.Query.Type (GenState_, Order, SQL(..), Source(..))
 import Selda.Table (Alias)
 
@@ -31,14 +32,14 @@ prettyM
 prettyM ph i m = showM ph i $ dodoPrint <$> m
 
 ppState ∷ GenState_ → PrettyM
-ppState { cols, source, restricts, havings, aggr, order, limit, distinct } =
+ppState { cols, source, restricts, havings, aggr, order, limit, offset, distinct } =
   ppCols distinct cols
     `appDoc` ppFrom source
     `appTxt` ppRestricts restricts
     `appTxt` ppGrouping aggr
     `appTxt` ppHavings havings
     `appTxt` ppOrdering order
-    `appTxt` (pure <<< text <<< ishowLimit) limit
+    `appTxt` (pure <<< text <<< uncurry ishowLimitOffset) (limit /\ offset)
     where
       appDoc = lift2 appendBreak
       appTxt = lift2 appendNonEmptyDoc
