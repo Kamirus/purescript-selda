@@ -56,6 +56,7 @@ derive instance newtypeGenState ∷ Newtype GenState _
 -- | Represents an intermediate query state.
 -- | Before being wrapped with FullQuery this state represents SQL query without
 -- | FROM component, but having every other including JOIN[s]
+newtype Query :: forall k. k -> Type -> Type
 newtype Query s a = Query (State GenState a)
 derive instance newtypeQuery ∷ Newtype (Query s a) _
 derive newtype instance functorQuery ∷ Functor (Query s)
@@ -66,6 +67,7 @@ derive newtype instance monadQuery ∷ Monad (Query s)
 derive newtype instance stateQuery ∷ MonadState GenState (Query s)
 
 -- | wrapper for query that is ready for SQL generation
+newtype FullQuery :: forall k. k -> Type -> Type
 newtype FullQuery s a = FullQuery (Query s a)
 derive instance newtypeFullQuery ∷ Newtype (FullQuery s a) _
 derive newtype instance functorFullQuery ∷ Functor (FullQuery s)

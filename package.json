@@ -7,18 +7,25 @@
     "test": "test"
   },
   "scripts": {
-    "lit": "rm -rf guide/src/ && paluh-litps --input guide/ --output guide/src/",
-    "test": "npm run-script lit && spago test",
-    "build": "npm run-script lit && spago build"
+    "lit": "rm -rf guide/src/ && paluh-litps --input guide/ --output guide/src/ && cp guide/Custom.js guide/src/Custom.js",
+    "build": "npm run-script lit && spago build",
+    "test:guide:simpleE2E": "npm run-script lit && spago test --main Test.Guide.SimpleE2E",
+    "test:guide:custom": "npm run-script lit && spago test --main Test.Guide.Custom",
+    "test:guide": "npm-run-all --sequential test:guide:*",
+    "test:main": "spago test",
+    "test": "npm-run-all --sequential test:*"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "decimal.js": "^10.0.1",
-    "pg": "^7.6.0",
-    "sqlite3": "^4.1.0"
+    "pg": "^8.5.1",
+    "sqlite3": "^5.0.2"
   },
   "devDependencies": {
-    "paluh-litps": "^0.1.4"
+    "npm-run-all": "^4.1.5",
+    "paluh-litps": "^0.1.4",
+    "purescript": "^0.14.1",
+    "spago": "^0.20.2"
   }
 }

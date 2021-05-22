@@ -12,13 +12,12 @@ module Selda.Table
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Prim.Row as R
-import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Record as Record
 import Selda.Table.Constraint (class EraseConstraint)
-import Type.Data.RowList (RLProxy(..))
+import Type.Proxy (Proxy(..))
 
 -- | Represents table-like SQL sources.
 -- | 
@@ -34,7 +33,8 @@ import Type.Data.RowList (RLProxy(..))
 -- | (which is used in the `FROM` or `JOIN` SQL clause)
 -- | with or without a full alias (which is a combination of an alias prefix
 -- | and a unique number supplied during query generation).
-data Table ( r ∷ # Type )
+data Table :: Row Type -> Type
+data Table r
   = Table { name ∷ String }
   | Source Alias (Maybe Alias → StringSQL)
 
@@ -52,11 +52,13 @@ type StringSQL = String
 -- | - alias (used as a namespace for columns of the Table-like source)
 type AliasedTable = { body ∷ String, alias ∷ Alias }
 
+newtype Column :: forall k. k -> Type
 newtype Column a = Column { namespace ∷ Alias, name ∷ String }
 
 -- Table { name ∷ String, id ∷ Int } → { name ∷ Column String, id ∷ Column Int }
-class TableColumns (rl ∷ RowList) (r ∷ # Type) | rl → r where
-  tableColumns ∷ ∀ t. { alias ∷ Alias | t } → RLProxy rl → Record r
+class TableColumns :: RL.RowList Type -> Row Type -> Constraint
+class TableColumns rl r | rl → r where
+  tableColumns ∷ ∀ t proxy. { alias ∷ Alias | t } → proxy rl → Record r
 
 instance tableColumnsNil ∷ TableColumns RL.Nil () where
   tableColumns _ _ = {}
@@ -72,14 +74,15 @@ instance tableColumnsCons
   where
   tableColumns table _ = 
     let
-      _sym = (SProxy ∷ SProxy sym)
-      res' = tableColumns table (RLProxy ∷ RLProxy tail)
+      _sym = (Proxy ∷ Proxy sym)
+      res' = tableColumns table (Proxy ∷ Proxy tail)
       col = Column { namespace: table.alias, name: reflectSymbol _sym }
     in
     Record.insert _sym col res'
 
+class TableColumnNames :: RL.RowList Type -> Constraint
 class TableColumnNames rl where
-  tableColumnNames ∷ RLProxy rl → Array String
+  tableColumnNames ∷ forall proxy. proxy rl → Array String
 instance tableColumnNamesHead ∷ TableColumnNames RL.Nil where
   tableColumnNames _ = []
 else instance tableColumnNamesCons
@@ -88,5 +91,5 @@ else instance tableColumnNamesCons
   where
   tableColumnNames _ = tableColumnNames _tail <> [reflectSymbol _sym]
     where
-    _tail = (RLProxy ∷ RLProxy tail)
-    _sym = (SProxy ∷ SProxy sym)
+    _tail = (Proxy ∷ Proxy tail)
+    _sym = (Proxy ∷ Proxy sym)

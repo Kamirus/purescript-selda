@@ -6,11 +6,10 @@ import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Database.PostgreSQL (Connection, PoolConfiguration, defaultPoolConfiguration)
+import Database.PostgreSQL (Connection, Configuration, defaultConfiguration)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), S, lit, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, generateSeries, litPG)
@@ -19,7 +18,7 @@ import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
-import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
+import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG, unsafeStringify)
 
 employees ∷ Table
   ( id ∷ Auto Int
@@ -53,7 +52,9 @@ testSuite
 testSuite ctx = do
   let
     unordered = assertUnorderedSeqEq
-    ordered = assertSeqEq
+    -- Note: ordered is not being used. not sure if this is
+    -- an unfinished test or not, so commenting out for now
+    -- ordered = assertSeqEq
 
   testWith ctx unordered "employees inserted with default and without salary"
     [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
@@ -92,7 +93,7 @@ testSuite ctx = do
 
 main ∷ (TestSuite → Aff S) → Aff S
 main cont = do
-  pool ← liftEffect $ PostgreSQL.newPool dbconfig
+  pool ← liftEffect $ PostgreSQL.new dbconfig
   PostgreSQL.withConnection pool case _ of
     Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
     Right conn → do
@@ -227,8 +228,8 @@ main cont = do
         suite "PG" $ testWithPG conn legacySuite
         suite "PG.Specific" $ testWithPG conn testSuite
 
-dbconfig ∷ PoolConfiguration
-dbconfig = (defaultPoolConfiguration "purspg")
+dbconfig ∷ Configuration
+dbconfig = (defaultConfiguration "purspg")
   { user = Just "init"
   , password = Just $ "qwerty"
   , idleTimeoutMillis = Just $ 1000

@@ -14,6 +14,9 @@ module Selda
   , not_
   , inArray
   , isNull
+  , isNull_
+  , expAnd
+  , expOr
   , asc, desc
   ) where
 
