@@ -14,12 +14,11 @@ import Data.Tuple (Tuple(..))
 import Prim.RowList as RL
 import Selda.Col (class GetCols, Col, getCols, showCol)
 import Selda.Expr (ShowM, showExpr)
-import Selda.Query.PrettyPrint (PrettyM, ppState)
+import Selda.Query.PrettyPrint (PrettyM, dodoPrint, ppState)
 import Selda.Query.Type (FullQuery, GenState(..), runFullQuery)
 import Selda.Query.Utils (class RowListLength, class TableToColsWithoutAlias, rowListLength, tableToColsWithoutAlias)
-import Selda.Table (class TableColumnNames, Table, tableColumnNames, tableName)
+import Selda.Table (class TableColumnNames, Table, showColumnName, tableColumnNames, tableName)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
-import Text.Pretty (render)
 import Type.Proxy (Proxy(..))
 
 ppQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s { | i } → PrettyM
@@ -29,7 +28,7 @@ ppQuery q = ppState st
     st = st' { cols = getCols res }
 
 showQuery ∷ ∀ i s. GetCols i ⇒ FullQuery s (Record i) → ShowM
-showQuery q = render 0 <$> ppQuery q
+showQuery q = dodoPrint <$> ppQuery q
 
 showDeleteFrom
   ∷ ∀ t s r
@@ -52,7 +51,7 @@ showUpdate table pred up = do
       s ← runExists showExpr e
       pure $ if n == s
         then Nothing
-        else Just $ n <> " = " <> s 
+        else Just $ showColumnName n <> " = " <> s 
   pred_str ← showCol $ pred recordWithCols
   vals ← joinWith ", " <$> catMaybes <$> (traverse f $ getCols $ up recordWithCols)
   pure $ if vals == "" then "" else

@@ -380,9 +380,9 @@ main = Guide.launchWithConnectionPG \conn → do
     DROP TABLE IF EXISTS bank_accounts;
     CREATE TABLE bank_accounts (
       id SERIAL PRIMARY KEY,
-      personId INTEGER NOT NULL,
+      "personId" INTEGER NOT NULL,
       balance INTEGER NOT NULL DEFAULT 100,
-      accountType TEXT NOT NULL
+      "accountType" TEXT NOT NULL
     );""" conn
 
   runSelda conn app >>= either logShow pure

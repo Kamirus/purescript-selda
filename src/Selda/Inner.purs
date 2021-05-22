@@ -15,9 +15,9 @@ data Inner s
 
 data OuterCols = OuterCols
 instance failOuterCols
-    ∷ Fail (Text "Nested query with an `Aggr` column: "
+    ∷ Fail (Text "Error in the nested query: column \""
         <:> Text sym
-        <:> Text ", expected `Col`")
+        <:> Text "\" has type `Aggr`, but `Col` was expected.")
     ⇒ MappingWithIndex OuterCols (Proxy sym) (Aggr s a) c
   where
   mappingWithIndex _ _ _ = unsafeCoerce "failed with error message"

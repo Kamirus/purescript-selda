@@ -24,6 +24,9 @@ jobs:
       - name: Start postgres db for PG test
         run: docker-compose up -d
 
+      - name: Setup env
+        run: cp .env-ci .env
+
       - run: npm install
       - run: npm run-script lit
       - run: npm run-script build

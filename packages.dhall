@@ -2,27 +2,6 @@ let upstream =
       https://github.com/purescript/package-sets/releases/download/psc-0.14.1-20210506/packages.dhall sha256:d199e142515f9cc15838d8e6d724a98cd0ca776ceb426b7b36e841311643e3ef
 
 in upstream
-    with prettyprinter =
-      { dependencies =
-        [ "ansi"
-        , "arrays"
-        , "console"
-        , "control"
-        , "effect"
-        , "foldable-traversable"
-        , "lists"
-        , "maybe"
-        , "nonempty"
-        , "partial"
-        , "prelude"
-        , "random"
-        , "strings"
-        , "tuples"
-        , "unfoldable"
-        ]
-      , repo = "https://github.com/jordanmartinez/purescript-prettyprinter.git"
-      , version = "updateTov0.14.1"
-      }
     with postgresql-client =
       { dependencies =
         [ "aff"
@@ -140,3 +119,4 @@ in upstream
         , repo = "https://github.com/jordanmartinez/batteries-env.git"
         , version = "updateTov0.14.1"
         }
+-- >>>>>>> master

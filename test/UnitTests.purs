@@ -25,10 +25,10 @@ testSuite = suite "Unit" do
     let ctx = { ph: "$" }
     assertEq
       (genericShowInsert ctx testTable [{ c: 1, a: "a1", z: 11}])
-      "INSERT INTO testTable (z, c, a) VALUES ($1, $2, $3);"
+      """INSERT INTO testTable ("z", "c", "a") VALUES ($1, $2, $3);"""
     assertEq
       (genericShowInsert ctx testTable
         [ { c: 1, a: "a1", z: 11}
         , { c: 2, a: "a2", z: 22}
         ])
-      "INSERT INTO testTable (z, c, a) VALUES ($1, $2, $3), ($4, $5, $6);"
+      """INSERT INTO testTable ("z", "c", "a") VALUES ($1, $2, $3), ($4, $5, $6);"""

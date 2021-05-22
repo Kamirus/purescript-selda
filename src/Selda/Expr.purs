@@ -4,7 +4,6 @@ module Selda.Expr
   -- internal AST for expressions
   , Expr(..)
   , Literal(..)
-  , Some(..)
   , None(..)
   , BinOp(..)
   , UnOp(..)
@@ -35,7 +34,7 @@ import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign)
-import Selda.Table (Column(..))
+import Selda.Table (Column, showColumn)
 
 -- | AST for SQL expressions:
 -- | 
@@ -65,9 +64,6 @@ data Literal a
   | LString String (String ~ a)
   | LInt Int (Int ~ a)
   | LNull (Exists (None a))
-  | LJust (Exists (Some a))
-
-data Some a b = Some (Literal b) (Maybe b ~ a)
 
 data None a b = None (Maybe b ~ a)
 
@@ -142,18 +138,12 @@ showForeign x = do
   put $ s { nextIndex = 1 + s.nextIndex, invertedParams = x : s.invertedParams }
   pure $ mkPlaceholder s.nextIndex
 
-showColumn ∷ ∀ a. Column a → String
-showColumn (Column { namespace, name })
-  | namespace == "" = name
-  | otherwise = namespace <> "." <> name
-
 showLiteral ∷ ∀ a. Literal a → String
 showLiteral = case _ of
   LBoolean b _ → show b
   LString s _ → "'" <> primPGEscape s <> "'"
   LInt i _ → show i
   LNull _ → "null"
-  LJust x → runExists (\(Some l _) → showLiteral l) x
 
 showBinOp ∷ ∀ i o. BinOp i o → String
 showBinOp = case _ of
@@ -174,7 +164,7 @@ showExpr = case _ of
   EFn fn → runExists showFn fn
   EInArray e → runExists showInArray e
   EForeign x → showForeign x
-  Any m → primPGEscape <$> m
+  Any m → m
 
 showBinExp ∷ ∀ o i. BinExp o i → ShowM
 showBinExp (BinExp op e1 e2) = do

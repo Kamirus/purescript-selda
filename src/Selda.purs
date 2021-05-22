@@ -5,7 +5,6 @@ module Selda
   , module ShowStatement
   , module Query
   , module Table
-  , S
   , module Expr.Ord
   , in_
   , count
@@ -25,6 +24,7 @@ import Prelude
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
+import Dodo as Dodo
 import Selda.Aggr (Aggr(..))
 import Selda.Col (Col(..)) as Col
 import Selda.Col (Col(..), showCol)
@@ -32,15 +32,12 @@ import Selda.Expr (Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
 import Selda.Expr.Ord ((.==), (./=), (.>), (.>=), (.<), (.<=)) as Expr.Ord
 import Selda.Lit (lit, class Lit) as Lit
 import Selda.Query (crossJoin, crossJoin_, innerJoin, innerJoin_, restrict, having, notNull, notNull_, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
+import Selda.Query.PrettyPrint (dodoPrint)
 import Selda.Query.ShowStatement (ppQuery)
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
 import Selda.Query.Type (Order(..), FullQuery)
 import Selda.Query.Type (Query(..), FullQuery(..)) as Query.Type
 import Selda.Table (Table(..)) as Table
-import Text.Pretty as PP
-
--- | Top-level scope of a query
-type S = Unit
 
 asc ∷ Order
 asc = Asc
@@ -62,7 +59,7 @@ in_
 in_ col subQ = Col $ Any do
   c ← showCol col
   doc ← ppQuery subQ
-  let q = PP.render 0 $ PP.nest 2 $ PP.line <> doc <> PP.line
+  let q = dodoPrint $ Dodo.indent $ Dodo.break <> doc <> Dodo.break
   pure $ c <> " IN (" <> q <> ")"
 
 count ∷ ∀ s a. Col s a → Aggr s Int

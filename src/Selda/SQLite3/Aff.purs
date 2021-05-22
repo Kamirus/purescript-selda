@@ -8,6 +8,7 @@ import Selda.Col (class GetCols)
 import Selda.Query.Class (runSelda)
 import Selda.Query.Type (FullQuery)
 import Selda.Query.Utils (class MapR, UnCol_)
+import Selda.SQLite3.Class (BackendSQLite3Class)
 import Selda.SQLite3.Class as S
 import Simple.JSON (class ReadForeign, E)
 
@@ -16,5 +17,7 @@ query
   . GetCols i
   ⇒ MapR UnCol_ i o
   ⇒ ReadForeign { | o }
-  ⇒ DBConnection → FullQuery Unit { | i } → Aff (E (Array { | o }))
+  ⇒ DBConnection
+  → FullQuery BackendSQLite3Class { | i }
+  → Aff (E (Array { | o }))
 query conn q = runSelda conn $ S.query q

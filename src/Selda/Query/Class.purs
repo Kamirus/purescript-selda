@@ -10,20 +10,21 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Foreign (Foreign)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
-import Selda (Col, Table)
+import Selda.Col (Col)
+import Selda.Table (Table)
 import Selda.Query.ShowStatement (class GenericShowInsert, genericShowInsert)
 import Selda.Query.Type (FullQuery)
 import Selda.Query.Utils (RecordToArrayForeign(..))
 import Type.Proxy (Proxy)
 
-class GenericQuery :: forall k. k -> (Type -> Type) -> Row Type -> Row Type -> Constraint
+class GenericQuery ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
 class Monad m <= GenericQuery b m i o | i → o, b → m where
   genericQuery
     ∷ Proxy b
-    → FullQuery Unit { | i }
+    → FullQuery b { | i }
     → m (Array { | o })
 
-class GenericInsert :: forall k. k -> (Type -> Type) -> Row Type -> Row Type -> Constraint
+class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
 class Monad m <= GenericInsert b m t r | t → r, b → m where
   genericInsert
     ∷ Proxy b
@@ -31,20 +32,20 @@ class Monad m <= GenericInsert b m t r | t → r, b → m where
     → Array { | r }
     → m Unit
 
-class GenericDelete :: forall k1 k2. k1 -> (Type -> Type) -> k2 -> Row Type -> Row Type -> Constraint
-class Monad m <= GenericDelete b m s t r | t → r, b → m where
+class GenericDelete ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+class Monad m <= GenericDelete b m t r | t → r, b → m where
   genericDelete
     ∷ Proxy b
     → Table t
-    → ({ | r } → Col s Boolean)
+    → ({ | r } → Col b Boolean)
     → m Unit
 
-class GenericUpdate :: forall k1 k2. k1 -> (Type -> Type) -> k2 -> Row Type -> Row Type -> Constraint
-class Monad m <= GenericUpdate b m s t r | t → r, b → m where
+class GenericUpdate ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+class Monad m <= GenericUpdate b m t r | t → r, b → m where
   genericUpdate
-    ∷ Proxy b 
+    ∷ Proxy b
     → Table t
-    → ({ | r } → Col s Boolean)
+    → ({ | r } → Col b Boolean)
     → ({ | r } → { | r })
     → m Unit
 
@@ -77,7 +78,7 @@ hoistSeldaWith fe fr m = do
   runReaderT (runExceptT m) conn # liftAff
     >>= either (throwError <<< fe) pure
 
-class 
+class
   ( MonadAff m
   , MonadError e m
   , MonadReader r m

@@ -44,7 +44,7 @@ testWith
     → (Array { | o } → Array { | o } → Aff Unit)
     → String
     → Array { | o }
-    → FullQuery Unit { | i }
+    → FullQuery b { | i }
     → TestSuite
 testWith ctx assertFn msg expected q = Unit.test msg
   $ testWith' ctx assertFn expected q
@@ -56,7 +56,7 @@ testFailingWith
     ⇒ GetCols i
     ⇒ TestCtx b m ctx
     → String
-    → FullQuery Unit { | i }
+    → FullQuery b { | i }
     → TestSuite
 testFailingWith ctx msg q = Unit.test msg
   $ expectFailure "failure msg"
@@ -71,7 +71,7 @@ class TestBackend b m ctx | b m → ctx where
     ⇒ TestCtx b m ctx
     → (Array { | o } → Array { | o } → Aff Unit)
     → Array { | o }
-    → FullQuery Unit { | i }
+    → FullQuery b { | i }
     → Aff Unit
 
 -- testFailingWith ctx = testWith' ctx unordered "failing: aggr & having"
@@ -101,7 +101,7 @@ testWith_
   → Proxy b
   → (m ~> Aff)
   → Array { | o }
-  → FullQuery Unit { | i }
+  → FullQuery b { | i }
   → Aff Unit
 testWith_ assertFn showB b runM = 
   testQueryWith_ (\q → runM $ genericQuery b q) assertFn (showQuery >>> showB)
@@ -137,8 +137,9 @@ testQueryWith_
 testQueryWith_ run assertFunc showQ expected query =
   run query >>= assertFunc expected # catchError $ \e → do
     log "Error occured - Printing the query below"
-    log $ showQ query
+    logQuery
     throwError e
+  where logQuery = log "" *> log (showQ query)
 
 withRollback_
   ∷ ∀ err a
