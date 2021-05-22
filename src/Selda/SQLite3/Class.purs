@@ -122,4 +122,4 @@ execSQLite3 q params = do
 
 -- | Utility function to execute a given query (as String) with parameters and discard the result
 execSQLite3_ ∷ ∀ m. MonadSeldaSQLite3 m ⇒ String → Array Foreign → m Unit
-execSQLite3_ q l = void $ execSQLite3 q l
+execSQLite3_ q l = when (q /= "") $ void $ execSQLite3 q l

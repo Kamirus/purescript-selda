@@ -184,6 +184,10 @@ main cont = do
         insert_ employees [ { name: "E1", salary: 123 } ]
         insert1_ employees { name: "E2", date: date 2000 11 21 }
         insert1_ employees { name: "E3" }
+        update employees
+          (\r → r.name .== lit "E1")
+          (\r → r { salary = lit 123 })
+
         insert_ qualifiedTableWithSchema
           [ { name: "s1" }
           , { name: "s2" }
@@ -215,9 +219,12 @@ main cont = do
           (\r → r { "end" = lit 2 })
         deleteFrom pgKeywordTable_quote
           (\r → r."end" .== lit 2)
+
+      -- test empty insert,update won't break
       runSeldaAff conn do
         _ ← insert people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })
         insert_ people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })
+        update people (\r → r.id .== r.id) identity
       cont do
         suite "PG" $ testWithPG conn legacySuite
         suite "PG.Specific" $ testWithPG conn testSuite

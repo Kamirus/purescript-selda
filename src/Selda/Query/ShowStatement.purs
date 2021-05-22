@@ -4,8 +4,10 @@ module Selda.Query.ShowStatement where
 
 import Prelude
 
+import Data.Array (catMaybes)
 import Data.Array as Array
 import Data.Exists (runExists)
+import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -47,10 +49,13 @@ showUpdate table pred up = do
     recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
     f (Tuple n e) = do 
       s ← runExists showExpr e
-      pure $ showColumnName n <> " = " <> s
+      pure $ if n == s
+        then Nothing
+        else Just $ showColumnName n <> " = " <> s 
   pred_str ← showCol $ pred recordWithCols
-  vals ← joinWith ", " <$> (traverse f $ getCols $ up recordWithCols)
-  pure $ "UPDATE " <> tableName table <> " SET " <> vals <> " WHERE " <> pred_str
+  vals ← joinWith ", " <$> catMaybes <$> (traverse f $ getCols $ up recordWithCols)
+  pure $ if vals == "" then "" else
+    "UPDATE " <> tableName table <> " SET " <> vals <> " WHERE " <> pred_str
 
 -- | typeclass-alias for `genericShowInsert` constraints
 class GenericShowInsert t r where

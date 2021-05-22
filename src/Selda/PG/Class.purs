@@ -65,11 +65,10 @@ pgExecute ∷
   ∀ m.
   MonadSeldaPG m ⇒
   ShowM → m Unit
-pgExecute m = do
+pgExecute m = when (strQuery /= "") do
   conn ← ask
-  let
-    { strQuery, params } = showPG m
   PostgreSQL.PG.execute conn (PostgreSQL.Query strQuery) params
+  where { strQuery, params } = showPG m
 
 -- | Executes an insert query for each input record.
 insert_ ∷
