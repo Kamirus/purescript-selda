@@ -48,6 +48,7 @@ type GenState_ =
   , aggr ∷ Array (Exists Expr)
   , order ∷ Array (Tuple Order (Exists Expr))
   , limit ∷ Maybe Int
+  , offset ∷ Maybe Int
   , distinct ∷ Boolean
   }
 newtype GenState = GenState GenState_
@@ -88,6 +89,7 @@ initState = GenState
   , aggr: []
   , order: []
   , limit: Nothing
+  , offset: Nothing
   , distinct: false
   }
 

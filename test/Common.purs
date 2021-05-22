@@ -3,7 +3,7 @@ module Test.Common where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, in_, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<), (.<=), (.==), (.>))
+import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, in_, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, offset, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<), (.<=), (.==), (.>))
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
@@ -222,6 +222,32 @@ legacySuite ctx = do
     $ selectFrom people \r → do
         limit $ -7
         pure r
+  
+  testWith ctx unordered "offset negative is omitted"
+    [ { id: 1 }
+    , { id: 2 }
+    , { id: 3 }
+    ]
+    $ selectFrom people \{ id } → do
+        offset $ -7
+        pure { id }
+    
+  testWith ctx unordered "limit + offset"
+    [ { id: 2 }
+    ]
+    $ selectFrom people \{ id } → do
+        orderBy asc id
+        limit 1
+        offset 1
+        pure { id }
+
+  testWith ctx unordered "just offset"
+    [ { id: 3 }
+    ]
+    $ selectFrom people \{ id } → do
+        orderBy asc id
+        offset 2
+        pure { id }
 
   testWith ctx unordered "limit + order by: return first"
     [ { pid: 3, maxBalance: Just 300 } ]

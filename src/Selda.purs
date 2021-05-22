@@ -31,7 +31,7 @@ import Selda.Col (Col(..), showCol)
 import Selda.Expr (Expr(..), Fn(..), InArray(..), UnExp(..), UnOp(..))
 import Selda.Expr.Ord ((.==), (./=), (.>), (.>=), (.<), (.<=)) as Expr.Ord
 import Selda.Lit (lit, class Lit) as Lit
-import Selda.Query (crossJoin, crossJoin_, innerJoin, innerJoin_, restrict, having, notNull, notNull_, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, orderBy) as Query
+import Selda.Query (crossJoin, crossJoin_, innerJoin, innerJoin_, restrict, having, notNull, notNull_, union, unionAll, intersect, except, leftJoin, leftJoin_, distinct, aggregate, groupBy, groupBy', selectFrom, selectFrom_, limit, offset, orderBy) as Query
 import Selda.Query.PrettyPrint (dodoPrint)
 import Selda.Query.ShowStatement (ppQuery)
 import Selda.Query.ShowStatement (showQuery, showDeleteFrom, showUpdate) as ShowStatement
