@@ -36,14 +36,13 @@ import Control.Monad.Except (runExcept)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), either)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..), maybe)
 import Database.PostgreSQL (class FromSQLValue, class ToSQLValue)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Effect.Class.Console (log, logShow)
 import Foreign (readString, unsafeToForeign)
-import Global.Unsafe (unsafeStringify)
 import Guide.SimpleE2E as Guide
 import Selda (Col(..), FullQuery, Table(..), distinct, innerJoin, innerJoin_, lit, notNull, restrict, selectFrom, showQuery, (.==), (.>=))
 import Selda.Col (class GetCols, showCol)
@@ -52,6 +51,9 @@ import Selda.PG (litPG, showPG)
 import Selda.PG.Class (insert_)
 import Selda.PG.Class as PG
 import Selda.Query.Class (runSelda)
+
+-- necessary since Global.Unsafe (unsafeStringify) was removed
+foreign import unsafeStringify :: forall a. a -> String
 ```
 ## Before
 

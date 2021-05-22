@@ -6,10 +6,8 @@ import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Database.PostgreSQL (Connection)
-import Database.PostgreSQL (Row0(..)) as PostgreSQL
-import Database.PostgreSQL.Aff (Query(..), execute, withConnection) as PostgreSQL
+import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff)
-import Global.Unsafe (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), lit, restrict, selectFrom, (.==), (.>))
 import Selda.PG (extract, generateSeries, litPG)
@@ -19,7 +17,7 @@ import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Selda.PG.Config (load) as Config
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite)
-import Test.Utils (PGSelda, TestCtx, assertSeqEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
+import Test.Utils (PGSelda, TestCtx, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG, unsafeStringify)
 
 employees ∷
   Table
@@ -57,8 +55,10 @@ testSuite ∷
 testSuite ctx = do
   let
     unordered = assertUnorderedSeqEq
+    -- Note: ordered is not being used. not sure if this is
+    -- an unfinished test or not, so commenting out for now
+    -- ordered = assertSeqEq
 
-    ordered = assertSeqEq
   testWith ctx unordered "employees inserted with default and without salary"
     [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
     , { id: 2, name: "E2", salary: 500, date: date 2000 11 21 }

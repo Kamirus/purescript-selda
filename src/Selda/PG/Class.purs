@@ -38,7 +38,6 @@ import Selda.Query.Type (FullQuery(..), runFullQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
-import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 
 type B
@@ -128,15 +127,11 @@ instance insertRecordIntoTableReturningInstance ∷
   insertRecordIntoTableReturning r table = do
     let
       s = (Proxy ∷ Proxy s)
-
-      colsToinsert = (RLProxy ∷ RLProxy rlcols)
-
+      colsToinsert = (Proxy ∷ Proxy rlcols)
       rTuple = hfoldl RecordToTuple unit r
 
       tr = tableToColsWithoutAlias s table
-
-      colsToRet = (RLProxy ∷ RLProxy trl)
-
+      colsToRet = (Proxy ∷ Proxy trl)
       q = showInsert1 table colsToinsert colsToRet
     rows ← pgQuery (PostgreSQL.Query q) rTuple
     pure $ map (colsToPGHandler s tr) rows

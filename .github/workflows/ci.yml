@@ -25,7 +25,7 @@ jobs:
         run: docker-compose up -d
 
       - name: Setup env
-        run: export $(cat .env-ci | xargs)
+        run: cp .env-ci .env
 
       - run: npm install
       - run: npm run-script lit

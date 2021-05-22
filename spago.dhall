@@ -2,32 +2,50 @@
 Welcome to a Spago project!
 You can edit this file as you like.
 -}
-{ name =
-    "selda"
-, license =
-    "MIT"
-, repository =
-    "https://github.com/Kamirus/purescript-selda.git"
+{ name = "selda"
+, license = "MIT"
+, repository = "https://github.com/Kamirus/purescript-selda.git"
 , dependencies =
-    [ "console"
-    , "debug"
-    , "dodo-printer"
-    , "dotenv"
-    , "exists"
-    , "heterogeneous"
-    , "lists"
-    , "node-sqlite3"
-    , "polyform-batteries-env"
-    , "postgresql-client"
-    , "prelude"
-    , "simple-json"
-    , "strings"
-    , "test-unit"
-    , "transformers"
-    , "variant"
-    ]
-, packages =
-    ./packages.dhall
-, sources =
-    [ "src/**/*.purs", "test/**/*.purs", "guide/src/**/*.purs" ]
+  [ "aff"
+  , "arrays"
+  , "bifunctors"
+  , "console"
+  , "datetime"
+  , "dodo-printer"
+  , "dotenv"
+  , "effect"
+  , "either"
+  , "enums"
+  , "exceptions"
+  , "exists"
+  , "foldable-traversable"
+  , "foreign"
+  , "foreign-object"
+  , "heterogeneous"
+  , "leibniz"
+  , "lists"
+  , "maybe"
+  , "newtype"
+  , "node-process"
+  , "node-sqlite3"
+  , "ordered-collections"
+  , "partial"
+  , "polyform"
+  , "polyform-batteries-core"
+  , "polyform-batteries-env"
+  , "postgresql-client"
+  , "prelude"
+  , "record"
+  , "simple-json"
+  , "strings"
+  , "test-unit"
+  , "transformers"
+  , "tuples"
+  , "typelevel-prelude"
+  , "unsafe-coerce"
+  , "validation"
+  , "variant"
+  ]
+, packages = ./packages.dhall
+, sources = [ "src/**/*.purs", "test/**/*.purs", "guide/src/**/*.purs" ]
 }

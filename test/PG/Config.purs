@@ -1,6 +1,7 @@
 module Test.Selda.PG.Config where
 
 import Prelude
+
 import Control.Monad.Error.Class (throwError)
 import Data.Either (Either(..))
 import Data.Map (fromFoldable) as Map
@@ -21,6 +22,7 @@ import Polyform.Batteries.Env.Validators (optional, required) as Env
 import Polyform.Batteries.Int (IntExpected)
 import Polyform.Batteries.Int (validator) as Int
 import Polyform.Validator (liftFnM, runValidator)
+import Test.Utils (unsafeStringify)
 import Type.Row (type (+))
 
 poolConfiguration ∷
@@ -47,5 +49,5 @@ load = do
   runValidator pool env >>= un V
     >>> case _ of
         Left err → do
-          throwError $ error "Configuration error. Please verify your environment and .env file."
+          throwError $ error $ "Configuration error. Please verify your environment and .env file.\nRaw error: " <> unsafeStringify err
         Right p → pure p

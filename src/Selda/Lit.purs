@@ -24,6 +24,7 @@ lit
   ⇒ a → col s a
 lit = unsafeFromCol <<< litImpl
 
+class Lit ∷ ∀ k. k → Type → Constraint
 class Lit s a where
   litImpl ∷ a → Col s a
 

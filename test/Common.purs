@@ -4,7 +4,6 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Selda (Col, FullQuery, Table(..), aggregate, asc, count, crossJoin, desc, distinct, groupBy, having, inArray, in_, innerJoin, innerJoin_, isNull, leftJoin, leftJoin_, limit, lit, max_, notNull, notNull_, orderBy, restrict, selectFrom, selectFrom_, sum_, union, (.<), (.<=), (.==), (.>))
-import Selda.Lit (class Lit)
 import Selda.Query.Class (class GenericQuery)
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite)
@@ -40,7 +39,6 @@ testSelectEscapedString ctx = do
       restrict $ r.id .== lit 1
       pure { val: lit "'abc' \' \"def\"" }
 
-legacySuite ∷ ∀ b ctx m. LegacySuite b ctx m ((TestCtx b m ctx) → TestSuite)
 legacySuite ctx = do
   let
     unordered = assertUnorderedSeqEq
@@ -122,7 +120,7 @@ legacySuite ctx = do
     -- , { id: 2, balance: Nothing }
     , { id: 3, balance: 300, accountType: Personal }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { accountType, balance, personId } ← crossJoin bankAccounts
         restrict $ id .== personId
         pure { accountType, id, balance }
@@ -132,7 +130,7 @@ legacySuite ctx = do
     , { id: 1, balance: 150, accountType: Personal }
     , { id: 3, balance: 300, accountType: Personal }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { accountType, balance } ← innerJoin bankAccounts $ \b → id .== b.personId
         pure { accountType, id, balance }
 
@@ -142,7 +140,7 @@ legacySuite ctx = do
     , { id: 2, balance: Nothing }
     , { id: 3, balance: Just 300 }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { balance } ← leftJoin bankAccounts \b → id .== b.personId
         pure { id, balance }
 
@@ -152,7 +150,7 @@ legacySuite ctx = do
     , { id: 2, balance: Nothing }
     , { id: 3, balance: Just 300 }
     ]
-    $ selectFrom people \{ id, name, age } → do
+    $ selectFrom people \{ id } → do
         { balance } ← leftJoin_ (\b → id .== b.personId) do
           selectFrom bankAccounts \b → do
             -- restrict $ id .== b.personId -- type error
@@ -163,7 +161,7 @@ legacySuite ctx = do
     [ { balance: Just 150, id: 1 }
     , { balance: Nothing, id: 2 }
     , { balance: Just 300, id: 3 }
-    ] $ selectFrom people \{ id, name, age } → do
+    ] $ selectFrom people \{ id } → do
           { balance } ← leftJoin_ (\b → id .== b.personId) $
             aggregate $ selectFrom bankAccounts \b → do
               personId ← groupBy b.personId
@@ -173,7 +171,7 @@ legacySuite ctx = do
 
   testWith ctx unordered "aggr: max people id"
     [ { maxId: Just 3 } ]
-    $ aggregate $ selectFrom people \{ id, name, age } → do
+    $ aggregate $ selectFrom people \{ id } → do
         pure { maxId: max_ id }
 
   testWith ctx unordered "aggr: max people id from bankAccounts with counts"
@@ -372,153 +370,3 @@ legacySuite ctx = do
         restrict $ id `in_` (selectFrom bankAccounts \r → pure { x: r.personId })
         restrict $ id .> lit 0
         pure { id }
-
-
-type LegacySuite t1164 t87 t88 fun =
-  ( TestBackend t1164 t88 t87
-  ⇒ GenericQuery t1164 t88
-    ( val ∷ Col t1164 String)
-    ( val ∷ String)
-  ⇒ GenericQuery t1164 t88
-    ( age ∷ Col t1164 (Maybe Int)
-    , id ∷ Col t1164 Int
-    , name ∷ Col t1164 String
-    )
-    ( age ∷ Maybe Int
-    , id ∷ Int
-    , name ∷ String
-    )
-  ⇒ GenericQuery t1164 t88
-    ( x ∷ Col t1164 Int
-    , y ∷ Col t1164 (Maybe Int)
-    )
-    ( x ∷ Int
-    , y ∷ Maybe Int
-    )
-  ⇒ Lit t1164 (Maybe Int)
-  ⇒ GenericQuery t1164 t88
-    ( accountType ∷ Col t1164 AccountType
-    , balance ∷ Col t1164 Int
-    , id ∷ Col t1164 Int
-    , personId ∷ Col t1164 Int
-    )
-    ( accountType ∷ AccountType
-    , balance ∷ Int
-    , id ∷ Int
-    , personId ∷ Int
-    )
-  ⇒ Lit t1164 AccountType
-  ⇒ GenericQuery t1164 t88
-    ( age1 ∷ Col t1164 (Maybe Int)
-    , age2 ∷ Col t1164 (Maybe Int)
-    , id1 ∷ Col t1164 Int
-    )
-    ( age1 ∷ Maybe Int
-    , age2 ∷ Maybe Int
-    , id1 ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( age1 ∷ Col t1164 (Maybe Int)
-    , age2 ∷ Col t1164 (Maybe Int)
-    , id ∷ Col t1164 Int
-    , name1 ∷ Col t1164 String
-    , name2 ∷ Col t1164 (Maybe String)
-    )
-    ( age1 ∷ Maybe Int
-    , age2 ∷ Maybe Int
-    , id ∷ Int
-    , name1 ∷ String
-    , name2 ∷ Maybe String
-    )
-  ⇒ Lit t1164 Int
-  ⇒ GenericQuery t1164 t88
-    ( id ∷ Col t1164 Int
-    , text ∷ Col t1164 (Maybe String)
-    )
-    ( id ∷ Int
-    , text ∷ Maybe String
-    )
-  ⇒ GenericQuery t1164 t88
-    ( accountType ∷ Col t1164 AccountType
-    , balance ∷ Col t1164 Int
-    , id ∷ Col t1164 Int
-    )
-    ( accountType ∷ AccountType
-    , balance ∷ Int
-    , id ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( balance ∷ Col t1164 (Maybe Int)
-    , id ∷ Col t1164 Int
-    )
-    ( balance ∷ Maybe Int
-    , id ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( maxId ∷ Col t1164 (Maybe Int)
-    )
-    ( maxId ∷ Maybe Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( c ∷ Col t1164 Int
-    , m ∷ Col t1164 (Maybe Int)
-    , pid ∷ Col t1164 Int
-    )
-    ( c ∷ Int
-    , m ∷ Maybe Int
-    , pid ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( c ∷ Col t1164 Int
-    , m ∷ Col t1164 Int
-    , pid ∷ Col t1164 Int
-    )
-    ( c ∷ Int
-    , m ∷ Int
-    , pid ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( maxBalance ∷ Col t1164 (Maybe Int)
-    , pid ∷ Col t1164 Int
-    )
-    ( maxBalance ∷ Maybe Int
-    , pid ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( id ∷ Col t1164 Int
-    )
-    ( id ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( pid ∷ Col t1164 Int
-    , sum ∷ Col t1164 (Maybe Int)
-    )
-    ( pid ∷ Int
-    , sum ∷ Maybe Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( id ∷ Col t1164 Int
-    , text ∷ Col t1164 String
-    )
-    ( id ∷ Int
-    , text ∷ String
-    )
-  ⇒ GenericQuery t1164 t88
-    ( pid ∷ Col t1164 Int
-    )
-    ( pid ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( v ∷ Col t1164 Int
-    )
-    ( v ∷ Int
-    )
-  ⇒ GenericQuery t1164 t88
-    ( balance ∷ Col t1164 Int
-    , pid ∷ Col t1164 Int
-    )
-    ( balance ∷ Int
-    , pid ∷ Int
-    )
-  ⇒ fun
-  )

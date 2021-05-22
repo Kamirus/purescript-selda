@@ -29,10 +29,9 @@ import Control.Monad.Except (class MonadError, ExceptT, runExceptT, throwError)
 import Control.Monad.Reader (class MonadReader, ReaderT, asks, runReaderT)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Variant (SProxy(..), Variant, inj)
+import Data.Variant (Variant, inj)
 import Database.PostgreSQL (PGError)
-import Database.PostgreSQL (Row0(..)) as PostgreSQL
-import Database.PostgreSQL.Aff (Connection, Query(..), execute, withConnection) as PostgreSQL
+import Database.PostgreSQL as PostgreSQL
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
 import Effect.Aff as Aff
@@ -45,8 +44,23 @@ import Selda.PG (showPG)
 import Selda.PG.Class (insert_, query)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Selda.PG.Config (load) as Config
+import Type.Proxy (Proxy(..))
 ```
 ## Setup
+
+- To run the examples below we need a postgresql db.
+  Set it up with the following command:
+
+  ```bash
+  docker-compose up -d
+  ```
+  Or do it manually - check [docker-compose.yml](../docker-compose.yml)
+
+- prepare `.env` file
+
+  ```bash
+  cp .env-ci .env
+  ```
 
 ### Table definition
 
@@ -160,8 +174,8 @@ We can write the same query using `purescript-selda`.
 ```purescript
 qNamesWithBalance
   ∷ ∀ s. FullQuery s { name ∷ Col s String , balance ∷ Col s (Maybe Int) }
-qNamesWithBalance = 
-  selectFrom people \{ id, name, age } → do      -- FROM people
+qNamesWithBalance =
+  selectFrom people \{ id, name } → do           -- FROM people
     { balance } ← leftJoin bankAccounts          -- LEFT JOIN bank_accounts
                     \acc → id .== acc.personId   -- ON people.id = bank_accounts.personId
     restrict $ id .> lit 1                       -- WHERE people.id > 1 
@@ -233,7 +247,7 @@ qCountBankAccountOwners
   ∷ ∀ s. FullQuery s { numberOfOwners ∷ Col s Int }
 qCountBankAccountOwners = 
   aggregate $ selectFrom_
-    (aggregate $ selectFrom bankAccounts \{ id, personId } → do
+    (aggregate $ selectFrom bankAccounts \{ personId } → do
       pid ← groupBy personId
       pure { pid })
     \{ pid } → pure { numberOfOwners: count pid }
@@ -321,7 +335,7 @@ type AppError = Variant
   ( pgError ∷ PGError
   , error ∷ String
   )
-_pgError = SProxy ∷ SProxy "pgError"
+_pgError = Proxy ∷ Proxy "pgError"
 type App = ReaderT Context (ExceptT AppError Aff)
 
 runApp ∷ ∀ a. Context → App a → Aff (Either AppError a)

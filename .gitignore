@@ -9,6 +9,8 @@
 /.psa*
 /.spago/
 
+.env
+
 package-lock.json
 
 test/db.sqlite3
