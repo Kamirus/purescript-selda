@@ -15,6 +15,11 @@ import Simple.JSON (class WriteForeign, write)
 litSQLite3 ∷ ∀ col s a. WriteForeign a ⇒ Coerce col ⇒ a → col s a
 litSQLite3 = unsafeFromCol <<< Col <<< EForeign <<< write
 
+showSQLite3Query
+  ∷ ShowM
+  → String
+showSQLite3Query = showSQLite3 >>> _.strQuery
+
 showSQLite3
   ∷ ShowM
   → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }
