@@ -28,10 +28,7 @@ class Lit ∷ ∀ k. k → Type → Constraint
 class Lit s a where
   litImpl ∷ a → Col s a
 
-instance litInner ∷ Lit s a ⇒ Lit (Inner s) a where
-  litImpl a = case (litImpl a ∷ Col s a) of Col e → Col e
-
-else instance litBoolean ∷ Lit b Boolean where
+instance litBoolean ∷ Lit b Boolean where
   litImpl x = Col $ ELit $ LBoolean x identity
 
 else instance litString ∷ Lit b String where
@@ -53,3 +50,6 @@ else instance ilitPG ∷ ToSQLValue a ⇒ Lit BackendPGClass a where
 
 else instance ilitSQLite3 ∷ WriteForeign a ⇒ Lit BackendSQLite3Class a where
   litImpl = litSQLite3
+
+else instance litInner ∷ Lit s a ⇒ Lit (Inner s) a where
+  litImpl a = case (litImpl a ∷ Col s a) of Col e → Col e
