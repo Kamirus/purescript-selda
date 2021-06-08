@@ -21,6 +21,11 @@ import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 litPG ∷ ∀ col s a. ToSQLValue a ⇒ Coerce col ⇒ a → col s a
 litPG = unsafeFromCol <<< Col <<< EForeign <<< toSQLValue
 
+showPGQuery
+  ∷ ShowM
+  → String
+showPGQuery = showPG >>> _.strQuery
+
 showPG
   ∷ ShowM
   → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }

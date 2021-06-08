@@ -1,6 +1,7 @@
 module Test.PG where
 
 import Prelude
+
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
@@ -9,15 +10,15 @@ import Database.PostgreSQL (Connection)
 import Database.PostgreSQL as PostgreSQL
 import Effect.Aff (Aff)
 import Partial.Unsafe (unsafePartial)
-import Selda (Col, Table(..), lit, restrict, selectFrom, (.==), (.>))
-import Selda.PG (extract, generateSeries, litPG)
+import Selda (Col, Table(..), lit, restrict, selectFrom, showUpdate, (.==), (.>))
+import Selda.PG (extract, generateSeries, litPG, showPGQuery)
 import Selda.PG.Class (BackendPGClass, deleteFrom, insert, insert1, insert1_, insert_, update)
 import Selda.Table.Constraint (Auto, Default)
 import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Selda.PG.Config (load) as Config
 import Test.Types (AccountType(..))
-import Test.Unit (TestSuite, failure, suite)
-import Test.Utils (PGSelda, TestCtx, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG, unsafeStringify)
+import Test.Unit (TestSuite, failure, suite, test)
+import Test.Utils (PGSelda, TestCtx, assertEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG, unsafeStringify)
 
 employees ∷
   Table
@@ -55,8 +56,6 @@ testSuite ∷
 testSuite ctx = do
   let
     unordered = assertUnorderedSeqEq
-    -- Note: ordered is not being used. not sure if this is
-    -- an unfinished test or not, so commenting out for now
     -- ordered = assertSeqEq
 
   testWith ctx unordered "employees inserted with default and without salary"
@@ -92,6 +91,12 @@ testSuite ctx = do
     , { i: 5 }
     ]
     $ selectFrom (generateSeries 3 5) pure
+    
+  test "Generated UPDATE does not include unchanged columns" do
+    assertEq """UPDATE people SET "name" = 'name' WHERE ("id" = 7)""" $
+      showPGQuery $ showUpdate people
+        (\r → r.id .== lit 7)
+        (\r → r { name = lit "name" })
 
 main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do
@@ -156,7 +161,7 @@ main cont = do
         DROP SCHEMA IF EXISTS qualified;
         CREATE SCHEMA qualified;
         CREATE TABLE qualified.tablename (
-          id SERIAL PRIMARY KEY,
+          id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
           name TEXT NOT NULL
         );
       """

@@ -47,11 +47,12 @@ showUpdate
 showUpdate table pred up = do
   let
     recordWithCols = tableToColsWithoutAlias (Proxy ∷ Proxy s) table
-    f (Tuple n e) = do 
-      s ← runExists showExpr e
-      pure $ if n == s
+    f (Tuple name expr) = do
+      updatedValue ← runExists showExpr expr
+      let columnName = showColumnName name
+      pure $ if columnName == updatedValue
         then Nothing
-        else Just $ showColumnName n <> " = " <> s 
+        else Just $ columnName <> " = " <> updatedValue 
   pred_str ← showCol $ pred recordWithCols
   vals ← joinWith ", " <$> catMaybes <$> (traverse f $ getCols $ up recordWithCols)
   pure $ if vals == "" then "" else
