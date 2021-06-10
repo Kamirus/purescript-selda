@@ -46,7 +46,7 @@ in upstream
         , "validation"
         ]
       , repo = "https://github.com/jordanmartinez/purescript-postgresql-client.git"
-      , version = "updateTov0.14.1"
+      , version = "exposeUnsafeQuery"
       }
     with polyform =
         { dependencies =
