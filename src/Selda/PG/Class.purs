@@ -28,9 +28,9 @@ import Data.Array as Array
 import Data.Array.Partial (head)
 import Data.Bifunctor (lmap)
 import Data.Either (Either, either)
-import Data.Maybe (Maybe(..))
-import Data.Traversable (for, traverse)
-import Data.Tuple (Tuple(..), fst)
+import Data.Maybe (Maybe)
+import Data.Traversable (traverse)
+import Data.Tuple (fst)
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, fromSQLRow, toSQLRow, toSQLValue)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
