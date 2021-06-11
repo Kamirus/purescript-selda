@@ -7,23 +7,30 @@ module Selda.PG.Class
   -- , insert1
   -- , insert1_
   , query
+  , query'
   , query1
+  , query1'
   -- , deleteFrom
   -- , update
   , BackendPGClass
   ) where
 
 import Prelude
+
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ask)
 import Data.Array (concat, null)
 import Data.Array as Array
 import Data.Array.Partial (head)
+import Data.Bifunctor (lmap)
+import Data.Either (Either, either)
 import Data.Maybe (Maybe)
-import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..))
-import Database.PostgreSQL (Connection, class FromSQLRow, class ToSQLRow, class ToSQLValue, PGError, toSQLValue)
+import Data.Traversable (for, traverse)
+import Data.Tuple (Tuple(..), fst)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, fromSQLRow, toSQLValue)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
+import Effect.Aff.Class (liftAff)
 import Foreign (Foreign)
 import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Partial.Unsafe (unsafePartial)
@@ -156,31 +163,59 @@ instance pgToForeign ∷ ToSQLValue a ⇒ ToForeign BackendPGClass a where
 --         PostgreSQL.PG.execute conn (PostgreSQL.Query q) l
 
 query ∷
+  ∀ o i m tup.
+  ColsToPGHandler B i tup o ⇒
+  GetCols i ⇒
+  FromSQLRow tup ⇒
+  GenericQuery BackendPGClass m i o ⇒
+  FullQuery B { | i } →
+  m (Array { | o })
+query q = do
+  let
+    res = fst $ runFullQuery q
+    decodeRow = colsToPGHandler (Proxy ∷ Proxy BackendPGClass) res
+  query' q (map decodeRow <<< fromSQLRow)
+
+query' ∷
   ∀ o i m.
   GenericQuery BackendPGClass m i o ⇒
-  FullQuery B { | i } → m (Array { | o })
-query = genericQuery (Proxy ∷ Proxy BackendPGClass)
+  FullQuery B { | i } →
+  (Array Foreign -> Either String { | o }) →
+  m (Array { | o })
+query' = genericQuery (Proxy ∷ Proxy BackendPGClass)
 
 query1 ∷
+  ∀ o i m tup.
+  ColsToPGHandler B i tup o ⇒
+  GetCols i ⇒
+  FromSQLRow tup ⇒
+  GenericQuery BackendPGClass m i o ⇒
+  FullQuery B { | i } →
+  m (Maybe { | o })
+query1 (FullQuery q) =
+  query (FullQuery (limit 1 >>= \_ → q)) <#> Array.head
+
+query1' ∷
   ∀ o i m.
   GenericQuery BackendPGClass m i o ⇒
-  FullQuery B { | i } → m (Maybe { | o })
-query1 (FullQuery q) = query (FullQuery (limit 1 >>= \_ → q)) <#> Array.head
+  FullQuery B { | i } →
+  (Array Foreign -> Either String { | o }) →
+  m (Maybe { | o })
+query1' (FullQuery q) decodeRow =
+  query' (FullQuery (limit 1 >>= \_ → q)) decodeRow <#> Array.head
 
 instance genericQueryPG ∷
-  ( ColsToPGHandler B i tup o
-  , GetCols i
-  , FromSQLRow tup
+  ( GetCols i
   , MonadSeldaPG m
   ) ⇒
   GenericQuery BackendPGClass m i o where
-  genericQuery _ q = do
-    let
-      (Tuple res _) = runFullQuery q
-
-      { strQuery, params } = showPG $ showQuery q
-    rows ← pgQuery (PostgreSQL.Query strQuery) params
-    pure $ map (colsToPGHandler (Proxy ∷ Proxy BackendPGClass) res) rows
+  genericQuery _ q decodeRow = do
+    let { strQuery, params } = showPG $ showQuery q
+    conn ← ask
+    errOrResult ← liftAff $ PostgreSQL.unsafeQuery conn strQuery params
+    either throwError pure $
+      errOrResult >>= (_.rows) >>>
+        traverse (decodeRow >>> lmap PostgreSQL.ConversionError)
 
 -- deleteFrom ∷
 --   ∀ t r m.
@@ -194,7 +229,7 @@ instance genericQueryPG ∷
 --   ) ⇒
 --   GenericDelete BackendPGClass m t r where
 --   genericDelete _ table pred = pgExecute $ showDeleteFrom table pred
--- 
+--
 -- update ∷
 --   ∀ t r m.
 --   GenericUpdate BackendPGClass m t r ⇒

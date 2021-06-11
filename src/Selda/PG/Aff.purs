@@ -21,6 +21,7 @@ import Data.Either (Either)
 import Data.Maybe (Maybe)
 import Database.PostgreSQL (class FromSQLRow, Connection, PGError)
 import Effect.Aff (Aff)
+import Foreign (Foreign)
 import Selda (Col, Table)
 import Selda.Col (class GetCols)
 import Selda.PG.Class (BackendPGClass)
@@ -63,8 +64,11 @@ query
   . ColsToPGHandler B i tup o
   ⇒ GetCols i
   ⇒ FromSQLRow tup
-  ⇒ Connection → FullQuery B (Record i) → Aff (Either PGError (Array { | o }))
-query conn q = runSelda conn $ Selda.PG.query q
+  ⇒ Connection
+  → FullQuery B (Record i)
+  → (Array Foreign -> Either String { | o })
+  → Aff (Either PGError (Array { | o }))
+query conn q = runSelda conn <<< Selda.PG.query q
 
 query1
   ∷ ∀ o i tup
@@ -73,8 +77,10 @@ query1
   ⇒ FromSQLRow tup
   ⇒ Connection
   → FullQuery B (Record i)
+  → (Array Foreign -> Either String { | o })
   → Aff (Either PGError (Maybe { | o }))
-query1 conn (FullQuery q) = query conn (FullQuery (limit 1 >>= \_ → q)) <#> map Array.head
+query1 conn (FullQuery q) decodeRow =
+  query conn (FullQuery (limit 1 >>= \_ → q)) decodeRow <#> map Array.head
 
 -- deleteFrom
 --   ∷ ∀ r r'

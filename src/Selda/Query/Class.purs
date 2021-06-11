@@ -22,6 +22,7 @@ class Monad m <= GenericQuery b m i o | i → o, b → m where
   genericQuery
     ∷ Proxy b
     → FullQuery b { | i }
+    → (Array Foreign -> Either String { | o })
     → m (Array { | o })
 
 -- class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
