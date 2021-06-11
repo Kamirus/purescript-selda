@@ -24,46 +24,46 @@ class Monad m <= GenericQuery b m i o | i → o, b → m where
     → FullQuery b { | i }
     → m (Array { | o })
 
-class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
-class Monad m <= GenericInsert b m t r | t → r, b → m where
-  genericInsert
-    ∷ Proxy b
-    → Table t
-    → Array { | r }
-    → m Unit
-
-class GenericDelete ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
-class Monad m <= GenericDelete b m t r | t → r, b → m where
-  genericDelete
-    ∷ Proxy b
-    → Table t
-    → ({ | r } → Col b Boolean)
-    → m Unit
-
-class GenericUpdate ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
-class Monad m <= GenericUpdate b m t r | t → r, b → m where
-  genericUpdate
-    ∷ Proxy b
-    → Table t
-    → ({ | r } → Col b Boolean)
-    → ({ | r } → { | r })
-    → m Unit
-
--- | parametrized implementation of `genericInsert`
-genericInsert_
-  ∷ ∀ t r a b
-  . GenericShowInsert t r
-  ⇒ HFoldl (RecordToArrayForeign b) (Array Foreign) { | r } (Array Foreign)
-  ⇒ { ph ∷ String, exec ∷ String → Array Foreign → a }
-  → Proxy b
-  → Table t
-  → Array { | r }
-  → a
-genericInsert_ { ph, exec } b table rs = do
-  let
-    q = genericShowInsert { ph } table rs
-    l = rs >>= hfoldl (RecordToArrayForeign b) ([] ∷ Array Foreign)
-  exec q l
+-- class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+-- class Monad m <= GenericInsert b m t r | t → r, b → m where
+--   genericInsert
+--     ∷ Proxy b
+--     → Table t
+--     → Array { | r }
+--     → m Unit
+--
+-- class GenericDelete ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+-- class Monad m <= GenericDelete b m t r | t → r, b → m where
+--   genericDelete
+--     ∷ Proxy b
+--     → Table t
+--     → ({ | r } → Col b Boolean)
+--     → m Unit
+--
+-- class GenericUpdate ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+-- class Monad m <= GenericUpdate b m t r | t → r, b → m where
+--   genericUpdate
+--     ∷ Proxy b
+--     → Table t
+--     → ({ | r } → Col b Boolean)
+--     → ({ | r } → { | r })
+--     → m Unit
+--
+-- -- | parametrized implementation of `genericInsert`
+-- genericInsert_
+--   ∷ ∀ t r a b
+--   . GenericShowInsert t r
+--   ⇒ HFoldl (RecordToArrayForeign b) (Array Foreign) { | r } (Array Foreign)
+--   ⇒ { ph ∷ String, exec ∷ String → Array Foreign → a }
+--   → Proxy b
+--   → Table t
+--   → Array { | r }
+--   → a
+-- genericInsert_ { ph, exec } b table rs = do
+--   let
+--     q = genericShowInsert { ph } table rs
+--     l = rs >>= hfoldl (RecordToArrayForeign b) ([] ∷ Array Foreign)
+--   exec q l
 
 hoistSeldaWith
   ∷ ∀ r e' e m r'
