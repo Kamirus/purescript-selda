@@ -188,37 +188,22 @@ instance insertRecordIntoTableReturningInstance ∷
   , CanInsertColumnsIntoTable rlcols t
   , TableColumnNames rlcols
   , RowListLength rlcols
-  -- , ToSQLRow rTuple
-  -- , FromSQLRow trTuple
-  -- , HFoldl RecordToTuple Unit { | r } rTuple
   , TableToColsWithoutAlias s t tr
   , RL.RowToList tr trl
   , TableColumnNames trl
-  -- , ColsToPGHandler s tr trTuple ret
   ) ⇒
   InsertRecordIntoTableReturning r t ret where
   insertRecordIntoTableReturning r table encode decodeRow = do
     let
-      -- s = (Proxy ∷ Proxy s)
       colsToinsert = (Proxy ∷ Proxy rlcols)
-      -- rTuple = hfoldl RecordToTuple unit r
-
-      -- tr = tableToColsWithoutAlias s table
       colsToRet = (Proxy ∷ Proxy trl)
       q = showInsert1 table colsToinsert colsToRet
-
-      -- b = Proxy :: Proxy BackendPGClass
 
     conn ← ask
     errOrResult ← liftAff $ PostgreSQL.unsafeQuery conn q (encode r)
     either throwError pure $
       errOrResult >>= (_.rows) >>>
         traverse (decodeRow >>> lmap PostgreSQL.ConversionError)
-
-    -- rows ← pgQuery (PostgreSQL.Query q) rTuple
-    -- pure $ map (colsToPGHandler s tr) rows
-
-
 
 instance pgToForeign ∷ ToSQLValue a ⇒ ToForeign BackendPGClass a where
   toForeign _ = toSQLValue
