@@ -180,14 +180,7 @@ instance pgToForeign ∷ ToSQLValue a ⇒ ToForeign BackendPGClass a where
   toForeign _ = toSQLValue
 
 instance genericInsertPGClass ∷
-  (
-    -- HFoldl
-    --   (RecordToArrayForeign BackendPGClass)
-    --   (Array Foreign)
-    --   { | r }
-    --   (Array Foreign)
-  -- ,
-  MonadSeldaPG m
+  ( MonadSeldaPG m
   , GenericShowInsert t r
   ) ⇒
   GenericInsert BackendPGClass m t r where
