@@ -6,7 +6,9 @@ module Selda.PG.Aff
   , insert1_
   , insert1_'
   , query
+  , query'
   , query1
+  , query1'
   , PGSelda
   -- , deleteFrom
   -- , update
