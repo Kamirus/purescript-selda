@@ -10,7 +10,7 @@ module Selda.PG.Aff
   , query1
   , query1'
   , PGSelda
-  -- , deleteFrom
+  , deleteFrom
   , update
   ) where
 
