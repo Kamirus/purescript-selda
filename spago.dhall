@@ -47,5 +47,5 @@ You can edit this file as you like.
   , "variant"
   ]
 , packages = ./packages.dhall
-, sources = [ "src/**/*.purs", "test/**/*.purs", "guide/src/**/*.purs" ]
+, sources = [ "src/**/*.purs" ]
 }
