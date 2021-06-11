@@ -31,15 +31,15 @@ class Monad m <= GenericInsert b m t r | t → r, b → m where
     → ({ | r } -> Array Foreign)
     → Array { | r }
     → m Unit
---
--- class GenericDelete ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
--- class Monad m <= GenericDelete b m t r | t → r, b → m where
---   genericDelete
---     ∷ Proxy b
---     → Table t
---     → ({ | r } → Col b Boolean)
---     → m Unit
---
+
+class GenericDelete ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+class Monad m <= GenericDelete b m t r | t → r, b → m where
+  genericDelete
+    ∷ Proxy b
+    → Table t
+    → ({ | r } → Col b Boolean)
+    → m Unit
+
 -- class GenericUpdate ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
 -- class Monad m <= GenericUpdate b m t r | t → r, b → m where
 --   genericUpdate

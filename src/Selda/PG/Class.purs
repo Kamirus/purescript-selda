@@ -12,7 +12,7 @@ module Selda.PG.Class
   , query'
   , query1
   , query1'
-  -- , deleteFrom
+  , deleteFrom
   -- , update
   , BackendPGClass
   ) where
@@ -41,7 +41,7 @@ import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
 import Selda.Query (limit)
-import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericInsert_, genericQuery)
+import Selda.Query.Class (class GenericDelete, class GenericInsert, class GenericQuery, class MonadSelda, genericDelete, genericInsert, genericInsert_, genericQuery)
 import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery(..), runFullQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
@@ -70,15 +70,15 @@ pgQuery q xTup = do
   conn ← ask
   PostgreSQL.PG.query conn q xTup
 
--- pgExecute ∷
---   ∀ m.
---   MonadSeldaPG m ⇒
---   ShowM → m Unit
--- pgExecute m = when (strQuery /= "") do
---   conn ← ask
---   PostgreSQL.PG.execute conn (PostgreSQL.Query strQuery) params
---   where { strQuery, params } = showPG m
---
+pgExecute ∷
+  ∀ m.
+  MonadSeldaPG m ⇒
+  ShowM → m Unit
+pgExecute m = when (strQuery /= "") do
+  conn ← ask
+  PostgreSQL.PG.execute conn (PostgreSQL.Query strQuery) params
+  where { strQuery, params } = showPG m
+
 -- | Executes an insert query for each input record.
 insert_ ∷
   ∀ m t r.
@@ -247,19 +247,19 @@ instance genericQueryPG ∷
       errOrResult >>= (_.rows) >>>
         traverse (decodeRow >>> lmap PostgreSQL.ConversionError)
 
--- deleteFrom ∷
---   ∀ t r m.
---   GenericDelete BackendPGClass m t r ⇒
---   Table t → ({ | r } → Col B Boolean) → m Unit
--- deleteFrom = genericDelete (Proxy ∷ Proxy BackendPGClass)
---
--- instance genericDeletePG ∷
---   ( TableToColsWithoutAlias B t r
---   , MonadSeldaPG m
---   ) ⇒
---   GenericDelete BackendPGClass m t r where
---   genericDelete _ table pred = pgExecute $ showDeleteFrom table pred
---
+deleteFrom ∷
+  ∀ t r m.
+  GenericDelete BackendPGClass m t r ⇒
+  Table t → ({ | r } → Col B Boolean) → m Unit
+deleteFrom = genericDelete (Proxy ∷ Proxy BackendPGClass)
+
+instance genericDeletePG ∷
+  ( TableToColsWithoutAlias B t r
+  , MonadSeldaPG m
+  ) ⇒
+  GenericDelete BackendPGClass m t r where
+  genericDelete _ table pred = pgExecute $ showDeleteFrom table pred
+
 -- update ∷
 --   ∀ t r m.
 --   GenericUpdate BackendPGClass m t r ⇒

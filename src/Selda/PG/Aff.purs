@@ -138,15 +138,15 @@ query1'
 query1' conn (FullQuery q) decodeRow =
   query' conn (FullQuery (limit 1 >>= \_ → q)) decodeRow <#> map Array.head
 
--- deleteFrom
---   ∷ ∀ r r'
---   . TableToColsWithoutAlias B r r'
---   ⇒ Connection
---   → Table r
---   → ({ | r' } → Col B Boolean)
---   → Aff (Either PGError Unit)
--- deleteFrom conn table pred = runSelda conn $ Selda.PG.deleteFrom table pred
---
+deleteFrom
+  ∷ ∀ r r'
+  . TableToColsWithoutAlias B r r'
+  ⇒ Connection
+  → Table r
+  → ({ | r' } → Col B Boolean)
+  → Aff (Either PGError Unit)
+deleteFrom conn table pred = runSelda conn $ Selda.PG.deleteFrom table pred
+
 -- update
 --   ∷ ∀ r r'
 --   . TableToColsWithoutAlias B r r'
