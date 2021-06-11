@@ -11,7 +11,7 @@ module Selda.PG.Aff
   , query1'
   , PGSelda
   -- , deleteFrom
-  -- , update
+  , update
   ) where
 
 import Prelude
@@ -147,13 +147,13 @@ deleteFrom
   → Aff (Either PGError Unit)
 deleteFrom conn table pred = runSelda conn $ Selda.PG.deleteFrom table pred
 
--- update
---   ∷ ∀ r r'
---   . TableToColsWithoutAlias B r r'
---   ⇒ GetCols r'
---   ⇒ Connection
---   → Table r
---   → ({ | r' } → Col B Boolean)
---   → ({ | r' } → { | r' })
---   → Aff (Either PGError Unit)
--- update conn table pred up = runSelda conn $ Selda.PG.update table pred up
+update
+  ∷ ∀ r r'
+  . TableToColsWithoutAlias B r r'
+  ⇒ GetCols r'
+  ⇒ Connection
+  → Table r
+  → ({ | r' } → Col B Boolean)
+  → ({ | r' } → { | r' })
+  → Aff (Either PGError Unit)
+update conn table pred up = runSelda conn $ Selda.PG.update table pred up

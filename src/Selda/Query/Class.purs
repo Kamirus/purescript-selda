@@ -40,14 +40,14 @@ class Monad m <= GenericDelete b m t r | t → r, b → m where
     → ({ | r } → Col b Boolean)
     → m Unit
 
--- class GenericUpdate ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
--- class Monad m <= GenericUpdate b m t r | t → r, b → m where
---   genericUpdate
---     ∷ Proxy b
---     → Table t
---     → ({ | r } → Col b Boolean)
---     → ({ | r } → { | r })
---     → m Unit
+class GenericUpdate ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+class Monad m <= GenericUpdate b m t r | t → r, b → m where
+  genericUpdate
+    ∷ Proxy b
+    → Table t
+    → ({ | r } → Col b Boolean)
+    → ({ | r } → { | r })
+    → m Unit
 --
 -- | parametrized implementation of `genericInsert`
 genericInsert_

@@ -13,7 +13,7 @@ module Selda.PG.Class
   , query1
   , query1'
   , deleteFrom
-  -- , update
+  , update
   , BackendPGClass
   ) where
 
@@ -41,7 +41,7 @@ import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
 import Selda.Query (limit)
-import Selda.Query.Class (class GenericDelete, class GenericInsert, class GenericQuery, class MonadSelda, genericDelete, genericInsert, genericInsert_, genericQuery)
+import Selda.Query.Class (class GenericDelete, class GenericInsert, class GenericQuery, class GenericUpdate, class MonadSelda, genericDelete, genericInsert, genericInsert_, genericQuery, genericUpdate)
 import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery(..), runFullQuery)
 import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
@@ -260,16 +260,16 @@ instance genericDeletePG ∷
   GenericDelete BackendPGClass m t r where
   genericDelete _ table pred = pgExecute $ showDeleteFrom table pred
 
--- update ∷
---   ∀ t r m.
---   GenericUpdate BackendPGClass m t r ⇒
---   Table t → ({ | r } → Col B Boolean) → ({ | r } → { | r }) → m Unit
--- update = genericUpdate (Proxy ∷ Proxy BackendPGClass)
---
--- instance genericUpdatePG ∷
---   ( TableToColsWithoutAlias B t r
---   , GetCols r
---   , MonadSeldaPG m
---   ) ⇒
---   GenericUpdate BackendPGClass m t r where
---   genericUpdate _ table pred up = pgExecute $ showUpdate table pred up
+update ∷
+  ∀ t r m.
+  GenericUpdate BackendPGClass m t r ⇒
+  Table t → ({ | r } → Col B Boolean) → ({ | r } → { | r }) → m Unit
+update = genericUpdate (Proxy ∷ Proxy BackendPGClass)
+
+instance genericUpdatePG ∷
+  ( TableToColsWithoutAlias B t r
+  , GetCols r
+  , MonadSeldaPG m
+  ) ⇒
+  GenericUpdate BackendPGClass m t r where
+  genericUpdate _ table pred up = pgExecute $ showUpdate table pred up
