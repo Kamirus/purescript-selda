@@ -2,10 +2,12 @@ module Selda.PG.Class
   ( class MonadSeldaPG
   -- , class InsertRecordIntoTableReturning
   -- , insertRecordIntoTableReturning
-  -- , insert_
+  , insert_
+  , insert_'
   -- , insert
   -- , insert1
-  -- , insert1_
+  , insert1_
+  , insert1_'
   , query
   , query'
   , query1
@@ -24,7 +26,7 @@ import Data.Array as Array
 import Data.Array.Partial (head)
 import Data.Bifunctor (lmap)
 import Data.Either (Either, either)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..), fst)
 import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, fromSQLRow, toSQLValue)
@@ -39,10 +41,10 @@ import Selda.Col (class GetCols, Col)
 import Selda.Expr (ShowM)
 import Selda.PG (showInsert1, showPG)
 import Selda.Query (limit)
-import Selda.Query.Class (class GenericQuery, class MonadSelda, genericQuery)
+import Selda.Query.Class (class GenericInsert, class GenericQuery, class MonadSelda, genericInsert, genericInsert_, genericQuery)
 import Selda.Query.ShowStatement (class GenericShowInsert, showDeleteFrom, showQuery, showUpdate)
 import Selda.Query.Type (FullQuery(..), runFullQuery)
-import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign, RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
+import Selda.Query.Utils (class ColsToPGHandler, class RowListLength, class TableToColsWithoutAlias, class ToForeign, RecordToArrayForeign(..), RecordToTuple(..), colsToPGHandler, tableToColsWithoutAlias)
 import Selda.Table (class TableColumnNames, Table)
 import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Proxy (Proxy(..))
@@ -77,20 +79,52 @@ pgQuery q xTup = do
 --   PostgreSQL.PG.execute conn (PostgreSQL.Query strQuery) params
 --   where { strQuery, params } = showPG m
 --
--- -- | Executes an insert query for each input record.
--- insert_ ∷
---   ∀ m t r.
---   GenericInsert BackendPGClass m t r ⇒
---   MonadSeldaPG m ⇒
---   Table t → Array { | r } → m Unit
--- insert_ = genericInsert (Proxy ∷ Proxy BackendPGClass)
---
--- insert1_ ∷
---   ∀ m t r.
---   GenericInsert BackendPGClass m t r ⇒
---   MonadSeldaPG m ⇒
---   Table t → { | r } → m Unit
--- insert1_ table r = insert_ table [ r ]
+-- | Executes an insert query for each input record.
+insert_ ∷
+  ∀ m t r.
+  GenericInsert BackendPGClass m t r ⇒
+  HFoldl (RecordToArrayForeign BackendPGClass) (Array Foreign) { | r } (Array Foreign) ⇒
+  MonadSeldaPG m ⇒
+  Table t →
+  Array { | r } →
+  m Unit
+insert_ t r = insert_' t encode r
+  where
+    encode = hfoldl (RecordToArrayForeign _b) ([] ∷ Array Foreign)
+    _b = Proxy :: Proxy BackendPGClass
+
+insert_' ∷
+  ∀ m t r.
+  GenericInsert BackendPGClass m t r ⇒
+  MonadSeldaPG m ⇒
+  Table t →
+  ({ | r } -> Array Foreign) →
+  Array { | r } →
+  m Unit
+insert_' = genericInsert (Proxy ∷ Proxy BackendPGClass)
+
+insert1_ ∷
+  ∀ m t r.
+  GenericInsert BackendPGClass m t r ⇒
+  HFoldl (RecordToArrayForeign BackendPGClass) (Array Foreign) { | r } (Array Foreign) ⇒
+  MonadSeldaPG m ⇒
+  Table t →
+  { | r } →
+  m Unit
+insert1_ table r = insert1_' table encode r
+  where
+    encode = hfoldl (RecordToArrayForeign _b) ([] ∷ Array Foreign)
+    _b = Proxy :: Proxy BackendPGClass
+
+insert1_' ∷
+  ∀ m t r.
+  GenericInsert BackendPGClass m t r ⇒
+  MonadSeldaPG m ⇒
+  Table t →
+  ({ | r } -> Array Foreign) →
+  { | r } →
+  m Unit
+insert1_' table encode r = insert_' table encode [ r ]
 --
 -- -- | Executes an insert query for each input record.
 -- -- | Column constraints: `Default`s are optional, `Auto`s are forbidden
@@ -145,22 +179,25 @@ pgQuery q xTup = do
 instance pgToForeign ∷ ToSQLValue a ⇒ ToForeign BackendPGClass a where
   toForeign _ = toSQLValue
 
--- instance genericInsertPGClass ∷
---   ( HFoldl
---       (RecordToArrayForeign BackendPGClass)
---       (Array Foreign)
---       { | r }
---       (Array Foreign)
---   , MonadSeldaPG m
---   , GenericShowInsert t r
---   ) ⇒
---   GenericInsert BackendPGClass m t r where
---   genericInsert = genericInsert_ { exec, ph: "$" }
---     where
---     exec q l =
---       when (not $ null l) do
---         conn ← ask
---         PostgreSQL.PG.execute conn (PostgreSQL.Query q) l
+instance genericInsertPGClass ∷
+  (
+    -- HFoldl
+    --   (RecordToArrayForeign BackendPGClass)
+    --   (Array Foreign)
+    --   { | r }
+    --   (Array Foreign)
+  -- ,
+  MonadSeldaPG m
+  , GenericShowInsert t r
+  ) ⇒
+  GenericInsert BackendPGClass m t r where
+  genericInsert b table encode rs =
+    genericInsert_ { exec, ph: "$" } b table encode rs
+    where
+    exec q values =
+      when (not $ null values) do
+        conn ← ask
+        liftAff $ void $ PostgreSQL.unsafeQuery conn q values
 
 query ∷
   ∀ o i m tup.

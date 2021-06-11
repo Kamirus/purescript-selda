@@ -9,12 +9,10 @@ import Data.Either (Either, either)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Foreign (Foreign)
-import Heterogeneous.Folding (class HFoldl, hfoldl)
 import Selda.Col (Col)
 import Selda.Table (Table)
 import Selda.Query.ShowStatement (class GenericShowInsert, genericShowInsert)
 import Selda.Query.Type (FullQuery)
-import Selda.Query.Utils (RecordToArrayForeign(..))
 import Type.Proxy (Proxy)
 
 class GenericQuery ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
@@ -25,13 +23,14 @@ class Monad m <= GenericQuery b m i o | i → o, b → m where
     → (Array Foreign -> Either String { | o })
     → m (Array { | o })
 
--- class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
--- class Monad m <= GenericInsert b m t r | t → r, b → m where
---   genericInsert
---     ∷ Proxy b
---     → Table t
---     → Array { | r }
---     → m Unit
+class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
+class Monad m <= GenericInsert b m t r | t → r, b → m where
+  genericInsert
+    ∷ Proxy b
+    → Table t
+    → ({ | r } -> Array Foreign)
+    → Array { | r }
+    → m Unit
 --
 -- class GenericDelete ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
 -- class Monad m <= GenericDelete b m t r | t → r, b → m where
@@ -50,21 +49,21 @@ class Monad m <= GenericQuery b m i o | i → o, b → m where
 --     → ({ | r } → { | r })
 --     → m Unit
 --
--- -- | parametrized implementation of `genericInsert`
--- genericInsert_
---   ∷ ∀ t r a b
---   . GenericShowInsert t r
---   ⇒ HFoldl (RecordToArrayForeign b) (Array Foreign) { | r } (Array Foreign)
---   ⇒ { ph ∷ String, exec ∷ String → Array Foreign → a }
---   → Proxy b
---   → Table t
---   → Array { | r }
---   → a
--- genericInsert_ { ph, exec } b table rs = do
---   let
---     q = genericShowInsert { ph } table rs
---     l = rs >>= hfoldl (RecordToArrayForeign b) ([] ∷ Array Foreign)
---   exec q l
+-- | parametrized implementation of `genericInsert`
+genericInsert_
+  ∷ ∀ t r a b
+  . GenericShowInsert t r
+  ⇒ { ph ∷ String, exec ∷ String → Array Foreign → a }
+  → Proxy b
+  → Table t
+  → ({ | r } -> Array Foreign)
+  → Array { | r }
+  → a
+genericInsert_ { ph, exec } _ table encode rs = do
+  let
+    q = genericShowInsert { ph } table rs
+    l = rs >>= encode
+  exec q l
 
 hoistSeldaWith
   ∷ ∀ r e' e m r'
