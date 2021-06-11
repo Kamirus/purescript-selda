@@ -1,11 +1,11 @@
 module Selda.PG.Class
   ( class MonadSeldaPG
-  -- , class InsertRecordIntoTableReturning
-  -- , insertRecordIntoTableReturning
+  , class InsertRecordIntoTableReturning
+  , insertRecordIntoTableReturning
   , insert_
   , insert_'
-  -- , insert
-  -- , insert1
+  , insert
+  , insert1
   , insert1_
   , insert1_'
   , query
@@ -29,7 +29,7 @@ import Data.Either (Either, either)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..), fst)
-import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, fromSQLRow, toSQLValue)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, class ToSQLValue, Connection, PGError, fromSQLRow, toSQLRow, toSQLValue)
 import Database.PostgreSQL as PostgreSQL
 import Database.PostgreSQL.PG as PostgreSQL.PG
 import Effect.Aff.Class (liftAff)
@@ -125,56 +125,100 @@ insert1_' ∷
   { | r } →
   m Unit
 insert1_' table encode r = insert_' table encode [ r ]
---
--- -- | Executes an insert query for each input record.
--- -- | Column constraints: `Default`s are optional, `Auto`s are forbidden
--- insert ∷
+
+-- | Executes an insert query for each input record.
+-- | Column constraints: `Default`s are optional, `Auto`s are forbidden
+insert ∷
+  ∀ m r t ret rTuple trTuple s tr.
+  InsertRecordIntoTableReturning r t ret ⇒
+  ToSQLRow rTuple ⇒
+  FromSQLRow trTuple ⇒
+  HFoldl RecordToTuple Unit { | r } rTuple ⇒
+  ColsToPGHandler s tr trTuple ret ⇒
+  TableToColsWithoutAlias s t tr ⇒
+  MonadSeldaPG m ⇒
+  Table t → Array { | r } → m (Array { | ret })
+insert table xs = concat <$> traverse ins1 xs
+  where
+  ins1 r = insertRecordIntoTableReturning r table encode decode
+  encode = toSQLRow <<< hfoldl RecordToTuple unit
+  decode = map (colsToPGHandler s tr) <<< fromSQLRow
+  s = (Proxy ∷ Proxy s)
+  tr = tableToColsWithoutAlias s table
+
+-- insert' ∷
 --   ∀ m r t ret.
 --   InsertRecordIntoTableReturning r t ret ⇒
 --   MonadSeldaPG m ⇒
---   Table t → Array { | r } → m (Array { | ret })
--- insert table xs = concat <$> traverse ins1 xs
+--   Table t →
+--   Array { | r } →
+--   ({ | r } -> Array Foreign) →
+--   (Array Foreign -> Either String { | ret }) →
+--   m (Array { | ret })
+-- insert' table encode decode xs = concat <$> traverse ins1 xs
 --   where
---   ins1 r = insertRecordIntoTableReturning r table
+--   ins1 r = insertRecordIntoTableReturning r table encode decode
+
+insert1 ∷
+  ∀ m r t ret rTuple tr trTuple s.
+  InsertRecordIntoTableReturning r t ret ⇒
+  ToSQLRow rTuple ⇒
+  FromSQLRow trTuple ⇒
+  HFoldl RecordToTuple Unit { | r } rTuple ⇒
+  ColsToPGHandler s tr trTuple ret ⇒
+  TableToColsWithoutAlias s t tr ⇒
+  MonadSeldaPG m ⇒
+  Table t → { | r } → m { | ret }
+insert1 table r = unsafePartial $ head <$> insertRecordIntoTableReturning r table encode decode
+  where
+    encode = toSQLRow <<< hfoldl RecordToTuple unit
+    decode = map (colsToPGHandler s tr) <<< fromSQLRow
+    s = (Proxy ∷ Proxy s)
+    tr = tableToColsWithoutAlias s table
+
+
+-- | Inserts `{ | r }` into `Table t`. Checks constraints (Auto, Default).
+-- | Returns inserted record with every column from `Table t`.
+class InsertRecordIntoTableReturning r t ret | r t → ret where
+  insertRecordIntoTableReturning ∷
+    ∀ m. MonadSeldaPG m ⇒ { | r } → Table t → ({ | r } -> Array Foreign) → (Array Foreign → Either String { | ret }) → m (Array { | ret })
 --
--- insert1 ∷
---   ∀ m r t ret.
---   InsertRecordIntoTableReturning r t ret ⇒
---   MonadSeldaPG m ⇒
---   Table t → { | r } → m { | ret }
--- insert1 table r = unsafePartial $ head <$> insertRecordIntoTableReturning r table
---
--- -- | Inserts `{ | r }` into `Table t`. Checks constraints (Auto, Default).
--- -- | Returns inserted record with every column from `Table t`.
--- class InsertRecordIntoTableReturning r t ret | r t → ret where
---   insertRecordIntoTableReturning ∷
---     ∀ m. MonadSeldaPG m ⇒ { | r } → Table t → m (Array { | ret })
---
--- instance insertRecordIntoTableReturningInstance ∷
---   ( RL.RowToList r rlcols
---   , CanInsertColumnsIntoTable rlcols t
---   , TableColumnNames rlcols
---   , RowListLength rlcols
---   , ToSQLRow rTuple
---   , FromSQLRow trTuple
---   , HFoldl RecordToTuple Unit { | r } rTuple
---   , TableToColsWithoutAlias s t tr
---   , RL.RowToList tr trl
---   , TableColumnNames trl
---   , ColsToPGHandler s tr trTuple ret
---   ) ⇒
---   InsertRecordIntoTableReturning r t ret where
---   insertRecordIntoTableReturning r table = do
---     let
---       s = (Proxy ∷ Proxy s)
---       colsToinsert = (Proxy ∷ Proxy rlcols)
---       rTuple = hfoldl RecordToTuple unit r
---
---       tr = tableToColsWithoutAlias s table
---       colsToRet = (Proxy ∷ Proxy trl)
---       q = showInsert1 table colsToinsert colsToRet
---     rows ← pgQuery (PostgreSQL.Query q) rTuple
---     pure $ map (colsToPGHandler s tr) rows
+instance insertRecordIntoTableReturningInstance ∷
+  ( RL.RowToList r rlcols
+  , CanInsertColumnsIntoTable rlcols t
+  , TableColumnNames rlcols
+  , RowListLength rlcols
+  -- , ToSQLRow rTuple
+  -- , FromSQLRow trTuple
+  -- , HFoldl RecordToTuple Unit { | r } rTuple
+  , TableToColsWithoutAlias s t tr
+  , RL.RowToList tr trl
+  , TableColumnNames trl
+  -- , ColsToPGHandler s tr trTuple ret
+  ) ⇒
+  InsertRecordIntoTableReturning r t ret where
+  insertRecordIntoTableReturning r table encode decodeRow = do
+    let
+      -- s = (Proxy ∷ Proxy s)
+      colsToinsert = (Proxy ∷ Proxy rlcols)
+      -- rTuple = hfoldl RecordToTuple unit r
+
+      -- tr = tableToColsWithoutAlias s table
+      colsToRet = (Proxy ∷ Proxy trl)
+      q = showInsert1 table colsToinsert colsToRet
+
+      -- b = Proxy :: Proxy BackendPGClass
+
+    conn ← ask
+    errOrResult ← liftAff $ PostgreSQL.unsafeQuery conn q (encode r)
+    either throwError pure $
+      errOrResult >>= (_.rows) >>>
+        traverse (decodeRow >>> lmap PostgreSQL.ConversionError)
+
+    -- rows ← pgQuery (PostgreSQL.Query q) rTuple
+    -- pure $ map (colsToPGHandler s tr) rows
+
+
 
 instance pgToForeign ∷ ToSQLValue a ⇒ ToForeign BackendPGClass a where
   toForeign _ = toSQLValue
