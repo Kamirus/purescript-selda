@@ -62,15 +62,15 @@ instance monadSeldaPGInstance ∷
   MonadSelda m PGError Connection ⇒
   MonadSeldaPG m
 
-pgQuery ∷
-  ∀ i o m.
-  ToSQLRow i ⇒
-  FromSQLRow o ⇒
-  MonadSeldaPG m ⇒
-  PostgreSQL.Query i o → i → m (Array o)
-pgQuery q xTup = do
-  conn ← ask
-  PostgreSQL.PG.query conn q xTup
+-- pgQuery ∷
+--   ∀ i o m.
+--   ToSQLRow i ⇒
+--   FromSQLRow o ⇒
+--   MonadSeldaPG m ⇒
+--   PostgreSQL.Query i o → i → m (Array o)
+-- pgQuery q xTup = do
+--   conn ← ask
+--   PostgreSQL.PG.query conn q xTup
 
 pgExecute ∷
   ∀ m.
