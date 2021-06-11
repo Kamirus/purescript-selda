@@ -189,7 +189,7 @@ insert1' table r encode decode = unsafePartial $ head <$> insertRecordIntoTableR
 class InsertRecordIntoTableReturning r t ret | r t → ret where
   insertRecordIntoTableReturning ∷
     ∀ m. MonadSeldaPG m ⇒ { | r } → Table t → ({ | r } -> Array Foreign) → (Array Foreign → Either String { | ret }) → m (Array { | ret })
---
+
 instance insertRecordIntoTableReturningInstance ∷
   ( RL.RowToList r rlcols
   , CanInsertColumnsIntoTable rlcols t
