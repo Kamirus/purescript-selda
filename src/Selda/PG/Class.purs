@@ -5,7 +5,9 @@ module Selda.PG.Class
   , insert_
   , insert_'
   , insert
+  , insert'
   , insert1
+  , insert1'
   , insert1_
   , insert1_'
   , query
@@ -138,26 +140,25 @@ insert ∷
   TableToColsWithoutAlias s t tr ⇒
   MonadSeldaPG m ⇒
   Table t → Array { | r } → m (Array { | ret })
-insert table xs = concat <$> traverse ins1 xs
+insert table xs = insert' table xs encode decode
   where
-  ins1 r = insertRecordIntoTableReturning r table encode decode
   encode = toSQLRow <<< hfoldl RecordToTuple unit
   decode = map (colsToPGHandler s tr) <<< fromSQLRow
   s = (Proxy ∷ Proxy s)
   tr = tableToColsWithoutAlias s table
 
--- insert' ∷
---   ∀ m r t ret.
---   InsertRecordIntoTableReturning r t ret ⇒
---   MonadSeldaPG m ⇒
---   Table t →
---   Array { | r } →
---   ({ | r } -> Array Foreign) →
---   (Array Foreign -> Either String { | ret }) →
---   m (Array { | ret })
--- insert' table encode decode xs = concat <$> traverse ins1 xs
---   where
---   ins1 r = insertRecordIntoTableReturning r table encode decode
+insert' ∷
+  ∀ m r t ret.
+  InsertRecordIntoTableReturning r t ret ⇒
+  MonadSeldaPG m ⇒
+  Table t →
+  Array { | r } →
+  ({ | r } -> Array Foreign) →
+  (Array Foreign -> Either String { | ret }) →
+  m (Array { | ret })
+insert' table xs encode decode = concat <$> traverse ins1 xs
+  where
+  ins1 r = insertRecordIntoTableReturning r table encode decode
 
 insert1 ∷
   ∀ m r t ret rTuple tr trTuple s.
@@ -169,13 +170,19 @@ insert1 ∷
   TableToColsWithoutAlias s t tr ⇒
   MonadSeldaPG m ⇒
   Table t → { | r } → m { | ret }
-insert1 table r = unsafePartial $ head <$> insertRecordIntoTableReturning r table encode decode
+insert1 table r = insert1' table r encode decode
   where
     encode = toSQLRow <<< hfoldl RecordToTuple unit
     decode = map (colsToPGHandler s tr) <<< fromSQLRow
     s = (Proxy ∷ Proxy s)
     tr = tableToColsWithoutAlias s table
 
+insert1' ∷
+  ∀ m r t ret.
+  InsertRecordIntoTableReturning r t ret ⇒
+  MonadSeldaPG m ⇒
+  Table t → { | r } → ({ | r } -> Array Foreign) → (Array Foreign → Either String { | ret }) → m { | ret }
+insert1' table r encode decode = unsafePartial $ head <$> insertRecordIntoTableReturning r table encode decode
 
 -- | Inserts `{ | r }` into `Table t`. Checks constraints (Auto, Default).
 -- | Returns inserted record with every column from `Table t`.

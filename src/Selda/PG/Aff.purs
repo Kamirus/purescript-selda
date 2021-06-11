@@ -21,18 +21,19 @@ import Control.Monad.Reader (ReaderT)
 import Data.Array (head) as Array
 import Data.Either (Either)
 import Data.Maybe (Maybe)
-import Database.PostgreSQL (class FromSQLRow, Connection, PGError, fromSQLRow)
+import Database.PostgreSQL (class FromSQLRow, class ToSQLRow, Connection, PGError, fromSQLRow)
 import Effect.Aff (Aff)
 import Foreign (Foreign)
 import Heterogeneous.Folding (class HFoldl)
 import Selda (Col, Table)
 import Selda.Col (class GetCols)
-import Selda.PG.Class (BackendPGClass)
+import Selda.PG.Class (class InsertRecordIntoTableReturning, BackendPGClass)
 import Selda.PG.Class as Selda.PG
 import Selda.Query (limit)
 import Selda.Query.Class (class GenericInsert, runSelda)
 import Selda.Query.Type (FullQuery(..))
-import Selda.Query.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, RecordToArrayForeign)
+import Selda.Query.Utils (class ColsToPGHandler, class TableToColsWithoutAlias, RecordToArrayForeign, RecordToTuple(..))
+import Selda.Table.Constraint (class CanInsertColumnsIntoTable)
 import Type.Proxy (Proxy(..))
 
 type PGSelda = ExceptT PGError (ReaderT Connection Aff)
@@ -85,17 +86,27 @@ insert1_'
   → { | r }
   → Aff (Either PGError Unit)
 insert1_' conn t encode r = runSelda conn $ Selda.PG.insert1_' t encode r
---
+
 -- insert
---   ∷ ∀ r t tr
---   . InsertRecordIntoTableReturning r t tr
---   ⇒ Connection → Table t → Array { | r } → Aff (Either PGError (Array { | tr }))
+--   ∷ ∀ r t ret rTuple tr trTuple s
+--   . InsertRecordIntoTableReturning r t ret
+--   ⇒ ToSQLRow rTuple
+--   ⇒ FromSQLRow trTuple
+--   ⇒ HFoldl RecordToTuple Unit { | r } rTuple
+--   ⇒ ColsToPGHandler s tr trTuple ret
+--   ⇒ TableToColsWithoutAlias s t tr
+--   ⇒ Connection → Table t → Array { | r } → Aff (Either PGError (Array { | ret }))
 -- insert conn t r = runSelda conn $ Selda.PG.insert t r
---
+
 -- insert1
---   ∷ ∀ r t tr
---   . InsertRecordIntoTableReturning r t tr
---   ⇒ Connection → Table t → { | r } → Aff (Either PGError { | tr })
+--   ∷ ∀ r t ret rTuple tr trTuple s
+--   . InsertRecordIntoTableReturning r t ret
+--   ⇒ ToSQLRow rTuple
+--   ⇒ FromSQLRow trTuple
+--   ⇒ HFoldl RecordToTuple Unit { | r } rTuple
+--   ⇒ ColsToPGHandler s tr trTuple ret
+--   ⇒ TableToColsWithoutAlias s t tr
+--   ⇒ Connection → Table t → { | r } → Aff (Either PGError { | ret })
 -- insert1 conn t r = runSelda conn $ Selda.PG.insert1 t r
 
 query
