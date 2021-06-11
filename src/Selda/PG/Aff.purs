@@ -107,7 +107,7 @@ query
 query conn = runSelda conn <<< Selda.PG.query
 
 query'
-  ∷ ∀ o i tup
+  ∷ ∀ o i
   . GetCols i
   ⇒ Connection
   → FullQuery B { | i }
@@ -127,7 +127,7 @@ query1 conn (FullQuery q) =
   query conn (FullQuery (limit 1 >>= \_ → q)) <#> map Array.head
 
 query1'
-  ∷ ∀ o i tup
+  ∷ ∀ o i
   . GetCols i
   ⇒ Connection
   → FullQuery B (Record i)
