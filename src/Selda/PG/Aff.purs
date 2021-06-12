@@ -49,8 +49,7 @@ insert_
       { | r }
       (Array Foreign)
   ⇒ Connection → Table t → Array { | r } → Aff (Either PGError Unit)
-insert_ conn t r =
-  runSelda conn $ Selda.PG.insert_ t r
+insert_ conn t r = runSelda conn $ Selda.PG.insert_ t r
 
 insert_'
   ∷ ∀ t r
@@ -117,7 +116,7 @@ query
   ⇒ Connection
   → FullQuery B (Record i)
   → Aff (Either PGError (Array { | o }))
-query conn = runSelda conn <<< Selda.PG.query
+query conn q = runSelda conn $ Selda.PG.query q
 
 query'
   ∷ ∀ o i
@@ -136,8 +135,7 @@ query1
   ⇒ Connection
   → FullQuery B (Record i)
   → Aff (Either PGError (Maybe { | o }))
-query1 conn (FullQuery q) =
-  query conn (FullQuery (limit 1 >>= \_ → q)) <#> map Array.head
+query1 conn (FullQuery q) = query conn (FullQuery (limit 1 >>= \_ → q)) <#> map Array.head
 
 query1'
   ∷ ∀ o i
