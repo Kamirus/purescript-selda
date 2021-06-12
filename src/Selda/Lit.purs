@@ -5,14 +5,15 @@ import Prelude
 import Data.Exists (mkExists)
 import Data.Maybe (Maybe(..))
 import Database.PostgreSQL (class ToSQLValue)
+import Foreign (Foreign)
 import Selda.Aggr (class Coerce, unsafeFromCol)
 import Selda.Col (Col(..))
 import Selda.Expr (Expr(..), Literal(..), None(..))
 import Selda.Inner (Inner)
 import Selda.PG (litPG)
 import Selda.PG.Class (BackendPGClass)
--- import Selda.SQLite3 (litSQLite3)
--- import Selda.SQLite3.Class (BackendSQLite3Class)
+import Selda.SQLite3 (litSQLite3)
+import Selda.SQLite3.Class (BackendSQLite3Class)
 import Simple.JSON (class WriteForeign)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -23,6 +24,9 @@ lit
   ⇒ Coerce col
   ⇒ a → col s a
 lit = unsafeFromCol <<< litImpl
+
+lit' ∷ ∀ col s a. Coerce col ⇒ (a → Foreign) → a → col s a
+lit' toVal = unsafeFromCol <<< Col <<< EForeign <<< toVal
 
 class Lit ∷ ∀ k. k → Type → Constraint
 class Lit s a where
@@ -48,8 +52,8 @@ else instance litMaybe ∷ Lit b a ⇒ Lit b (Maybe a) where
 else instance ilitPG ∷ ToSQLValue a ⇒ Lit BackendPGClass a where
   litImpl = litPG
 
--- else instance ilitSQLite3 ∷ WriteForeign a ⇒ Lit BackendSQLite3Class a where
---   litImpl = litSQLite3
+else instance ilitSQLite3 ∷ WriteForeign a ⇒ Lit BackendSQLite3Class a where
+  litImpl = litSQLite3
 
 else instance litInner ∷ Lit s a ⇒ Lit (Inner s) a where
   litImpl a = case (litImpl a ∷ Col s a) of Col e → Col e
