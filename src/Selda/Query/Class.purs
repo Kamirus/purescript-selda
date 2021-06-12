@@ -48,7 +48,7 @@ class Monad m <= GenericUpdate b m t r | t → r, b → m where
     → ({ | r } → Col b Boolean)
     → ({ | r } → { | r })
     → m Unit
---
+
 -- | parametrized implementation of `genericInsert`
 genericInsert_
   ∷ ∀ t r a b
