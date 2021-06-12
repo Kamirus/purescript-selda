@@ -233,7 +233,7 @@ query ∷
   ColsToPGHandler B i tup o ⇒
   GetCols i ⇒
   FromSQLRow tup ⇒
-  GenericQuery BackendPGClass m i o ⇒
+  GenericQuery BackendPGClass (Array Foreign) (Either String) m i o ⇒
   FullQuery B { | i } →
   m (Array { | o })
 query q = do
@@ -244,7 +244,7 @@ query q = do
 
 query' ∷
   ∀ o i m.
-  GenericQuery BackendPGClass m i o ⇒
+  GenericQuery BackendPGClass (Array Foreign) (Either String) m i o ⇒
   FullQuery B { | i } →
   (Array Foreign -> Either String { | o }) →
   m (Array { | o })
@@ -255,7 +255,7 @@ query1 ∷
   ColsToPGHandler B i tup o ⇒
   GetCols i ⇒
   FromSQLRow tup ⇒
-  GenericQuery BackendPGClass m i o ⇒
+  GenericQuery BackendPGClass (Array Foreign) (Either String) m i o ⇒
   FullQuery B { | i } →
   m (Maybe { | o })
 query1 (FullQuery q) =
@@ -263,7 +263,7 @@ query1 (FullQuery q) =
 
 query1' ∷
   ∀ o i m.
-  GenericQuery BackendPGClass m i o ⇒
+  GenericQuery BackendPGClass (Array Foreign) (Either String) m i o ⇒
   FullQuery B { | i } →
   (Array Foreign -> Either String { | o }) →
   m (Maybe { | o })
@@ -274,7 +274,7 @@ instance genericQueryPG ∷
   ( GetCols i
   , MonadSeldaPG m
   ) ⇒
-  GenericQuery BackendPGClass m i o where
+  GenericQuery BackendPGClass (Array Foreign) (Either String) m i o where
   genericQuery _ q decodeRow = do
     let { strQuery, params } = showPG $ showQuery q
     conn ← ask

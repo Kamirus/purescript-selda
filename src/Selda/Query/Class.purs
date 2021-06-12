@@ -15,12 +15,12 @@ import Selda.Query.ShowStatement (class GenericShowInsert, genericShowInsert)
 import Selda.Query.Type (FullQuery)
 import Type.Proxy (Proxy)
 
-class GenericQuery ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
-class Monad m <= GenericQuery b m i o | i → o, b → m where
+class GenericQuery ∷ ∀ k. k → Type → (Type -> Type) → (Type → Type) → Row Type → Row Type → Constraint
+class Monad m <= GenericQuery b decodeInput decodeOutput m i o | i → o, b → decodeInput decodeOutput m where
   genericQuery
     ∷ Proxy b
     → FullQuery b { | i }
-    → (Array Foreign -> Either String { | o })
+    → (decodeInput -> decodeOutput { | o })
     → m (Array { | o })
 
 class GenericInsert ∷ ∀ k. k → (Type → Type) → Row Type → Row Type → Constraint
