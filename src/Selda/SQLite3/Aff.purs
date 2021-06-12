@@ -3,6 +3,7 @@ module Selda.SQLite3.Aff where
 import Prelude
 
 import Effect.Aff (Aff)
+import Foreign (Foreign, F)
 import SQLite3 (DBConnection)
 import Selda.Col (class GetCols)
 import Selda.Query.Class (runSelda)
@@ -21,3 +22,13 @@ query
   → FullQuery BackendSQLite3Class { | i }
   → Aff (E (Array { | o }))
 query conn q = runSelda conn $ S.query q
+
+query'
+  ∷ ∀ i o
+  . GetCols i
+  ⇒ MapR UnCol_ i o
+  ⇒ DBConnection
+  → FullQuery BackendSQLite3Class { | i }
+  → (Foreign → F { | o })
+  → Aff (E (Array { | o }))
+query' conn q decodeRow = runSelda conn $ S.query' q decodeRow
