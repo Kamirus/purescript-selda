@@ -4,8 +4,8 @@ services:
   db:
     image: postgres:12.5
     environment:
-      POSTGRES_DB: purspg
-      POSTGRES_USER: init
-      POSTGRES_PASSWORD: qwerty
+      POSTGRES_DB: $PG_DB
+      POSTGRES_USER: $PG_USER
+      POSTGRES_PASSWORD: $PG_PASSWORD
     ports:
-      - 5432:5432
+      - $PG_PORT:5432
