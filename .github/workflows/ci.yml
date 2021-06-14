@@ -21,11 +21,11 @@ jobs:
             .spago
             output
 
-      - name: Start postgres db for PG test
-        run: docker-compose up -d
-
       - name: Setup env
         run: cp .env-ci .env
+
+      - name: Start postgres db for PG test
+        run: docker-compose up -d
 
       - run: npm install
       - run: npm run-script lit
