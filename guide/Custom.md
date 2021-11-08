@@ -43,6 +43,7 @@ import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Effect.Class.Console (log, logShow)
 import Foreign (readString, unsafeToForeign)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Guide.SimpleE2E as Guide
 import Selda (Col(..), FullQuery, Table(..), distinct, innerJoin, innerJoin_, lit, notNull, restrict, selectFrom, showQuery, (.==), (.>=))
 import Selda.Col (class GetCols, showCol)
@@ -51,9 +52,6 @@ import Selda.PG (litPG, showPG)
 import Selda.PG.Class (insert_)
 import Selda.PG.Class as PG
 import Selda.Query.Class (runSelda)
-
--- necessary since Global.Unsafe (unsafeStringify) was removed
-foreign import unsafeStringify :: forall a. a -> String
 ```
 ## Before
 

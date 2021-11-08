@@ -15,9 +15,10 @@ import Type.Proxy (Proxy(..))
 
 newtype Col :: forall k. k -> Type -> Type
 newtype Col s a = Col (Expr a)
-derive instance newtypeCol ∷ Newtype (Col s a) _
 
-instance heytingAlgebraCol ∷ HeytingAlgebra (Col s Boolean) where
+derive instance newtypeCol :: Newtype (Col s a) _
+
+instance heytingAlgebraCol :: HeytingAlgebra (Col s Boolean) where
   ff = Col $ ELit $ LBoolean false identity
   tt = Col $ ELit $ LBoolean true identity
   implies a b = not a || b
@@ -25,7 +26,7 @@ instance heytingAlgebraCol ∷ HeytingAlgebra (Col s Boolean) where
   disj = binOp (Or identity identity)
   not (Col e) = Col $ EUnOp $ mkExists $ UnExp (Not identity identity) e
 
-showCol ∷ ∀ s a. Col s a → ShowM
+showCol :: forall s a. Col s a -> ShowM
 showCol = unwrap >>> showExpr
 
 -- | ```purescript
@@ -34,43 +35,46 @@ showCol = unwrap >>> showExpr
 -- | { name ∷ Col s String, id ∷ Col s Int }
 -- | ```
 class ToCols :: forall k. k -> Row Type -> Row Type -> Constraint
-class ToCols s i o | s i → o where
-  toCols ∷ forall proxy. proxy s → { | i } → { | o }
+class ToCols s i o | s i -> o where
+  toCols :: forall proxy. proxy s -> { | i } -> { | o }
 
-instance toColsI ∷ HMap (ToCols_ s) { | i } { | o } ⇒ ToCols s i o where
-  toCols _ = hmap (ToCols_ ∷ ToCols_ s)
+instance toColsI :: HMap (ToCols_ s) { | i } { | o } => ToCols s i o where
+  toCols _ = hmap (ToCols_ :: ToCols_ s)
 
 data ToCols_ :: forall k. k -> Type
 data ToCols_ s = ToCols_
-instance toColsMapping ∷ Mapping (ToCols_ s) (Column a) (Col s a) where
+
+instance toColsMapping :: Mapping (ToCols_ s) (Column a) (Col s a) where
   mapping _ col = Col $ EColumn col
 
 -- | For record { n1 ∷ Col s String, n2 ∷ Col s String, id ∷ Col s Int }
 -- | → [(id, Expr Int), (n1, Expr String), (n2, Expr String)]
 -- | → [(id, Exists Expr), (n1, Exists Expr), (n2, Exists Expr)]
 class GetCols r where
-  getCols ∷ { | r } → Array (Tuple Alias (Exists Expr))
-instance getcols 
-    ∷ HFoldlWithIndex ExtractCols 
-      (Array (Tuple String (Exists Expr)))
-      { | r }
-      (Array (Tuple String (Exists Expr))) 
-    ⇒ GetCols r
+  getCols :: { | r } -> Array (Tuple Alias (Exists Expr))
+
+instance getcols ::
+  HFoldlWithIndex ExtractCols
+    (Array (Tuple String (Exists Expr)))
+    { | r }
+    (Array (Tuple String (Exists Expr))) =>
+  GetCols r
   where
-  getCols r = hfoldlWithIndex ExtractCols ([] ∷ Array (Tuple String (Exists Expr))) r
+  getCols r = hfoldlWithIndex ExtractCols ([] :: Array (Tuple String (Exists Expr))) r
 
 data ExtractCols = ExtractCols
-instance extractcols
-    ∷ IsSymbol sym
-    ⇒ FoldingWithIndex ExtractCols (Proxy sym)
-      (Array (Tuple String (Exists Expr)))
-      (Col s a) 
-      (Array (Tuple String (Exists Expr)))
+
+instance extractcols ::
+  IsSymbol sym =>
+  FoldingWithIndex ExtractCols
+    (Proxy sym)
+    (Array (Tuple String (Exists Expr)))
+    (Col s a)
+    (Array (Tuple String (Exists Expr)))
   where
   foldingWithIndex ExtractCols _ acc (Col e) =
-    Tuple (reflectSymbol (Proxy ∷ Proxy sym)) (mkExists e) : acc
+    Tuple (reflectSymbol (Proxy :: Proxy sym)) (mkExists e) : acc
 
-binOp ∷ ∀ s o i. BinOp i o → Col s i → Col s i → Col s o
+binOp :: forall s o i. BinOp i o -> Col s i -> Col s i -> Col s o
 binOp op (Col e1) (Col e2) = Col $ EBinOp $ mkExists $ BinExp op e1 e2
-
 

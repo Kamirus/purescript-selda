@@ -1,14 +1,15 @@
 module Test.PG where
 
 import Prelude
-
 import Data.Date (Date, canonicalDate)
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Database.PostgreSQL (Connection)
 import Database.PostgreSQL as PostgreSQL
+import Database.PostgreSQL.Aff as PostgreSQL.Aff
 import Effect.Aff (Aff)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Partial.Unsafe (unsafePartial)
 import Selda (Col, Table(..), lit, restrict, selectFrom, showUpdate, (.==), (.>))
 import Selda.PG (extract, generateSeries, litPG, showPGQuery)
@@ -18,7 +19,7 @@ import Test.Common (bankAccounts, descriptions, legacySuite, people)
 import Test.Selda.PG.Config (load) as Config
 import Test.Types (AccountType(..))
 import Test.Unit (TestSuite, failure, suite, test)
-import Test.Utils (PGSelda, TestCtx, assertEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG, unsafeStringify)
+import Test.Utils (PGSelda, TestCtx, assertEq, assertUnorderedSeqEq, runSeldaAff, testWith, testWithPG)
 
 employees ∷
   Table
@@ -56,8 +57,7 @@ testSuite ∷
 testSuite ctx = do
   let
     unordered = assertUnorderedSeqEq
-    -- ordered = assertSeqEq
-
+  -- ordered = assertSeqEq
   testWith ctx unordered "employees inserted with default and without salary"
     [ { id: 1, name: "E1", salary: 123, date: date 2000 10 20 }
     , { id: 2, name: "E2", salary: 500, date: date 2000 11 21 }
@@ -67,9 +67,9 @@ testSuite ctx = do
         restrict $ not $ r.date .> (litPG $ date 2000 11 21)
         pure r
   testWith ctx unordered "extract month from employees"
-    [ { y: 2000, m: 10, d: 20 }
-    , { y: 2000, m: 11, d: 21 }
-    , { y: 2000, m: 12, d: 22 }
+    [ { y: "2000", m: "10", d: "20" }
+    , { y: "2000", m: "11", d: "21" }
+    , { y: "2000", m: "12", d: "22" }
     ]
     $ selectFrom employees \r → do
         let
@@ -91,21 +91,21 @@ testSuite ctx = do
     , { i: 5 }
     ]
     $ selectFrom (generateSeries 3 5) pure
-    
   test "Generated UPDATE does not include unchanged columns" do
-    assertEq """UPDATE people SET "name" = 'name' WHERE ("id" = 7)""" $
-      showPGQuery $ showUpdate people
-        (\r → r.id .== lit 7)
-        (\r → r { name = lit "name" })
+    assertEq """UPDATE people SET "name" = 'name' WHERE ("id" = 7)"""
+      $ showPGQuery
+      $ showUpdate people
+          (\r → r.id .== lit 7)
+          (\r → r { name = lit "name" })
 
 main ∷ (TestSuite → Aff Unit) → Aff Unit
 main cont = do
   pool ← Config.load
-  PostgreSQL.withConnection pool case _ of
+  PostgreSQL.Aff.withConnection pool case _ of
     Left pgError → failure ("PostgreSQL connection error: " <> unsafeStringify pgError)
     Right conn → do
       createdb ←
-        PostgreSQL.execute conn
+        PostgreSQL.Aff.execute conn
           ( PostgreSQL.Query
               """
         DROP TABLE IF EXISTS people;
@@ -192,7 +192,6 @@ main cont = do
         update employees
           (\r → r.name .== lit "E1")
           (\r → r { salary = lit 123 })
-
         insert_ qualifiedTableWithSchema
           [ { name: "s1" }
           , { name: "s2" }
@@ -224,7 +223,6 @@ main cont = do
           (\r → r { "end" = lit 2 })
         deleteFrom pgKeywordTable_quote
           (\r → r."end" .== lit 2)
-
       -- test empty insert,update won't break
       runSeldaAff conn do
         _ ← insert people ([] ∷ Array { id ∷ Int, name ∷ String, age ∷ Maybe Int })

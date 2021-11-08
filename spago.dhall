@@ -22,6 +22,7 @@ You can edit this file as you like.
   , "foreign"
   , "foreign-object"
   , "heterogeneous"
+  , "js-unsafe-stringify"
   , "leibniz"
   , "lists"
   , "maybe"

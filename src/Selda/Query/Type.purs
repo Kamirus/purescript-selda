@@ -39,49 +39,53 @@ data QBinOp
 -- WHERE components in `restricts`
 -- SELECT components in `cols`, list of `Expr a`, where type `a` is irrelevant
 -- `nextId` provides fresh identifiers
-type GenState_ = 
-  { source ∷ Source
-  , restricts ∷ Array (Expr Boolean)
-  , havings ∷ Array (Expr Boolean)
-  , nextId ∷ Int
-  , cols ∷ Array (Tuple Alias (Exists Expr))
-  , aggr ∷ Array (Exists Expr)
-  , order ∷ Array (Tuple Order (Exists Expr))
-  , limit ∷ Maybe Int
-  , offset ∷ Maybe Int
-  , distinct ∷ Boolean
+type GenState_ =
+  { source :: Source
+  , restricts :: Array (Expr Boolean)
+  , havings :: Array (Expr Boolean)
+  , nextId :: Int
+  , cols :: Array (Tuple Alias (Exists Expr))
+  , aggr :: Array (Exists Expr)
+  , order :: Array (Tuple Order (Exists Expr))
+  , limit :: Maybe Int
+  , offset :: Maybe Int
+  , distinct :: Boolean
   }
+
 newtype GenState = GenState GenState_
-derive instance newtypeGenState ∷ Newtype GenState _
+
+derive instance newtypeGenState :: Newtype GenState _
 
 -- | Represents an intermediate query state.
 -- | Before being wrapped with FullQuery this state represents SQL query without
 -- | FROM component, but having every other including JOIN[s]
 newtype Query :: forall k. k -> Type -> Type
 newtype Query s a = Query (State GenState a)
-derive instance newtypeQuery ∷ Newtype (Query s a) _
-derive newtype instance functorQuery ∷ Functor (Query s)
-derive newtype instance applyQuery ∷ Apply (Query s)
-derive newtype instance applicativeQuery ∷ Applicative (Query s)
-derive newtype instance bindQuery ∷ Bind (Query s)
-derive newtype instance monadQuery ∷ Monad (Query s)
-derive newtype instance stateQuery ∷ MonadState GenState (Query s)
+
+derive instance newtypeQuery :: Newtype (Query s a) _
+derive newtype instance functorQuery :: Functor (Query s)
+derive newtype instance applyQuery :: Apply (Query s)
+derive newtype instance applicativeQuery :: Applicative (Query s)
+derive newtype instance bindQuery :: Bind (Query s)
+derive newtype instance monadQuery :: Monad (Query s)
+derive newtype instance stateQuery :: MonadState GenState (Query s)
 
 -- | wrapper for query that is ready for SQL generation
 newtype FullQuery :: forall k. k -> Type -> Type
 newtype FullQuery s a = FullQuery (Query s a)
-derive instance newtypeFullQuery ∷ Newtype (FullQuery s a) _
-derive newtype instance functorFullQuery ∷ Functor (FullQuery s)
-derive newtype instance applyFullQuery ∷ Apply (FullQuery s)
-derive newtype instance applicativeFullQuery ∷ Applicative (FullQuery s)
-derive newtype instance bindFullQuery ∷ Bind (FullQuery s)
-derive newtype instance monadFullQuery ∷ Monad (FullQuery s)
+
+derive instance newtypeFullQuery :: Newtype (FullQuery s a) _
+derive newtype instance functorFullQuery :: Functor (FullQuery s)
+derive newtype instance applyFullQuery :: Apply (FullQuery s)
+derive newtype instance applicativeFullQuery :: Applicative (FullQuery s)
+derive newtype instance bindFullQuery :: Bind (FullQuery s)
+derive newtype instance monadFullQuery :: Monad (FullQuery s)
 
 data Order = Asc | Desc
 
-initState ∷ GenState
+initState :: GenState
 initState = GenState
-  { source: (unsafeCoerce unit ∷ Source)
+  { source: (unsafeCoerce unit :: Source)
   , restricts: []
   , havings: []
   , nextId: 0
@@ -93,25 +97,25 @@ initState = GenState
   , distinct: false
   }
 
-get ∷ ∀ s. Query s GenState_
+get :: forall s. Query s GenState_
 get = unwrap <$> State.get
 
-put ∷ ∀ s. GenState_ → Query s Unit
+put :: forall s. GenState_ -> Query s Unit
 put = State.put <<< wrap
 
-modify_ ∷ ∀ s. (GenState_ → GenState_) → Query s Unit
+modify_ :: forall s. (GenState_ -> GenState_) -> Query s Unit
 modify_ f = do
-  st ← get
+  st <- get
   put $ f st
 
-freshId ∷ ∀ s. Query s Int
+freshId :: forall s. Query s Int
 freshId = do
-  st ← get
+  st <- get
   put $ st { nextId = st.nextId + 1 }
   pure st.nextId
 
-runQuery ∷ ∀ a s. Query s a → Tuple a GenState
+runQuery :: forall a s. Query s a -> Tuple a GenState
 runQuery (Query st) = runState st initState
 
-runFullQuery ∷ ∀ a s. FullQuery s a → Tuple a GenState
+runFullQuery :: forall a s. FullQuery s a -> Tuple a GenState
 runFullQuery = unwrap >>> runQuery

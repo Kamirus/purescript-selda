@@ -35,91 +35,107 @@ type B = BackendSQLite3Class
 
 data BackendSQLite3Class
 
-class 
+class
   ( MonadSelda m (NonEmptyList ForeignError) DBConnection
-  ) <= MonadSeldaSQLite3 m
+  ) <=
+  MonadSeldaSQLite3 m
 
-instance monadSeldaSQLite3Instance
-  ∷ MonadSelda m MultipleErrors DBConnection
-  ⇒ MonadSeldaSQLite3 m
+instance monadSeldaSQLite3Instance ::
+  MonadSelda m MultipleErrors DBConnection =>
+  MonadSeldaSQLite3 m
 
 query
-  ∷ ∀ m i o
-  . GenericQuery BackendSQLite3Class m i o
-  ⇒ FullQuery B { | i } → m (Array { | o })
-query = genericQuery (Proxy ∷ Proxy BackendSQLite3Class)
+  :: forall m i o
+   . GenericQuery BackendSQLite3Class m i o
+  => FullQuery B { | i }
+  -> m (Array { | o })
+query = genericQuery (Proxy :: Proxy BackendSQLite3Class)
 
 query1
-  ∷ ∀ m i o
-  . GenericQuery BackendSQLite3Class m i o
-  ⇒ FullQuery B { | i } → m (Maybe { | o })
+  :: forall m i o
+   . GenericQuery BackendSQLite3Class m i o
+  => FullQuery B { | i }
+  -> m (Maybe { | o })
 query1 q = query q <#> Array.head
 
-instance genericQuerySQLite3
-    ∷ ( MonadSeldaSQLite3 m
-      , ReadForeign { | o }
-      , MapR UnCol_ i o
-      , GetCols i
-      ) ⇒ GenericQuery BackendSQLite3Class m i o
+instance genericQuerySQLite3 ::
+  ( MonadSeldaSQLite3 m
+  , ReadForeign { | o }
+  , MapR UnCol_ i o
+  , GetCols i
+  ) =>
+  GenericQuery BackendSQLite3Class m i o
   where
   genericQuery _ q = do
-    rows ← execSQLite3 # showSQLite3_ (showQuery q)
+    rows <- execSQLite3 # showSQLite3_ (showQuery q)
     either throwError pure (read rows)
 
 insert_
-  ∷ ∀ m t r
-  . GenericInsert BackendSQLite3Class m t r
-  ⇒ Table t → Array { | r } → m Unit
-insert_ = genericInsert (Proxy ∷ Proxy BackendSQLite3Class)
+  :: forall m t r
+   . GenericInsert BackendSQLite3Class m t r
+  => Table t
+  -> Array { | r }
+  -> m Unit
+insert_ = genericInsert (Proxy :: Proxy BackendSQLite3Class)
 
-instance sqlite3ToForeign ∷ WriteForeign a ⇒ ToForeign BackendSQLite3Class a where
+instance sqlite3ToForeign :: WriteForeign a => ToForeign BackendSQLite3Class a where
   toForeign _ = write
 
-instance genericInsertSQLite3
-    ∷ ( HFoldl (RecordToArrayForeign BackendSQLite3Class)
-          (Array Foreign) { | r } (Array Foreign)
-      , MonadSeldaSQLite3 m
-      , GenericShowInsert t r
-      ) ⇒ GenericInsert BackendSQLite3Class m t r
+instance genericInsertSQLite3 ::
+  ( HFoldl (RecordToArrayForeign BackendSQLite3Class)
+      (Array Foreign)
+      { | r }
+      (Array Foreign)
+  , MonadSeldaSQLite3 m
+  , GenericShowInsert t r
+  ) =>
+  GenericInsert BackendSQLite3Class m t r
   where
   genericInsert proxy table l = when (not $ null l) do
     genericInsert_ { exec: execSQLite3_, ph: "?" } proxy table l
 
 deleteFrom
-  ∷ ∀ t r m
-  . GenericDelete BackendSQLite3Class m t r
-  ⇒ Table t → ({ | r } → Col B Boolean) → m Unit
-deleteFrom = genericDelete (Proxy ∷ Proxy BackendSQLite3Class)
+  :: forall t r m
+   . GenericDelete BackendSQLite3Class m t r
+  => Table t
+  -> ({ | r } -> Col B Boolean)
+  -> m Unit
+deleteFrom = genericDelete (Proxy :: Proxy BackendSQLite3Class)
 
-instance genericDeleteSQLite3
-    ∷ ( TableToColsWithoutAlias B t r
-      , MonadSeldaSQLite3 m
-      ) ⇒ GenericDelete BackendSQLite3Class m t r
+instance genericDeleteSQLite3 ::
+  ( TableToColsWithoutAlias B t r
+  , MonadSeldaSQLite3 m
+  ) =>
+  GenericDelete BackendSQLite3Class m t r
   where
   genericDelete _ table pred =
     execSQLite3_ # showSQLite3_ (showDeleteFrom table pred)
 
 update
-  ∷ ∀ t r m
-  . GenericUpdate BackendSQLite3Class m t r
-  ⇒ Table t → ({ | r } → Col B Boolean) → ({ | r } → { | r }) → m Unit
-update = genericUpdate (Proxy ∷ Proxy BackendSQLite3Class)
+  :: forall t r m
+   . GenericUpdate BackendSQLite3Class m t r
+  => Table t
+  -> ({ | r } -> Col B Boolean)
+  -> ({ | r } -> { | r })
+  -> m Unit
+update = genericUpdate (Proxy :: Proxy BackendSQLite3Class)
 
-instance genericUpdateSQLite3
-    ∷ ( TableToColsWithoutAlias B t r
-      , GetCols r
-      , MonadSeldaSQLite3 m
-      ) ⇒ GenericUpdate BackendSQLite3Class m t r
+instance genericUpdateSQLite3 ::
+  ( TableToColsWithoutAlias B t r
+  , GetCols r
+  , MonadSeldaSQLite3 m
+  ) =>
+  GenericUpdate BackendSQLite3Class m t r
   where
   genericUpdate _ table pred up =
     execSQLite3_ # showSQLite3_ (showUpdate table pred up)
 
 -- | Utility function to execute a given query (as String) with parameters
-execSQLite3 ∷ ∀ m. MonadSeldaSQLite3 m ⇒ String → Array Foreign → m Foreign
+execSQLite3 :: forall m. MonadSeldaSQLite3 m => String -> Array Foreign -> m Foreign
 execSQLite3 q params = do
-  conn ← ask
+  conn <- ask
   liftAff $ queryDB conn q params
 
 -- | Utility function to execute a given query (as String) with parameters and discard the result
-execSQLite3_ ∷ ∀ m. MonadSeldaSQLite3 m ⇒ String → Array Foreign → m Unit
+execSQLite3_ :: forall m. MonadSeldaSQLite3 m => String -> Array Foreign -> m Unit
 execSQLite3_ q l = when (q /= "") $ void $ execSQLite3 q l

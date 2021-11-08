@@ -2,7 +2,7 @@ version: "3"
 
 services:
   db:
-    image: postgres:12.5
+    image: postgres:14.6
     environment:
       POSTGRES_DB: $PG_DB
       POSTGRES_USER: $PG_USER

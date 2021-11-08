@@ -32,6 +32,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Variant (Variant, inj)
 import Database.PostgreSQL (PGError)
 import Database.PostgreSQL as PostgreSQL
+import Database.PostgreSQL.Aff as PostgreSQL.Aff
 import Effect (Effect)
 import Effect.Aff (Aff, error, launchAff_)
 import Effect.Aff as Aff
@@ -84,7 +85,7 @@ To do so we define an auxiliary function `execute` that takes the SQL string lit
 ```purescript
 execute ∷ String → PostgreSQL.Connection → Aff Unit
 execute sql conn = do
-  PostgreSQL.execute conn (PostgreSQL.Query sql) PostgreSQL.Row0
+  PostgreSQL.Aff.execute' conn (PostgreSQL.Query sql)
     >>= maybe (pure unit) (throwError <<< error <<< show)
 ```
 
@@ -453,7 +454,7 @@ launchWithConnectionPG ∷ (PostgreSQL.Connection → Aff Unit) → Effect Unit
 launchWithConnectionPG m = do
   launchAff_ do
     pool ← Config.load
-    PostgreSQL.withConnection pool case _ of
+    PostgreSQL.Aff.withConnection pool case _ of
       Left pgError → logShow ("PostgreSQL connection error: " <> show pgError)
       Right conn → do
 ```

@@ -14,16 +14,18 @@ data Inner :: forall k. k -> Type
 data Inner s
 
 data OuterCols = OuterCols
-instance failOuterCols
-    ∷ Fail (Text "Error in the nested query: column \""
+
+instance failOuterCols ::
+  Fail
+    ( Text "Error in the nested query: column \""
         <:> Text sym
-        <:> Text "\" has type `Aggr`, but `Col` was expected.")
-    ⇒ MappingWithIndex OuterCols (Proxy sym) (Aggr s a) c
+        <:> Text "\" has type `Aggr`, but `Col` was expected."
+    ) =>
+  MappingWithIndex OuterCols (Proxy sym) (Aggr s a) c
   where
   mappingWithIndex _ _ _ = unsafeCoerce "failed with error message"
-else instance outercolsInstance
-    ∷ MappingWithIndex OuterCols (Proxy sym) (Col (Inner s) a) (Col s a)
+else instance outercolsInstance :: MappingWithIndex OuterCols (Proxy sym) (Col (Inner s) a) (Col s a)
   where
   mappingWithIndex _ _ (Col e) = Col e
-  
+
 infixl 4 type Beside as <:>
