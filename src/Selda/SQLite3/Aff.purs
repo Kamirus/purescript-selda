@@ -13,11 +13,11 @@ import Selda.SQLite3.Class as S
 import Simple.JSON (class ReadForeign, E)
 
 query
-  ∷ ∀ i o
-  . GetCols i
-  ⇒ MapR UnCol_ i o
-  ⇒ ReadForeign { | o }
-  ⇒ DBConnection
-  → FullQuery BackendSQLite3Class { | i }
-  → Aff (E (Array { | o }))
+  :: forall i o
+   . GetCols i
+  => MapR UnCol_ i o
+  => ReadForeign { | o }
+  => DBConnection
+  -> FullQuery BackendSQLite3Class { | i }
+  -> Aff (E (Array { | o }))
 query conn q = runSelda conn $ S.query q

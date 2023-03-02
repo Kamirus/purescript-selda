@@ -14,6 +14,7 @@ import Effect.Aff (Aff, catchError, throwError)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign (ForeignError, MultipleErrors, renderForeignError)
+import JS.Unsafe.Stringify (unsafeStringify)
 import SQLite3 (DBConnection)
 import Selda (FullQuery, showQuery)
 import Selda.Col (class GetCols)
@@ -204,4 +205,3 @@ assertEq ∷ ∀ a. Show a ⇒ Eq a ⇒ a → a → Aff Unit
 assertEq x y = assert msg $ x == y
   where msg = show x <> " != " <> show y
 
-foreign import unsafeStringify :: forall a. a -> String

@@ -18,38 +18,39 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- | Lift a value `a` to a column expression using `Lit s a` typeclass.
 lit
-  ∷ ∀ col s a
-  . Lit s a
-  ⇒ Coerce col
-  ⇒ a → col s a
+  :: forall col s a
+   . Lit s a
+  => Coerce col
+  => a
+  -> col s a
 lit = unsafeFromCol <<< litImpl
 
-class Lit ∷ ∀ k. k → Type → Constraint
+class Lit :: forall k. k -> Type -> Constraint
 class Lit s a where
-  litImpl ∷ a → Col s a
+  litImpl :: a -> Col s a
 
-instance litBoolean ∷ Lit b Boolean where
+instance litBoolean :: Lit b Boolean where
   litImpl x = Col $ ELit $ LBoolean x identity
 
-else instance litString ∷ Lit b String where
+else instance litString :: Lit b String where
   litImpl x = Col $ ELit $ LString x identity
 
-else instance litInt ∷ Lit b Int where
+else instance litInt :: Lit b Int where
   litImpl x = Col $ ELit $ LInt x identity
 
-else instance litMaybe ∷ Lit b a ⇒ Lit b (Maybe a) where
+else instance litMaybe :: Lit b a => Lit b (Maybe a) where
   litImpl = case _ of
-    Nothing → Col $ ELit $ LNull $ mkExists $ None identity
-    Just l → liftJust $ litImpl l
+    Nothing -> Col $ ELit $ LNull $ mkExists $ None identity
+    Just l -> liftJust $ litImpl l
       where
-        liftJust ∷ Col b a → Col b (Maybe a)
-        liftJust = unsafeCoerce
+      liftJust :: Col b a -> Col b (Maybe a)
+      liftJust = unsafeCoerce
 
-else instance ilitPG ∷ ToSQLValue a ⇒ Lit BackendPGClass a where
+else instance ilitPG :: ToSQLValue a => Lit BackendPGClass a where
   litImpl = litPG
 
-else instance ilitSQLite3 ∷ WriteForeign a ⇒ Lit BackendSQLite3Class a where
+else instance ilitSQLite3 :: WriteForeign a => Lit BackendSQLite3Class a where
   litImpl = litSQLite3
 
-else instance litInner ∷ Lit s a ⇒ Lit (Inner s) a where
-  litImpl a = case (litImpl a ∷ Col s a) of Col e → Col e
+else instance litInner :: Lit s a => Lit (Inner s) a where
+  litImpl a = case (litImpl a :: Col s a) of Col e -> Col e

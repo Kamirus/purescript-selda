@@ -14,35 +14,38 @@ infix 4 exprGe as .>=
 infix 4 exprLe as .<=
 
 exprNeq
-  ∷ ∀ expr a
-  . ExprEq expr ⇒ HeytingAlgebra (expr Boolean)
-  ⇒ expr a → expr a → expr Boolean
+  :: forall expr a
+   . ExprEq expr
+  => HeytingAlgebra (expr Boolean)
+  => expr a
+  -> expr a
+  -> expr Boolean
 exprNeq a b = not $ a .== b
 
 -- | Represents types that can model expressions with equality.
 class ExprEq expr where
-  exprEq ∷ ∀ a. expr a → expr a → expr Boolean
+  exprEq :: forall a. expr a -> expr a -> expr Boolean
 
-instance exprEqCol ∷ ExprEq (Col s) where
+instance exprEqCol :: ExprEq (Col s) where
   exprEq = binOp (Eq identity)
 
-instance exprEqAggr ∷ ExprEq (Aggr s) where
+instance exprEqAggr :: ExprEq (Aggr s) where
   exprEq (Aggr a) (Aggr b) = Aggr $ a .== b
 
 -- | Represents types that model expressions with ordering.
 class ExprEq expr <= ExprOrd expr where
-  exprGt ∷ ∀ a. expr a → expr a → expr Boolean
-  exprGe ∷ ∀ a. expr a → expr a → expr Boolean
-  exprLt ∷ ∀ a. expr a → expr a → expr Boolean
-  exprLe ∷ ∀ a. expr a → expr a → expr Boolean
+  exprGt :: forall a. expr a -> expr a -> expr Boolean
+  exprGe :: forall a. expr a -> expr a -> expr Boolean
+  exprLt :: forall a. expr a -> expr a -> expr Boolean
+  exprLe :: forall a. expr a -> expr a -> expr Boolean
 
-instance exprOrdCol ∷ ExprOrd (Col s) where
+instance exprOrdCol :: ExprOrd (Col s) where
   exprGt = binOp (Gt identity)
   exprGe = binOp (Ge identity)
   exprLt = binOp (Lt identity)
   exprLe = binOp (Le identity)
 
-instance exprOrdAggr ∷ ExprOrd (Aggr s) where
+instance exprOrdAggr :: ExprOrd (Aggr s) where
   exprGt (Aggr a) (Aggr b) = Aggr $ exprGt a b
   exprGe (Aggr a) (Aggr b) = Aggr $ exprGe a b
   exprLt (Aggr a) (Aggr b) = Aggr $ exprLt a b

@@ -15,6 +15,7 @@ import Effect.Aff (Aff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (toUnfoldable) as Object
+import JS.Unsafe.Stringify (unsafeStringify)
 import Node.Process (getEnv)
 import Polyform.Batteries.Env (Env, Validator) as Env
 import Polyform.Batteries.Env (MissingValue)
@@ -22,7 +23,6 @@ import Polyform.Batteries.Env.Validators (optional, required) as Env
 import Polyform.Batteries.Int (IntExpected)
 import Polyform.Batteries.Int (validator) as Int
 import Polyform.Validator (liftFnM, runValidator)
-import Test.Utils (unsafeStringify)
 import Type.Row (type (+))
 
 poolConfiguration ∷

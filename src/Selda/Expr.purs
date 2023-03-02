@@ -52,7 +52,7 @@ data Expr o
   | EBinOp (Exists (BinExp o))
   | EUnOp (Exists (UnExp o))
   | EFn (Exists (Fn o))
-  | EInArray (Exists (InArray o)) 
+  | EInArray (Exists (InArray o))
   | EForeign Foreign
   | Any ShowM
 
@@ -92,107 +92,111 @@ data Fn o i
 
 data InArray o i = InArray (Expr i) (Array (Expr i)) (Boolean ~ o)
 
-primPGEscape ∷ String → String
+primPGEscape :: String -> String
 primPGEscape = toCharArray >>> (_ >>= escape) >>> fromCharArray
   where
-  escape ∷ Char → Array Char
+  escape :: Char -> Array Char
   escape c = case c of
-    '\'' → [c, c]
-    _ → pure c
+    '\'' -> [ c, c ]
+    _ -> pure c
 
 -- | Keeps a list of parameters that will be passed to the backend-specific
 -- | query execution (which takes SQL query as String with placeholders $<int>
 -- | and an array with parameters that correspond to these placeholders)
 type QueryParams =
-  { invertedParams ∷ List Foreign 
-  , nextIndex ∷ Int
+  { invertedParams :: List Foreign
+  , nextIndex :: Int
   }
 
-type ShowMCtx = 
-  { mkPlaceholder ∷ Int → String
+type ShowMCtx =
+  { mkPlaceholder :: Int -> String
   }
 
 -- | Monad for: (Query AST) → (Query String with placeholders, Parameters)
 type ShowM = ReaderT ShowMCtx (State QueryParams) String
 
-runShowM ∷ (Int → String) → Int → ShowM → Tuple String QueryParams
-runShowM mkPlaceholder firstIndex m = 
+runShowM :: (Int -> String) -> Int -> ShowM -> Tuple String QueryParams
+runShowM mkPlaceholder firstIndex m =
   runReaderT m { mkPlaceholder }
     # flip runState { invertedParams: mempty, nextIndex: firstIndex }
 
 showM
-  ∷ String
-  → Int
-  → ShowM
-  → { params ∷ Array Foreign, nextIndex ∷ Int, strQuery ∷ String }
+  :: String
+  -> Int
+  -> ShowM
+  -> { params :: Array Foreign, nextIndex :: Int, strQuery :: String }
 showM ph i m = { params, nextIndex, strQuery }
   where
-    mkPh int = ph <> show int
-    (Tuple strQuery { invertedParams, nextIndex }) = runShowM mkPh i m
-    params = Array.fromFoldable $ List.reverse invertedParams
+  mkPh int = ph <> show int
+  (Tuple strQuery { invertedParams, nextIndex }) = runShowM mkPh i m
+  params = Array.fromFoldable $ List.reverse invertedParams
 
-showForeign ∷ Foreign → ShowM
+showForeign :: Foreign -> ShowM
 showForeign x = do
-  { mkPlaceholder } ← ask
-  s ← get
+  { mkPlaceholder } <- ask
+  s <- get
   put $ s { nextIndex = 1 + s.nextIndex, invertedParams = x : s.invertedParams }
   pure $ mkPlaceholder s.nextIndex
 
-showLiteral ∷ ∀ a. Literal a → String
+showLiteral :: forall a. Literal a -> String
 showLiteral = case _ of
-  LBoolean b _ → show b
-  LString s _ → "'" <> primPGEscape s <> "'"
-  LInt i _ → show i
-  LNull _ → "null"
+  LBoolean b _ -> show b
+  LString s _ -> "'" <> primPGEscape s <> "'"
+  LInt i _ -> show i
+  LNull _ -> "null"
 
-showBinOp ∷ ∀ i o. BinOp i o → String
+showBinOp :: forall i o. BinOp i o -> String
 showBinOp = case _ of
-  Or _ _ → " or "
-  And _ _ → " and "
-  Gt _ → " > "
-  Ge _ → " >= "
-  Lt _ → " < "
-  Le _ → " <= "
-  Eq _ → " = "
+  Or _ _ -> " or "
+  And _ _ -> " and "
+  Gt _ -> " > "
+  Ge _ -> " >= "
+  Lt _ -> " < "
+  Le _ -> " <= "
+  Eq _ -> " = "
 
-showExpr ∷ ∀ a. Expr a → ShowM
+showExpr :: forall a. Expr a -> ShowM
 showExpr = case _ of
-  EColumn col → pure $ showColumn col
-  ELit lit → pure $ showLiteral lit
-  EBinOp e → runExists showBinExp e
-  EUnOp e → runExists showUnExp e
-  EFn fn → runExists showFn fn
-  EInArray e → runExists showInArray e
-  EForeign x → showForeign x
-  Any m → m
+  EColumn col -> pure $ showColumn col
+  ELit lit -> pure $ showLiteral lit
+  EBinOp e -> runExists showBinExp e
+  EUnOp e -> runExists showUnExp e
+  EFn fn -> runExists showFn fn
+  EInArray e -> runExists showInArray e
+  EForeign x -> showForeign x
+  Any m -> m
 
-showBinExp ∷ ∀ o i. BinExp o i → ShowM
+showBinExp :: forall o i. BinExp o i -> ShowM
 showBinExp (BinExp op e1 e2) = do
-  s1 ← showExpr e1
-  s2 ← showExpr e2
+  s1 <- showExpr e1
+  s2 <- showExpr e2
   pure $ "(" <> s1 <> showBinOp op <> s2 <> ")"
 
-showUnExp ∷ ∀ o i. UnExp o i → ShowM
+showUnExp :: forall o i. UnExp o i -> ShowM
 showUnExp (UnExp op e) = do
   let
     ret s = "(" <> s <> ")"
     matchOp s = case op of
-      IsNotNull _ → s <> " IS NOT NULL"
-      IsNull _ → s <> " IS NULL"
-      Not _ _ → "NOT " <> s
+      IsNotNull _ -> s <> " IS NOT NULL"
+      IsNull _ -> s <> " IS NULL"
+      Not _ _ -> "NOT " <> s
   ret <$> matchOp <$> showExpr e
 
-showFn ∷ ∀ o i. Fn o i → ShowM
-showFn fn = 
-  let ret op e = (\s → op <> "(" <> s <> ")") <$> showExpr e in
-  let castToInt s = "CAST(" <> s <> " AS INTEGER)" in
-  case fn of
-    FnMax e _ → ret "MAX" e
-    FnCount e _ → castToInt <$> ret "COUNT" e
-    FnSum e _ → castToInt <$> ret "SUM" e
+showFn :: forall o i. Fn o i -> ShowM
+showFn fn =
+  let
+    ret op e = (\s -> op <> "(" <> s <> ")") <$> showExpr e
+  in
+    let
+      castToInt s = "CAST(" <> s <> " AS INTEGER)"
+    in
+      case fn of
+        FnMax e _ -> ret "MAX" e
+        FnCount e _ -> castToInt <$> ret "COUNT" e
+        FnSum e _ -> castToInt <$> ret "SUM" e
 
-showInArray ∷ ∀ o i. InArray o i → ShowM
+showInArray :: forall o i. InArray o i -> ShowM
 showInArray (InArray x xs _) = do
-  s ← showExpr x
-  ss ← traverse showExpr xs
+  s <- showExpr x
+  ss <- traverse showExpr xs
   pure $ "(" <> s <> " IN (" <> joinWith ", " ss <> "))"
